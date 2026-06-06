@@ -47,12 +47,67 @@ Flutterのマルチプラットフォーム機能を活かしつつ、開発の9
  ├── 📁 ios            # 将来のiOSアプリ化用（キープ）
  ├── 📁 android        # 手元の動作確認・将来のAndroid用（キープ）
  └── 📁 lib            🔥【開発のメイン】あなたがコードを書く場所
-      └── 📄 main.dart  # アプリの起動エントリーポイント
-🏃‍♂️ 開発の進め方 (Getting Started)
-手元でのテスト実行
-Bash
-# プロジェクトフォルダへ移動
-cd book_case
+       └── 📄 main.dart  # アプリの起動エントリーポイント
 
-# Web（Chrome）でデバッグ起動
-flutter run -d chrome
+---
+
+## 🏃‍♂️ 開発の進め方 (Getting Started)
+
+### 1. パッケージの取得
+```bash
+flutter pub get
+```
+
+### 2. データベース環境のセットアップ (ローカル開発環境)
+本プロジェクトは、本番環境 (Supabase Cloud) と開発環境 (ローカルPC) を簡単に分離できるよう設計されています。
+
+#### ① 必要なツールの準備
+* **Docker Desktop**: 起動しておきます
+* **Supabase CLI**: インストールします
+  ```bash
+  brew install supabase/tap/supabase
+  ```
+
+#### ② ローカルSupabaseの起動と初期スキーマ適用
+```bash
+# ローカルSupabaseを起動 (初回はDockerイメージ取得のため数分かかります)
+supabase start
+```
+起動が完了すると、ターミナル上にローカル用の `Project URL` と `anon key` が表示されます。また、`supabase/migrations` に配置した初期スキーマ（シードデータを含む）がローカルDBに自動適用されます。
+* **ローカルDB管理画面 (Studio)**: [http://localhost:54323](http://localhost:54323)
+
+#### ③ ローカル環境で実行
+起動時に取得したローカル用の接続キーを渡して実行します。
+```bash
+flutter run -d chrome \
+  --dart-define=SUPABASE_URL=http://localhost:54321 \
+  --dart-define=SUPABASE_KEY=あなたのローカルanon_key
+```
+*(※ キーを指定せずに起動した場合は、自動的にメモリ内のモックデータベースモードで起動します)*
+
+---
+
+## 🚀 本番への公開 (Production Deployment)
+
+### 1. Supabase Cloudの設定
+1. Supabase Cloudで新規プロジェクトを作成します。
+2. **SQL Editor** を開き、`supabase/schema.sql` の中身をコピー＆ペーストして実行し、スキーマとシードデータを本番DBに作成します。
+
+### 2. Vercelのデプロイ設定
+1. プロジェクトをVercelにインポートし、ダッシュボードの **Project Settings > Environment Variables** から以下の環境変数を設定します。
+   * `SUPABASE_URL`: 本番のSupabase Project URL
+   * `SUPABASE_ANON_KEY`: 本番のanon key
+2. これにより、クローラー検知時の動的レンダリング機能（SEO対策）が完全に有効化されます。
+
+### 3. 本番用ビルド・デバッグ
+```bash
+# 本番DBに繋いだ状態での実行
+flutter run -d chrome \
+  --dart-define=SUPABASE_URL=本番のURL \
+  --dart-define=SUPABASE_KEY=本番のanon_key
+
+# Web向けビルド生成
+flutter build web --release \
+  --dart-define=SUPABASE_URL=本番のURL \
+  --dart-define=SUPABASE_KEY=本番のanon_key
+```
