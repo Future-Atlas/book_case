@@ -17,8 +17,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x' # 使用しているバージョンに合わせて調整
-          channel: 'stable'
+          channel: 'stable' # 💡バージョン指定を外し、常に最新の安定版（stable）を使うようにします
           cache: true
 
       # 3. パッケージのダウンロード
