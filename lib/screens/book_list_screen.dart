@@ -19,24 +19,18 @@ class BookListScreen extends StatefulWidget {
   State<BookListScreen> createState() => _BookListScreenState();
 }
 
-class _BookListScreenState extends State<BookListScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  List<Book> _books = [];
-  List<Post> _timelinePosts = [];
-  bool _isLoading = true;
+  final BookListController _controller = BookListController();
+
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-    _searchController.addListener(_onSearchChanged);
+    _controller.initialize(context);
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
+    _controller.disposeController();
     super.dispose();
   }
 
@@ -160,9 +154,9 @@ class _BookListScreenState extends State<BookListScreen> {
       width: double.infinity,
       color: Theme.of(context).scaffoldBackgroundColor,
       child: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: () => _controller.loadData(context),
         color: const Color(0xFFFF3B30),
-        child: _isLoading
+        child: _controller.isLoading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3B30)))
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -175,7 +169,7 @@ class _BookListScreenState extends State<BookListScreen> {
                     // Search bar
                     _buildSearchBar(),
                     // Filtered Books or Main Sections
-                    if (_searchQuery.isNotEmpty)
+                    if (_controller.searchQuery.isNotEmpty)
                       _buildSearchResults()
                     else ...[
                       // Section 3: Recommended / Latest
@@ -185,10 +179,10 @@ class _BookListScreenState extends State<BookListScreen> {
                       const AdBanner(sectionLabel: 'Section 2'),
                       // Section 4: 洋書
                       _buildSectionHeader('洋書', 'Section 4'),
-                      _buildBookCarousel(_books.where((b) => b.genre == '洋書').toList()),
+                      _buildBookCarousel(_controller.books.where((b) => b.genre == '洋書').toList()),
                       // Section 6: 人気
                       _buildSectionHeader('人気作品', 'Section 6'),
-                      _buildBookCarousel(_books.where((b) => b.genre == '人気').toList()),
+                      _buildBookCarousel(_controller.books.where((b) => b.genre == '人気').toList()),
                       // Section 5: Banner Ad
                       const AdBanner(sectionLabel: 'Section 5'),
                       // Section 5 (Bottom): Timeline
@@ -356,8 +350,8 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchResults() {
-    final lowerQuery = _searchQuery.toLowerCase();
-    final results = _books.where((book) =>
+    final lowerQuery = _controller.searchQuery.toLowerCase();
+    final results = _controller.books.where((book) =>
         book.title.toLowerCase().contains(lowerQuery) ||
         book.author.toLowerCase().contains(lowerQuery) ||
         book.genre.toLowerCase().contains(lowerQuery)
