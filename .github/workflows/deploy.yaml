@@ -28,11 +28,12 @@ jobs:
       - name: Build Web
         run: flutter build web --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      # ✨【ここを追加！】Flutterの完成品をVercelが認識できる専用フォルダに配置する
+      # 完成品をVercelが認識できる専用フォルダに配置する
       - name: Prepare Vercel Output Directory
         run: |
           mkdir -p .vercel/output/static
           cp -r build/web/* .vercel/output/static/
+          echo '{"version":3}' > .vercel/output/config.json # ✨【この1行を追加！】Vercelに必要な設定ファイルを生成
 
       # 5. Vercelのツールをインストール
       - name: Install Vercel CLI
