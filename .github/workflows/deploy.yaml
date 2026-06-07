@@ -31,9 +31,10 @@ jobs:
       # 完成品をVercelが認識できる専用フォルダに配置する
       - name: Prepare Vercel Output Directory
         run: |
+          mkdir -p .vercel/output
+          echo '{"version":3}' > .vercel/output/config.json
           mkdir -p .vercel/output/static
           cp -r build/web/* .vercel/output/static/
-          echo '{"version":3}' > .vercel/output/config.json # ✨【この1行を追加！】Vercelに必要な設定ファイルを生成
 
       # 5. Vercelのツールをインストール
       - name: Install Vercel CLI
