@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
 import 'screens/book_list_screen.dart';
 import 'screens/user_profile_screen.dart';
 
+final supabaseService = SupabaseService();
+
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize SupabaseService. 
-  // Reads credentials if provided via compile-time variables (e.g., flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_KEY=...)
-  // If not provided, it falls back gracefully to internal Mock data.
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseKey = String.fromEnvironment('SUPABASE_KEY');
-  
-  final supabaseService = SupabaseService();
+  await dotenv.load(fileName: '.env');
+
+  // Load Supabase credentials from .env (or fallback to empty strings)
+  final supabaseUrl = dotenv.get('SUPABASE_URL', fallback: '');
+  final supabaseKey = dotenv.get('SUPABASE_ANON_KEY', fallback: '');
+
+  // Initialize Supabase service
   await supabaseService.initialize(url: supabaseUrl, anonKey: supabaseKey);
 
   runApp(

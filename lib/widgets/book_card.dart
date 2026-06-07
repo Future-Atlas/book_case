@@ -4,14 +4,14 @@ import '../models/book.dart';
 class BookCard extends StatefulWidget {
   final Book book;
   final VoidCallback? onTap;
-  final double width;
+  final double? width;
   final double height;
 
   const BookCard({
     super.key,
     required this.book,
     this.onTap,
-    this.width = 130,
+    this.width,
     this.height = 190,
   });
 
@@ -31,7 +31,7 @@ class _BookCardState extends State<BookCard> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          width: widget.width,
+          width: widget.width ?? 130,
           margin: const EdgeInsets.only(right: 16, bottom: 8),
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
@@ -46,13 +46,13 @@ class _BookCardState extends State<BookCard> {
           ),
           transform: Matrix4.identity()..scale(_isHovered ? 1.03 : 1.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Book Cover Image
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 child: SizedBox(
-                  width: widget.width,
+                  width: widget.width ?? 130,
                   height: widget.height * 0.7,
                   child: Hero(
                     tag: 'book-cover-${widget.book.id}',
@@ -83,12 +83,13 @@ class _BookCardState extends State<BookCard> {
                 ),
               ),
               // Book Metadata
-              Expanded(
+              Flexible(
+                fit: FlexFit.loose,
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // Title
                       Text(

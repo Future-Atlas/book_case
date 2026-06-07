@@ -155,61 +155,51 @@ class _BookListScreenState extends State<BookListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Responsive Max Width Container
-    return Center(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 800),
-        color: Theme.of(context).scaffoldBackgroundColor,
-        child: RefreshIndicator(
-          onRefresh: _loadData,
-          color: const Color(0xFFFF3B30),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3B30)))
-              : SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      _buildHeader(),
-
-                      // Search bar
-                      _buildSearchBar(),
-
-                      // Filtered Books or Main Sections
-                      if (_searchQuery.isNotEmpty)
-                        _buildSearchResults()
-                      else ...[
-                        // Section 3: Recommended / Latest
-                        _buildSectionHeader('おすすめの本', 'Section 3'),
-                        _buildBookCarousel(_books),
-
-                        // Section 2: Banner Ad
-                        const AdBanner(sectionLabel: 'Section 2'),
-
-                        // Section 4: 洋書
-                        _buildSectionHeader('洋書', 'Section 4'),
-                        _buildBookCarousel(_books.where((b) => b.genre == '洋書').toList()),
-
-                        // Section 6: 人気
-                        _buildSectionHeader('人気作品', 'Section 6'),
-                        _buildBookCarousel(_books.where((b) => b.genre == '人気').toList()),
-
-                        // Section 5: Banner Ad
-                        const AdBanner(sectionLabel: 'Section 5'),
-
-                        // Section 5 (Bottom): Timeline
-                        _buildSectionHeader('タイムライン', 'Section 5'),
-                        _buildTimeline(),
-                      ],
-
-                      // Footer
-                      _buildFooter(),
+    // Full-width container
+    return Container(
+      width: double.infinity,
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: RefreshIndicator(
+        onRefresh: _loadData,
+        color: const Color(0xFFFF3B30),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3B30)))
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    _buildHeader(),
+                    // Search bar
+                    _buildSearchBar(),
+                    // Filtered Books or Main Sections
+                    if (_searchQuery.isNotEmpty)
+                      _buildSearchResults()
+                    else ...[
+                      // Section 3: Recommended / Latest
+                      _buildSectionHeader('おすすめの本', 'Section 3'),
+                      _buildBookCarousel(_books),
+                      // Section 2: Banner Ad
+                      const AdBanner(sectionLabel: 'Section 2'),
+                      // Section 4: 洋書
+                      _buildSectionHeader('洋書', 'Section 4'),
+                      _buildBookCarousel(_books.where((b) => b.genre == '洋書').toList()),
+                      // Section 6: 人気
+                      _buildSectionHeader('人気作品', 'Section 6'),
+                      _buildBookCarousel(_books.where((b) => b.genre == '人気').toList()),
+                      // Section 5: Banner Ad
+                      const AdBanner(sectionLabel: 'Section 5'),
+                      // Section 5 (Bottom): Timeline
+                      _buildSectionHeader('タイムライン', 'Section 5'),
+                      _buildTimeline(),
                     ],
-                  ),
+                    // Footer
+                    _buildFooter(),
+                  ],
                 ),
-        ),
+              ),
       ),
     );
   }
@@ -261,7 +251,9 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 50,
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
