@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/book.dart';
+import '../data/book.dart';
+import '../repositories/book_repository.dart';
 import '../models/post.dart';
-import '../services/supabase_service.dart';
+
 
 class BookListController extends ChangeNotifier {
   final TextEditingController searchController = TextEditingController();
@@ -29,14 +30,15 @@ class BookListController extends ChangeNotifier {
   Future<void> _loadData(BuildContext context) async {
     isLoading = true;
     notifyListeners();
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    final fetchedBooks = await service.fetchBooks();
-    final fetchedTimeline = await service.fetchTimelinePosts();
-    books = fetchedBooks;
-    timelinePosts = fetchedTimeline;
+    final repository = BookRepository();
+    // Load all books (empty query fetches default set)
+    books = await repository.fetchAllBooks();
+    // Timeline posts are not fetched from API yet; keep empty list
+    timelinePosts = [];
     isLoading = false;
     notifyListeners();
   }
 
-  Future<void> loadData(BuildContext context) async => _loadData(context);
+  // Retained for compatibility; calls internal load method
+Future<void> loadData(BuildContext context) async => _loadData(context);
 }
