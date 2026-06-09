@@ -1,48 +1,55 @@
 name: Deploy Flutter Web to Vercel
 
 on:
-  push:
-    branches:
-      - main # mainブランチにPushされたら自動起動
+    push:
+        branches:
+            - main # mainブランチにPushされたら自動起動
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      # 1. コードのチェックアウト
-      - name: Checkout code
-        uses: actions/checkout@v4
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            # 1. コードのチェックアウト
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      # 2. Flutterの道具箱をセットアップ（GitHubの超強力サーバーを使用）
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable' # 💡バージョン指定を外し、常に最新の安定版（stable）を使うようにします
-          cache: true
+            # 2. Flutterの道具箱をセットアップ（GitHubの超強力サーバーを使用）
+            - name: Setup Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                  channel: "stable" # 💡バージョン指定を外し、常に最新の安定版（stable）を使うようにします
+                  cache: true
 
-      # 3. パッケージのダウンロード
-      - name: Install dependencies
-        run: flutter pub get
+            # 3. パッケージのダウンロード
+            - name: Install dependencies
+              run: flutter pub get
 
-      # 4. Webアプリの組み立て（GitHub側なのでメモリ制限なし！）
-      - name: Build Web
-        run: flutter build web --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            # 4. Webアプリの組み立て（GitHub側なのでメモリ制限なし！）
+            - name: Build Flutter Web
+              run: |
+                  flutter build web --release \
+                    --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+                    --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+                    --dart-define=RAKUTEN_APP_ID=${{ secrets.RAKUTEN_APP_ID }} \
+                    --dart-define=RAKUTEN_ACCESS_KEY=${{ secrets.RAKUTEN_ACCESS_KEY }}
 
-      # 完成品をVercelが認識できる専用フォルダに配置する
-      - name: Prepare Vercel Output Directory
-        run: |
-          mkdir -p .vercel/output
-          echo '{"version":3}' > .vercel/output/config.json
-          mkdir -p .vercel/output/static
-          cp -r build/web/* .vercel/output/static/
+            # (後略: Vercelへのデプロイステップ)
 
-      # 5. Vercelのツールをインストール
-      - name: Install Vercel CLI
-        run: npm install --global vercel
+            # 完成品をVercelが認識できる専用フォルダに配置する
+            - name: Prepare Vercel Output Directory
+              run: |
+                  mkdir -p .vercel/output
+                  echo '{"version":3}' > .vercel/output/config.json
+                  mkdir -p .vercel/output/static
+                  cp -r build/web/* .vercel/output/static/
 
-      # 6. 完成品だけをVercelに直接送りつけて公開！
-      - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+            # 5. Vercelのツールをインストール
+            - name: Install Vercel CLI
+              run: npm install --global vercel
+
+            # 6. 完成品だけをVercelに直接送りつけて公開！
+            - name: Deploy to Vercel
+              run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+              env:
+                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
