@@ -87,10 +87,6 @@ class RakutenApi {
         final isbn = bookData['isbn'] as String? ?? '';
 
         String coverUrl = bookData['largeImageUrl'] as String? ?? '';
-        if (coverUrl.isNotEmpty) {
-          coverUrl =
-              'https://images.weserv.nl/?url=${Uri.encodeComponent(coverUrl)}';
-        }
 
         final description = bookData['itemCaption'] as String? ?? '';
         final itemUrl = bookData['itemUrl'] as String? ?? '';
