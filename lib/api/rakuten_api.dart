@@ -8,7 +8,6 @@ class RakutenApi {
   static const String _baseUrl =
       'https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404';
 
-  // env.json / GitHub Secrets から最新のUUID形式キーをロード
   static const String _appId = String.fromEnvironment('RAKUTEN_APP_ID');
   static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
 
@@ -17,7 +16,6 @@ class RakutenApi {
     int page = 1,
     int count = 10,
   }) async {
-    // どちらか片方でも欠けていたら新APIは400エラーになるため即終了
     if (_appId.isEmpty || _accessKey.isEmpty) {
       print('💡 [RakutenApi] 新APIキー（ID/AccessKey）が未設定のため通信をスキップします。');
       return [];
@@ -36,7 +34,11 @@ class RakutenApi {
       genreId = '001006';
     } else if (selectedGenre.contains('English') ||
         selectedGenre.contains('洋書')) {
-      genreId = '005'; // 洋書ルート
+      // 🛠️【修正ポイント1：400エラー対策】
+      // 新APIでは '005' のような3桁ジャンルを指定するとバリデーションで400エラーになります。
+      // そのためジャンルIDはあえて空文字にし、キーワード検索として安全に処理させます。
+      genreId = '';
+      keyword = 'English';
     } else if (selectedGenre.contains('ベストセラー') ||
         selectedGenre.contains('人気')) {
       keyword = 'ベストセラー';
@@ -92,11 +94,12 @@ class RakutenApi {
         final pubDate = bookData['salesDate'] as String? ?? '';
         final isbn = bookData['isbn'] as String? ?? '';
 
-        // 🖼️ 修正ポイント：ここは文字列（String）の加工だけを行う！
+        // 🖼️【修正ポイント2：403エラー対策】
+        // corsproxy.io が制限により403エラーを返すため、画像専用の極めて安定した国際プロキシ(images.weserv.nl)に切り替えます。
         String coverUrl = bookData['largeImageUrl'] as String? ?? '';
         if (coverUrl.isNotEmpty) {
-          // CORSを回避する魔法の言葉をURLの先頭にくっつける
-          coverUrl = 'https://corsproxy.io/?${Uri.encodeComponent(coverUrl)}';
+          coverUrl =
+              'https://images.weserv.nl/?url=${Uri.encodeComponent(coverUrl)}';
         }
 
         final description = bookData['itemCaption'] as String? ?? '';
@@ -112,7 +115,7 @@ class RakutenApi {
             publisher: publisher,
             pubDate: pubDate,
             isbn: isbn,
-            coverUrl: coverUrl, // 安全になったURL文字列を渡す
+            coverUrl: coverUrl,
             genre: selectedGenre,
             description: description,
           ),
