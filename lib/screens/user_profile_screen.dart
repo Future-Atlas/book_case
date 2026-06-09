@@ -10,16 +10,14 @@ import '../widgets/book_card.dart';
 class UserProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
 
-  const UserProfileScreen({
-    super.key,
-    required this.onBack,
-  });
+  const UserProfileScreen({super.key, required this.onBack});
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfileScreenState extends State<UserProfileScreen> with SingleTickerProviderStateMixin {
+class _UserProfileScreenState extends State<UserProfileScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   UserProfile? _profile;
   List<Post> _userPosts = [];
@@ -43,7 +41,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final uid = service.activeProfileId;
+
+    // ⭕ 認証を実装するまでの間、指定のダミーUUIDを直接使用して通信します
+    const uid = 'd3b07384-d113-4ec5-a587-f3e098a58f4a';
 
     final profile = await service.fetchUserProfile(uid);
     final posts = await service.fetchUserPosts(uid);
@@ -73,12 +73,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
         ),
         title: const Text(
           'マイプロフィール',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
         centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3B30)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
+            )
+          : _profile == null
+          ? const Center(child: Text('プロフィールの読み込みに失敗しました。')) // ⭕ データ未取得時の安全ガード
           : Center(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 800),
@@ -87,7 +95,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                   children: [
                     // Profile Header Card
                     _buildProfileHeader(),
-                    
+
                     const SizedBox(height: 16),
 
                     // Custom Tab Bar with premium design
@@ -146,7 +154,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                       : null,
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Name and Stats
                 Expanded(
                   child: Column(
@@ -161,8 +169,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                         ),
                       ),
                       const SizedBox(height: 2),
+                      // ⭕ 文字数が足りない場合の RangeError 回避
                       Text(
-                        '@${_profile!.id.substring(0, 8)}',
+                        _profile!.id.length >= 8
+                            ? '@${_profile!.id.substring(0, 8)}'
+                            : '@${_profile!.id}',
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey[400],
@@ -170,7 +181,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                         ),
                       ),
                       const SizedBox(height: 12),
-                      
+
                       // Stat counters row
                       Container(
                         padding: const EdgeInsets.all(8),
@@ -181,9 +192,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildStatColumn('読了', _profile!.readCount.toString()),
-                            _buildStatColumn('フォロワー', _profile!.followersCount.toString()),
-                            _buildStatColumn('フォロー', _profile!.followingCount.toString()),
+                            _buildStatColumn(
+                              '読了',
+                              _profile!.readCount.toString(),
+                            ),
+                            _buildStatColumn(
+                              'フォロワー',
+                              _profile!.followersCount.toString(),
+                            ),
+                            _buildStatColumn(
+                              'フォロー',
+                              _profile!.followingCount.toString(),
+                            ),
                           ],
                         ),
                       ),
@@ -192,9 +212,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Bio comment box
             Container(
               width: double.infinity,
@@ -209,11 +229,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
                 children: [
                   const Text(
                     '自己紹介',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません。',
+                    _profile!.bio.isNotEmpty
+                        ? _profile!.bio
+                        : '自己紹介はまだ登録されていません。',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[850],
@@ -241,13 +267,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[500],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
       ],
     );
   }
@@ -269,7 +289,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
         labelColor: Colors.white,
         unselectedLabelColor: Colors.grey[600],
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
         tabs: const [
           Tab(text: '投稿'),
           Tab(text: 'コレクション'),
@@ -310,11 +333,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with SingleTicker
       itemCount: booksList.length,
       itemBuilder: (context, index) {
         final book = booksList[index];
-        return BookCard(
-          book: book,
-          width: double.infinity,
-          height: 140,
-        );
+        return BookCard(book: book, width: double.infinity, height: 140);
       },
     );
   }
