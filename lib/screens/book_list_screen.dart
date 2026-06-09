@@ -1,66 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
-import '../models/book.dart';
 import '../models/post.dart';
 import '../widgets/book_card.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/post_card.dart';
+import '../controllers/book_list_controller.dart';
+import '../models/book.dart';
 
 class BookListScreen extends StatefulWidget {
   final VoidCallback onNavigateToProfile;
 
-  const BookListScreen({
-    super.key,
-    required this.onNavigateToProfile,
-  });
+  const BookListScreen({super.key, required this.onNavigateToProfile});
 
   @override
   State<BookListScreen> createState() => _BookListScreenState();
 }
 
-  final BookListController _controller = BookListController();
-
+class _BookListScreenState extends State<BookListScreen> {
+  late final BookListController _controller;
+  final TextEditingController commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _controller.initialize(context);
+    _controller = BookListController();
+    _controller.initialize(context); // 👈 互換性のためにinitializeを呼び出し
   }
 
   @override
   void dispose() {
-    _controller.disposeController();
+    commentController.dispose();
+    // 👈 コントローラー内の searchController 等を安全に破棄する内部メソッドを呼ぶ
+    _controller.dispose();
     super.dispose();
-  }
-
-  void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text;
-    });
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    
-    final fetchedBooks = await service.fetchBooks();
-    final fetchedTimeline = await service.fetchTimelinePosts();
-    
-    if (mounted) {
-      setState(() {
-        _books = fetchedBooks;
-        _timelinePosts = fetchedTimeline;
-        _isLoading = false;
-      });
-    }
   }
 
   // Handle submit review dialog
   void _showAddReviewDialog(Book book) {
     double rating = 5.0;
-    final commentController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -68,16 +47,24 @@ class BookListScreen extends StatefulWidget {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: Text(
                 '『${book.title}』のレビューを投稿',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('評価点数:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  const Text(
+                    '評価点数:',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(5, (index) {
@@ -95,15 +82,23 @@ class BookListScreen extends StatefulWidget {
                     }),
                   ),
                   const SizedBox(height: 12),
-                  const Text('コメント:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  const Text(
+                    'コメント:',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: commentController,
                     maxLines: 3,
                     decoration: InputDecoration(
                       hintText: '読んだ感想を入力してください...',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 13,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
@@ -111,31 +106,42 @@ class BookListScreen extends StatefulWidget {
               ),
               actions: [
                 TextButton(
-                  child: Text('キャンセル', style: TextStyle(color: Colors.grey[600])),
+                  child: Text(
+                    'キャンセル',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF3B30),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  child: const Text('投稿する', style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    '投稿する',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onPressed: () async {
                     if (commentController.text.trim().isEmpty) return;
-                    
-                    final service = Provider.of<SupabaseService>(context, listen: false);
+
+                    final service = Provider.of<SupabaseService>(
+                      context,
+                      listen: false,
+                    );
                     final success = await service.createPost(
                       bookId: book.id,
                       rating: rating,
                       comment: commentController.text.trim(),
                     );
-                    
+
                     if (success && mounted) {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('レビューを投稿しました')),
                       );
-                      _loadData(); // Reload timeline
+                      _controller.loadData(context); // Reload timeline
                     }
                   },
                 ),
@@ -149,52 +155,59 @@ class BookListScreen extends StatefulWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Full-width container
-    return Container(
-      width: double.infinity,
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: RefreshIndicator(
-        onRefresh: () => _controller.loadData(context),
-        color: const Color(0xFFFF3B30),
-        child: _controller.isLoading
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3B30)))
-            : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    _buildHeader(),
-                    // Search bar
-                    _buildSearchBar(),
-                    // Filtered Books or Main Sections
-                    if (_controller.searchQuery.isNotEmpty)
-                      _buildSearchResults()
-                    else ...[
-                      // Section 3: Recommended / Latest
-                      _buildSectionHeader('おすすめの本', 'Section 3'),
-                      _buildBookCarousel(_books),
-                      // Section 2: Banner Ad
-                      const AdBanner(sectionLabel: 'Section 2'),
-                      // Section 4: 洋書
-                      _buildSectionHeader('洋書', 'Section 4'),
-                      _buildBookCarousel(_controller.books.where((b) => b.genre == '洋書').toList()),
-                      // Section 6: 人気
-                      _buildSectionHeader('人気作品', 'Section 6'),
-                      _buildBookCarousel(_controller.books.where((b) => b.genre == '人気').toList()),
-                      // Section 5: Banner Ad
-                      const AdBanner(sectionLabel: 'Section 5'),
-                      // Section 5 (Bottom): Timeline
-                      _buildSectionHeader('タイムライン', 'Section 5'),
-                      _buildTimeline(),
-                    ],
-                    // Footer
-                    _buildFooter(),
-                  ],
-                ),
-              ),
-      ),
+    // 📌 コントローラーの変更（notifyListeners）を検知して画面を再描画するために AnimatedBuilder で包みます
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: RefreshIndicator(
+            onRefresh: () => _controller.loadData(context),
+            color: const Color(0xFFFF3B30),
+            child: _controller.isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
+                  )
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(),
+                        _buildSearchBar(),
+                        if (_controller.searchQuery.isNotEmpty)
+                          _buildSearchResults()
+                        else ...[
+                          _buildSectionHeader('おすすめの本', 'Section 3'),
+                          // 📌 新しく分けたリストと、右端検知時の追加読み込み関数を渡します
+                          _buildBookCarousel(
+                            _controller.recommendedBooks,
+                            _controller.loadMoreRecommended,
+                          ),
+                          const AdBanner(sectionLabel: 'Section 2'),
+                          _buildSectionHeader('洋書', 'Section 4'),
+                          _buildBookCarousel(
+                            _controller.westernBooks,
+                            _controller.loadMoreWestern,
+                          ),
+                          _buildSectionHeader('人気作品', 'Section 6'),
+                          _buildBookCarousel(
+                            _controller.popularBooks,
+                            _controller.loadMorePopular,
+                          ),
+                          const AdBanner(sectionLabel: 'Section 5'),
+                          _buildSectionHeader('タイムライン', 'Section 5'),
+                          _buildTimeline(),
+                        ],
+                        _buildFooter(),
+                      ],
+                    ),
+                  ),
+          ),
+        );
+      },
     );
   }
 
@@ -227,18 +240,28 @@ class BookListScreen extends StatefulWidget {
           ),
           ElevatedButton.icon(
             onPressed: widget.onNavigateToProfile,
-            icon: const Icon(Icons.person_outline, size: 18, color: Colors.white),
+            icon: const Icon(
+              Icons.person_outline,
+              size: 18,
+              color: Colors.white,
+            ),
             label: const Text(
               'プロフィール',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFF3B30),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               elevation: 2,
             ),
-          )
+          ),
         ],
       ),
     );
@@ -257,24 +280,28 @@ class BookListScreen extends StatefulWidget {
             color: Colors.black.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
-          )
+          ),
         ],
       ),
       child: TextField(
-        controller: _searchController,
-        style: const TextStyle(fontSize: 14),
+        controller: _controller.searchController,
         decoration: InputDecoration(
           hintText: '本を検索 (作品名、著者、ジャンル)...',
           hintStyle: TextStyle(color: Colors.grey[400]),
           prefixIcon: const Icon(Icons.search, color: Color(0xFFFF3B30)),
-          suffixIcon: _searchQuery.isNotEmpty
+          suffixIcon: _controller.searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () => _searchController.clear(),
+                  onPressed: () {
+                    _controller.searchController.clear();
+                  },
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -297,7 +324,6 @@ class BookListScreen extends StatefulWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Section label matching mockup
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -324,7 +350,8 @@ class BookListScreen extends StatefulWidget {
     );
   }
 
-  Widget _buildBookCarousel(List<Book> bookList) {
+  // 📌 修正版：重複ロードを完全に防止し、最後の本でピタッとスクロールを止めるカルーセル
+  Widget _buildBookCarousel(List<Book> bookList, VoidCallback onLoadMore) {
     if (bookList.isEmpty) {
       return Container(
         height: 120,
@@ -333,17 +360,43 @@ class BookListScreen extends StatefulWidget {
       );
     }
 
+    final scrollController = ScrollController();
+
+    // 💡 連打防止用のローカルフラグ。一回の検知で一回だけ実行するように制御します
+    bool isTriggered = false;
+
+    scrollController.addListener(() {
+      final maxScroll = scrollController.position.maxScrollExtent;
+      final currentScroll = scrollController.position.pixels;
+
+      // 右端の100px手前に到達、かつ、まだ読み込みトリガーが引かれていない場合
+      if (currentScroll >= maxScroll - 100) {
+        if (!isTriggered) {
+          isTriggered = true; // ブレーキをかける
+          onLoadMore();
+
+          // コントローラー側がデータを更新（notifyListeners）して
+          // このカルーセルが再生成されるまで、追加のロード命令が出ないようにガードします
+        }
+      } else {
+        // 右端から左に戻ったらフラグをリセット
+        if (currentScroll < maxScroll - 150) {
+          isTriggered = false;
+        }
+      }
+    });
+
     return SizedBox(
       height: 205,
       child: ListView.builder(
+        controller: scrollController,
         scrollDirection: Axis.horizontal,
+        // 💡 physics を追加して、iOS風に最後の本で「びよーん」とバウンドして止まるようにします
+        physics: const BouncingScrollPhysics(),
         itemCount: bookList.length,
         itemBuilder: (context, index) {
           final book = bookList[index];
-          return BookCard(
-            book: book,
-            onTap: () => _showAddReviewDialog(book),
-          );
+          return BookCard(book: book, onTap: () => _showAddReviewDialog(book));
         },
       ),
     );
@@ -351,11 +404,14 @@ class BookListScreen extends StatefulWidget {
 
   Widget _buildSearchResults() {
     final lowerQuery = _controller.searchQuery.toLowerCase();
-    final results = _controller.books.where((book) =>
-        book.title.toLowerCase().contains(lowerQuery) ||
-        book.author.toLowerCase().contains(lowerQuery) ||
-        book.genre.toLowerCase().contains(lowerQuery)
-    ).toList();
+    final results = _controller.books
+        .where(
+          (book) =>
+              book.title.toLowerCase().contains(lowerQuery) ||
+              book.author.toLowerCase().contains(lowerQuery) ||
+              book.genre.toLowerCase().contains(lowerQuery),
+        )
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,20 +458,23 @@ class BookListScreen extends StatefulWidget {
   }
 
   Widget _buildTimeline() {
-    if (_timelinePosts.isEmpty) {
+    if (_controller.timelinePosts.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 40),
         alignment: Alignment.center,
-        child: Text('タイムラインの投稿がありません。', style: TextStyle(color: Colors.grey[500])),
+        child: Text(
+          'タイムラインの投稿がありません。',
+          style: TextStyle(color: Colors.grey[500]),
+        ),
       );
     }
 
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _timelinePosts.length,
+      itemCount: _controller.timelinePosts.length,
       itemBuilder: (context, index) {
-        return PostCard(post: _timelinePosts[index]);
+        return PostCard(post: _controller.timelinePosts[index]);
       },
     );
   }

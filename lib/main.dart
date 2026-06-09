@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
-import 'screens/book_list_screen.dart';
+import 'screens/book_list_screen.dart'; // 👈 これを追加
 import 'screens/user_profile_screen.dart';
 
 final supabaseService = SupabaseService();
 
-void main() async {
-  await dotenv.load(fileName: '.env');
+// 💡 パッケージを使わず、環境変数（JSON）から直接安全に引き抜く
+const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // Load Supabase credentials from .env (or fallback to empty strings)
-  final supabaseUrl = dotenv.get('SUPABASE_URL', fallback: '');
-  final supabaseKey = dotenv.get('SUPABASE_ANON_KEY', fallback: '');
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase service
   await supabaseService.initialize(url: supabaseUrl, anonKey: supabaseKey);
@@ -36,12 +35,14 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'BookCase',
       debugShowCheckedModeBanner: false,
-      
+
       // Premium Light Theme Design System
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF8F9FA), // Off-white HSL(210, 20%, 98%)
+        scaffoldBackgroundColor: const Color(
+          0xFFF8F9FA,
+        ), // Off-white HSL(210, 20%, 98%)
         primaryColor: const Color(0xFFFF3B30), // Brand Red
         cardColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
@@ -51,17 +52,18 @@ class MyApp extends StatelessWidget {
           secondary: const Color(0xFF264653), // Slate blue
           background: const Color(0xFFF8F9FA),
         ),
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).copyWith(
-          titleLarge: TextStyle(
-            fontFamily: GoogleFonts.outfit().fontFamily,
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF212529),
-          ),
-          bodyMedium: TextStyle(
-            fontFamily: GoogleFonts.outfit().fontFamily,
-            color: const Color(0xFF495057),
-          ),
-        ),
+        textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme)
+            .copyWith(
+              titleLarge: TextStyle(
+                fontFamily: GoogleFonts.outfit().fontFamily,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF212529),
+              ),
+              bodyMedium: TextStyle(
+                fontFamily: GoogleFonts.outfit().fontFamily,
+                color: const Color(0xFF495057),
+              ),
+            ),
         dividerColor: const Color(0xFFE9ECEF),
       ),
 
@@ -69,7 +71,9 @@ class MyApp extends StatelessWidget {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0B0F19), // Dark Navy HSL(224, 40%, 7%)
+        scaffoldBackgroundColor: const Color(
+          0xFF0B0F19,
+        ), // Dark Navy HSL(224, 40%, 7%)
         primaryColor: const Color(0xFFFF3B30),
         cardColor: const Color(0xFF161F30), // Card Blue-Gray HSL(219, 37%, 14%)
         colorScheme: ColorScheme.fromSeed(
@@ -79,21 +83,22 @@ class MyApp extends StatelessWidget {
           secondary: const Color(0xFF4EA8DE),
           background: const Color(0xFF0B0F19),
         ),
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
-          titleLarge: TextStyle(
-            fontFamily: GoogleFonts.outfit().fontFamily,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-          ),
-          bodyMedium: TextStyle(
-            fontFamily: GoogleFonts.outfit().fontFamily,
-            color: const Color(0xFFCED4DA),
-          ),
-        ),
+        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
+            .copyWith(
+              titleLarge: TextStyle(
+                fontFamily: GoogleFonts.outfit().fontFamily,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+              bodyMedium: TextStyle(
+                fontFamily: GoogleFonts.outfit().fontFamily,
+                color: const Color(0xFFCED4DA),
+              ),
+            ),
         dividerColor: const Color(0xFF2A3447),
       ),
       themeMode: ThemeMode.system, // Dynamically follow device preference
-      
+
       home: const MainNavigationShell(),
     );
   }
