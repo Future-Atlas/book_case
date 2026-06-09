@@ -54,13 +54,10 @@ class RakutenApi {
       keyword = selectedGenre;
     }
 
-    // ⚠️【新APIの罠対策】新仕様では「キーワード空っぽでジャンル指定のみ」は400エラーで弾かれます。
-    // そのため、キーワードが空の場合は「選択されたジャンル名」をキーワードとして救済措置で入れます。
     if (keyword.isEmpty) {
       keyword = selectedGenre;
     }
 
-    // 2026年新仕様のクエリ組み立て（両方の鍵が必須）
     String urlString =
         '$_baseUrl?format=json&page=$page&hits=$count&applicationId=$_appId&accessKey=$_accessKey';
 
@@ -94,7 +91,14 @@ class RakutenApi {
         final publisher = bookData['publisherName'] as String? ?? '不明な出版社';
         final pubDate = bookData['salesDate'] as String? ?? '';
         final isbn = bookData['isbn'] as String? ?? '';
-        final coverUrl = bookData['largeImageUrl'] as String? ?? '';
+
+        // 🖼️ 修正ポイント：ここは文字列（String）の加工だけを行う！
+        String coverUrl = bookData['largeImageUrl'] as String? ?? '';
+        if (coverUrl.isNotEmpty) {
+          // CORSを回避する魔法の言葉をURLの先頭にくっつける
+          coverUrl = 'https://corsproxy.io/?${Uri.encodeComponent(coverUrl)}';
+        }
+
         final description = bookData['itemCaption'] as String? ?? '';
         final itemUrl = bookData['itemUrl'] as String? ?? '';
 
@@ -108,7 +112,7 @@ class RakutenApi {
             publisher: publisher,
             pubDate: pubDate,
             isbn: isbn,
-            coverUrl: coverUrl,
+            coverUrl: coverUrl, // 安全になったURL文字列を渡す
             genre: selectedGenre,
             description: description,
           ),

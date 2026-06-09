@@ -8,6 +8,12 @@ class BookRepository {
   Future<List<Book>> fetchBooksByGenre(String genre, {int page = 1}) async {
     try {
       print('📦 [Repository] 楽天APIからジャンル本を取得します: $genre (Page: $page)');
+
+      // ⏱️【429エラー（連打）対策】
+      // コントローラーが一斉に複数のジャンルを要求してきた際、
+      // 楽天APIがパンクして429エラーを返さないよう、通信の直前に必ず「1秒の休憩」を挟みます。
+      await Future.delayed(const Duration(seconds: 1));
+
       // 楽天APIの searchBySelectedGenre を直接呼び出す
       final rakutenBooks = await RakutenApi.searchBySelectedGenre(
         selectedGenre: genre,
