@@ -4,21 +4,22 @@ import 'package:http/http.dart' as http;
 import '../models/book.dart';
 
 class RakutenApi {
-  // ✨ 修正：他のセクションと同じ、最高に安定している従来版のエンドポイントに変更
+  // ⭕ 2026年最新：楽天の「新」公式エンドポイント
   static const String _baseUrl =
-      'https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404';
+      'https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404';
 
-  // env.json から安全にロード（安定版は _appId のみで動きます）
+  // env.json / GitHub Secrets から最新のUUID形式キーをロード
   static const String _appId = String.fromEnvironment('RAKUTEN_APP_ID');
+  static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
 
   static Future<List<Book>> searchBySelectedGenre({
     required String selectedGenre,
     int page = 1,
     int count = 10,
   }) async {
-    // 💡 _appId のみのチェックにシンプル化
-    if (_appId.isEmpty) {
-      print('💡 [RakutenApi] ローカル環境またはキー未設定のため、通信をスキップします。');
+    // どちらか片方でも欠けていたら新APIは400エラーになるため即終了
+    if (_appId.isEmpty || _accessKey.isEmpty) {
+      print('💡 [RakutenApi] 新APIキー（ID/AccessKey）が未設定のため通信をスキップします。');
       return [];
     }
 
@@ -35,7 +36,7 @@ class RakutenApi {
       genreId = '001006';
     } else if (selectedGenre.contains('English') ||
         selectedGenre.contains('洋書')) {
-      genreId = '005'; // 💡 安定版APIなら、この洋書ジャンルIDも100%正常に受け付けます！
+      genreId = '005'; // 洋書ルート
     } else if (selectedGenre.contains('ベストセラー') ||
         selectedGenre.contains('人気')) {
       keyword = 'ベストセラー';
@@ -53,9 +54,15 @@ class RakutenApi {
       keyword = selectedGenre;
     }
 
-    // ✨ 修正：安定版のクエリ組み立て（accessKeyを削除）
+    // ⚠️【新APIの罠対策】新仕様では「キーワード空っぽでジャンル指定のみ」は400エラーで弾かれます。
+    // そのため、キーワードが空の場合は「選択されたジャンル名」をキーワードとして救済措置で入れます。
+    if (keyword.isEmpty) {
+      keyword = selectedGenre;
+    }
+
+    // 2026年新仕様のクエリ組み立て（両方の鍵が必須）
     String urlString =
-        '$_baseUrl?format=json&page=$page&hits=$count&applicationId=$_appId';
+        '$_baseUrl?format=json&page=$page&hits=$count&applicationId=$_appId&accessKey=$_accessKey';
 
     if (genreId.isNotEmpty) {
       urlString += '&booksGenreId=$genreId';
@@ -64,7 +71,7 @@ class RakutenApi {
       urlString += '&keyword=${Uri.encodeComponent(keyword)}';
     }
 
-    print('📡 [RakutenApi] 安定版楽天サーバーへリクエストを送信します（ジャンル: $selectedGenre）');
+    print('📡 [RakutenApi] 最新本番サーバーへ通信リクエストを送信します（ジャンル: $selectedGenre）');
 
     try {
       final uri = Uri.parse(urlString);
@@ -108,7 +115,7 @@ class RakutenApi {
         );
       }
 
-      print('✨ [RakutenApi] 安定版データ取得成功：${books.length} 件');
+      print('✨ [RakutenApi] 新データ取得成功：${books.length} 件');
       return books;
     } catch (e) {
       print('❌ [RakutenApi] 通信エラー: $e');
