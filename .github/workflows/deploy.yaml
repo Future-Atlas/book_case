@@ -25,6 +25,7 @@ jobs:
               run: flutter pub get
 
             # 4. Webアプリの組み立て（GitHub側なのでメモリ制限なし！）
+            # 4. Webアプリの組み立て（HTMLレンダラーを指定してCORSを完全回避！）
             - name: Build Flutter Web
               env:
                   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -32,7 +33,7 @@ jobs:
                   RAKUTEN_APP_ID: ${{ secrets.RAKUTEN_APP_ID }}
                   RAKUTEN_ACCESS_KEY: ${{ secrets.RAKUTEN_ACCESS_KEY }}
               run: |
-                  flutter build web --release \
+                  flutter build web --release --web-renderer html \
                     --dart-define=SUPABASE_URL=$SUPABASE_URL \
                     --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
                     --dart-define=RAKUTEN_APP_ID=$RAKUTEN_APP_ID \

@@ -25,18 +25,16 @@ class _BookListScreenState extends State<BookListScreen> {
   void initState() {
     super.initState();
     _controller = BookListController();
-    _controller.initialize(context); // 👈 互換性のためにinitializeを呼び出し
+    _controller.initialize(context);
   }
 
   @override
   void dispose() {
     commentController.dispose();
-    // 👈 コントローラー内の searchController 等を安全に破棄する内部メソッドを呼ぶ
     _controller.dispose();
     super.dispose();
   }
 
-  // Handle submit review dialog
   void _showAddReviewDialog(Book book) {
     double rating = 5.0;
 
@@ -137,11 +135,12 @@ class _BookListScreenState extends State<BookListScreen> {
                     );
 
                     if (success && mounted) {
+                      commentController.clear(); // 💡 投稿成功時にテキストをクリア
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('レビューを投稿しました')),
                       );
-                      _controller.loadData(context); // Reload timeline
+                      _controller.loadData(context);
                     }
                   },
                 ),
@@ -155,7 +154,6 @@ class _BookListScreenState extends State<BookListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 📌 コントローラーの変更（notifyListeners）を検知して画面を再描画するために AnimatedBuilder で包みます
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -181,7 +179,6 @@ class _BookListScreenState extends State<BookListScreen> {
                           _buildSearchResults()
                         else ...[
                           _buildSectionHeader('おすすめの本', 'Section 3'),
-                          // 📌 新しく分けたリストと、右端検知時の追加読み込み関数を渡します
                           _buildBookCarousel(
                             _controller.recommendedBooks,
                             _controller.loadMoreRecommended,
@@ -189,7 +186,8 @@ class _BookListScreenState extends State<BookListScreen> {
                           const AdBanner(sectionLabel: 'Section 2'),
                           _buildSectionHeader('洋書', 'Section 4'),
                           _buildBookCarousel(
-                            _controller.westernBooks,
+                            _controller
+                                .westernBooks, // 💡 ここで400エラーが起きても「本がありません」として安全に処理
                             _controller.loadMoreWestern,
                           ),
                           _buildSectionHeader('人気作品', 'Section 6'),
@@ -350,36 +348,35 @@ class _BookListScreenState extends State<BookListScreen> {
     );
   }
 
-  // 📌 修正版：重複ロードを完全に防止し、最後の本でピタッとスクロールを止めるカルーセル
   Widget _buildBookCarousel(List<Book> bookList, VoidCallback onLoadMore) {
     if (bookList.isEmpty) {
       return Container(
-        height: 120,
+        height: 205, // カルーセルの一致する高さ
         alignment: Alignment.center,
-        child: Text('本がありません。', style: TextStyle(color: Colors.grey[500])),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          'データを読み込めませんでした、または作品がありません。',
+          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+        ),
       );
     }
 
     final scrollController = ScrollController();
-
-    // 💡 連打防止用のローカルフラグ。一回の検知で一回だけ実行するように制御します
     bool isTriggered = false;
 
     scrollController.addListener(() {
       final maxScroll = scrollController.position.maxScrollExtent;
       final currentScroll = scrollController.position.pixels;
 
-      // 右端の100px手前に到達、かつ、まだ読み込みトリガーが引かれていない場合
       if (currentScroll >= maxScroll - 100) {
         if (!isTriggered) {
-          isTriggered = true; // ブレーキをかける
+          isTriggered = true;
           onLoadMore();
-
-          // コントローラー側がデータを更新（notifyListeners）して
-          // このカルーセルが再生成されるまで、追加のロード命令が出ないようにガードします
         }
       } else {
-        // 右端から左に戻ったらフラグをリセット
         if (currentScroll < maxScroll - 150) {
           isTriggered = false;
         }
@@ -391,7 +388,6 @@ class _BookListScreenState extends State<BookListScreen> {
       child: ListView.builder(
         controller: scrollController,
         scrollDirection: Axis.horizontal,
-        // 💡 physics を追加して、iOS風に最後の本で「びよーん」とバウンドして止まるようにします
         physics: const BouncingScrollPhysics(),
         itemCount: bookList.length,
         itemBuilder: (context, index) {
