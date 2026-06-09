@@ -23,8 +23,13 @@ jobs:
             # 3. 本番のデータベースに init_schema.sql を全自動で流し込む！
             - name: Deploy Database Migrations
               run: |
-                  # 🚀 --method direct を消し、--linked をつけて確実に本番へ送ります
-                  supabase db push --linked
+                  # 1. 🚀 最初にプロジェクトをリンクさせて、IPv4の接続を確立する！
+                  supabase link --project-ref $SUPABASE_PROJECT_ID -p $SUPABASE_DB_PASSWORD
+
+                  # 2. その後、本番データベースへマイグレーションをプッシュする
+                  supabase db push
               env:
                   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
                   SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+                  # 🔐 データベースのパスワードが必要です
+                  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
