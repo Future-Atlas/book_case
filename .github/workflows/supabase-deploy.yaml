@@ -1,0 +1,29 @@
+name: Deploy Database to Supabase
+
+on:
+    push:
+        branches:
+            - main # mainブランチにプッシュされた時に発動
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            # 1. GitHub上のコード（init_schema.sql）を読み込む
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            # 2. Supabase公式の自動化ツールを起動する
+            - name: Setup Supabase CLI
+              uses: supabase/setup-cli@v1
+              with:
+                  version: latest
+
+            # 3. 本番のデータベースに init_schema.sql を全自動で流し込む！
+            - name: Deploy migrations
+              run: |
+                  supabase db push --method direct
+              env:
+                  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+                  SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
