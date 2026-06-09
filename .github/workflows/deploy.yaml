@@ -24,7 +24,7 @@ jobs:
             - name: Install dependencies
               run: flutter pub get
 
-            # 4. Webアプリの組み立て（正しいレンダラー指定でCORSを完全回避！）
+            # 4. Webアプリの組み立て（コメントなし・最新のHTMLレンダラー指定）
             - name: Build Flutter Web
               env:
                   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -32,8 +32,8 @@ jobs:
                   RAKUTEN_APP_ID: ${{ secrets.RAKUTEN_APP_ID }}
                   RAKUTEN_ACCESS_KEY: ${{ secrets.RAKUTEN_ACCESS_KEY }}
               run: |
-                  # 💡 --web-renderer html ではなく --renderer html に修正します！
-                  flutter build web --release --renderer html \
+                  flutter build web --release \
+                    --dart-define=FLUTTER_WEB_RENDERER=html \
                     --dart-define=SUPABASE_URL=$SUPABASE_URL \
                     --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
                     --dart-define=RAKUTEN_APP_ID=$RAKUTEN_APP_ID \
