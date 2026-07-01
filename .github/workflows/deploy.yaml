@@ -28,19 +28,25 @@ jobs:
             - name: Build Flutter Web
               run: flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=RAKUTEN_APP_ID=${{ secrets.RAKUTEN_APP_ID }} --dart-define=RAKUTEN_ACCESS_KEY=${{ secrets.RAKUTEN_ACCESS_KEY }}
 
-            # 完成品をVercelが認識できる専用フォルダに配置する
-            - name: Prepare Vercel Output Directory
-              run: |
-                  mkdir -p .vercel/output
-                  echo '{"version":3}' > .vercel/output/config.json
-                  mkdir -p .vercel/output/static
-                  cp -r build/web/* .vercel/output/static/
-
             # 5. Vercelのツールをインストール
             - name: Install Vercel CLI
               run: npm install --global vercel
 
-            # 6. 完成品だけをVercelに直接送りつけて公開！
+            # 6. Vercelのプロジェクト設定を取得
+            - name: Pull Vercel Environment Information
+              run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+              env:
+                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+            # 7. Vercel BuildでFunctions/rewrites込みの成果物を作成
+            - name: Build Vercel Prebuilt Output
+              run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+              env:
+                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+            # 8. prebuilt成果物を本番デプロイ
             - name: Deploy to Vercel
               run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
               env:
