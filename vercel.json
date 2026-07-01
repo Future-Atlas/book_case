@@ -5,9 +5,9 @@
     "framework": null,
     "buildCommand": null,
     "outputDirectory": "build/web",
-    "rewrites": [
+    "routes": [
         {
-            "source": "/(.*)",
+            "src": "/(.*)",
             "has": [
                 {
                     "type": "query",
@@ -15,22 +15,25 @@
                     "value": "1"
                 }
             ],
-            "destination": "/api/seo?path=$1"
+            "dest": "/api/seo?path=$1"
         },
         {
-            "source": "/(.*)",
+            "src": "/(.*)",
             "has": [
                 {
                     "type": "header",
                     "key": "user-agent",
-                    "value": "(?i).*(googlebot|bingbot|yandexbot|duckduckbot|baiduspider|twitterbot|facebookexternalhit|facebot|linkedinbot|embedly|quora|slackbot).*"
+                    "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
                 }
             ],
-            "destination": "/api/seo?path=$1"
+            "dest": "/api/seo?path=$1"
         },
         {
-            "source": "/(.*)",
-            "destination": "/$1"
+            "handle": "filesystem"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/$1"
         }
     ]
 }
