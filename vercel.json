@@ -1,25 +1,36 @@
 {
-  "version": 2,
-  "public": true,
-  "cleanUrls": true,
-  "framework": null,
-  "buildCommand": null,
-  "outputDirectory": "build/web",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "has": [
+    "version": 2,
+    "public": true,
+    "cleanUrls": true,
+    "framework": null,
+    "buildCommand": null,
+    "outputDirectory": "build/web",
+    "rewrites": [
         {
-          "type": "header",
-          "key": "user-agent",
-          "value": "(?i).*(googlebot|bingbot|yandexbot|duckduckbot|baiduspider|twitterbot|facebookexternalhit|facebot|linkedinbot|embedly|quora|slackbot).*"
+            "source": "/(.*)",
+            "has": [
+                {
+                    "type": "query",
+                    "key": "seo_preview",
+                    "value": "1"
+                }
+            ],
+            "destination": "/api/seo?path=$1"
+        },
+        {
+            "source": "/(.*)",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": "(?i).*(googlebot|bingbot|yandexbot|duckduckbot|baiduspider|twitterbot|facebookexternalhit|facebot|linkedinbot|embedly|quora|slackbot).*"
+                }
+            ],
+            "destination": "/api/seo?path=$1"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/$1"
         }
-      ],
-      "destination": "/api/seo?path=$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
-    }
-  ]
+    ]
 }
