@@ -75,7 +75,8 @@ async function fetchRakutenSection(sectionTitle) {
         endpoint = RAKUTEN_FOREIGN_BOOK_API;
         extra += "&booksGenreId=005";
     } else if (sectionTitle === "人気作品") {
-        extra += "&booksGenreId=001&keyword=%E3%83%99%E3%82%B9%E3%83%88%E3%82%BB%E3%83%A9%E3%83%BC";
+        extra +=
+            "&booksGenreId=001&keyword=%E3%83%99%E3%82%B9%E3%83%88%E3%82%BB%E3%83%A9%E3%83%BC";
     } else {
         return [];
     }
@@ -221,7 +222,8 @@ module.exports = async (req, res) => {
                             const rawBookId = p.book_id || "書籍ID未設定";
                             let resolved = isbnCache.get(rawBookId);
                             if (resolved === undefined) {
-                                resolved = await fetchRakutenBookByIsbn(rawBookId);
+                                resolved =
+                                    await fetchRakutenBookByIsbn(rawBookId);
                                 isbnCache.set(rawBookId, resolved || null);
                             }
 
@@ -251,7 +253,8 @@ module.exports = async (req, res) => {
                             const rawBookId = row.book_id || "書籍ID未設定";
                             let resolved = isbnCache.get(rawBookId);
                             if (resolved === undefined) {
-                                resolved = await fetchRakutenBookByIsbn(rawBookId);
+                                resolved =
+                                    await fetchRakutenBookByIsbn(rawBookId);
                                 isbnCache.set(rawBookId, resolved || null);
                             }
 
@@ -404,7 +407,7 @@ module.exports = async (req, res) => {
     const html = renderPage({
         title: "本の一覧・検索・タイムライン",
         description:
-                        "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
+            "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
         content: `
       <h2>BookCaseについて</h2>
             <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
