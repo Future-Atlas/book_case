@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
-import '../models/post.dart';
 import '../widgets/book_card.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/post_card.dart';
@@ -135,7 +134,7 @@ class _BookListScreenState extends State<BookListScreen> {
                     );
 
                     if (success && mounted) {
-                      commentController.clear(); // 💡 投稿成功時にテキストをクリア
+                      commentController.clear();
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('レビューを投稿しました')),
@@ -173,27 +172,30 @@ class _BookListScreenState extends State<BookListScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        _buildTopHeroImage(),
                         _buildHeader(),
                         _buildSearchBar(),
                         if (_controller.searchQuery.isNotEmpty)
                           _buildSearchResults()
                         else ...[
-                          _buildSectionHeader('おすすめの本', 'Section 3'),
-                          _buildBookCarousel(
-                            _controller.recommendedBooks,
-                            _controller.loadMoreRecommended,
+                          _buildGenreSection(
+                            title: 'おすすめの本',
+                            sectionCode: 'Section 3',
+                            bookList: _controller.recommendedBooks,
+                            onLoadMore: _controller.loadMoreRecommended,
                           ),
                           const AdBanner(sectionLabel: 'Section 2'),
-                          _buildSectionHeader('洋書', 'Section 4'),
-                          _buildBookCarousel(
-                            _controller
-                                .westernBooks, // 💡 ここで400エラーが起きても「本がありません」として安全に処理
-                            _controller.loadMoreWestern,
+                          _buildGenreSection(
+                            title: '洋書',
+                            sectionCode: 'Section 4',
+                            bookList: _controller.westernBooks,
+                            onLoadMore: _controller.loadMoreWestern,
                           ),
-                          _buildSectionHeader('人気作品', 'Section 6'),
-                          _buildBookCarousel(
-                            _controller.popularBooks,
-                            _controller.loadMorePopular,
+                          _buildGenreSection(
+                            title: '人気作品',
+                            sectionCode: 'Section 6',
+                            bookList: _controller.popularBooks,
+                            onLoadMore: _controller.loadMorePopular,
                           ),
                           const AdBanner(sectionLabel: 'Section 5'),
                           _buildSectionHeader('タイムライン', 'Section 5'),
@@ -206,6 +208,54 @@ class _BookListScreenState extends State<BookListScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildTopHeroImage() {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: ClipRect(
+        child: Transform.translate(
+          offset: const Offset(-16, 0),
+          child: SizedBox(
+            width: screenWidth,
+            height: 170,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const ColoredBox(color: Color(0xFF090909)),
+                ClipPath(
+                  clipper: _DiagonalRedClipper(),
+                  child: const ColoredBox(color: Color(0xFFFF1F1F)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Image.asset(
+                    'assets/images/Sharemarium.png',
+                    fit: BoxFit.fitWidth,
+                    alignment: Alignment.center,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Text(
+                          'Sharemarium',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1.0,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -305,39 +355,85 @@ class _BookListScreenState extends State<BookListScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, String sectionCode) {
+  Widget _buildGenreSection({
+    required String title,
+    required String sectionCode,
+    required List<Book> bookList,
+    required VoidCallback onLoadMore,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          title,
+          sectionCode,
+          failedToLoad: bookList.isEmpty,
+        ),
+        _buildBookCarousel(bookList, onLoadMore),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(
+    String title,
+    String sectionCode, {
+    bool failedToLoad = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  sectionCode,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.grey[600],
+          Expanded(
+            child: Row(
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    sectionCode,
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (failedToLoad) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF3B30).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '取得できませんでした',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFFFF3B30),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           TextButton(
             onPressed: () {},
@@ -351,15 +447,36 @@ class _BookListScreenState extends State<BookListScreen> {
   Widget _buildBookCarousel(List<Book> bookList, VoidCallback onLoadMore) {
     if (bookList.isEmpty) {
       return Container(
-        height: 205, // カルーセルの一致する高さ
+        height: 205,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor.withOpacity(0.5),
+          color: Theme.of(context).cardColor.withOpacity(0.8),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFF3B30).withOpacity(0.25)),
         ),
-        child: Text(
-          'データを読み込めませんでした、または作品がありません。',
-          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.wifi_off_rounded,
+              color: Color(0xFFFF3B30),
+              size: 22,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'データを取得できませんでした',
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '楽天APIキー未設定、または通信エラーの可能性があります。',
+              style: TextStyle(color: Colors.grey[500], fontSize: 11),
+            ),
+          ],
         ),
       );
     }
@@ -496,4 +613,19 @@ class _BookListScreenState extends State<BookListScreen> {
       ),
     );
   }
+}
+
+class _DiagonalRedClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width * 0.33, 0)
+      ..lineTo(size.width * 0.47, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
