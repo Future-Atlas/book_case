@@ -3,6 +3,13 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
+const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
+const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
+
+const RAKUTEN_BOOK_API =
+    "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404";
+const RAKUTEN_FOREIGN_BOOK_API =
+    "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -33,6 +40,95 @@ async function supabaseGet(pathAndQuery) {
     }
 
     return response.json();
+}
+
+function rakutenEnabled() {
+    return RAKUTEN_APP_ID !== "" && RAKUTEN_ACCESS_KEY !== "";
+}
+
+function rakutenBaseParams() {
+    return `format=json&applicationId=${encodeURIComponent(RAKUTEN_APP_ID)}&accessKey=${encodeURIComponent(RAKUTEN_ACCESS_KEY)}`;
+}
+
+function normalizeRakutenBooks(items, sectionTitle) {
+    return (items || []).map((item) => {
+        const data = item?.Item || {};
+        return {
+            title: data.title || "不明なタイトル",
+            author: data.author || "不明な著者",
+            coverUrl: data.largeImageUrl || "",
+            genre: sectionTitle,
+            description: data.itemCaption || "",
+        };
+    });
+}
+
+async function fetchRakutenSection(sectionTitle) {
+    if (!rakutenEnabled()) return [];
+
+    let endpoint = RAKUTEN_BOOK_API;
+    let extra = "page=1&hits=6";
+
+    if (sectionTitle === "おすすめの本") {
+        extra += "&booksGenreId=001004";
+    } else if (sectionTitle === "洋書") {
+        endpoint = RAKUTEN_FOREIGN_BOOK_API;
+        extra += "&booksGenreId=005";
+    } else if (sectionTitle === "人気作品") {
+        extra += "&booksGenreId=001&keyword=%E3%83%99%E3%82%B9%E3%83%88%E3%82%BB%E3%83%A9%E3%83%BC";
+    } else {
+        return [];
+    }
+
+    const url = `${endpoint}?${rakutenBaseParams()}&${extra}`;
+    const response = await fetch(url);
+    if (!response.ok) return [];
+
+    const json = await response.json();
+    return normalizeRakutenBooks(json?.Items, sectionTitle);
+}
+
+async function fetchRakutenBookByIsbn(isbn) {
+    if (!rakutenEnabled()) return null;
+    if (!isbn) return null;
+
+    const compact = String(isbn).replace(/[^0-9Xx]/g, "");
+    if (compact.length !== 10 && compact.length !== 13) return null;
+
+    const url = `${RAKUTEN_BOOK_API}?${rakutenBaseParams()}&isbn=${encodeURIComponent(compact)}&hits=1&page=1`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    const first = json?.Items?.[0]?.Item;
+    if (!first) return null;
+
+    return {
+        title: first.title || compact,
+        author: first.author || "不明な著者",
+        coverUrl: first.largeImageUrl || "",
+    };
+}
+
+function renderBookList(books) {
+    if (!books.length) {
+        return "<p>現在、表示できる本情報がありません。</p>";
+    }
+
+    return books
+        .map(
+            (book) => `
+    <div class="book-item">
+      ${book.coverUrl ? `<img class="book-cover" src="${escapeHtml(book.coverUrl)}" alt="${escapeHtml(book.title)} Cover">` : ""}
+      <div class="book-details">
+        <h4 class="book-title">${escapeHtml(book.title)}</h4>
+        <p class="book-author">著者: ${escapeHtml(book.author)}</p>
+        ${book.description ? `<p style="font-size:0.9em; color:#555;">${escapeHtml(book.description)}</p>` : ""}
+      </div>
+    </div>
+  `,
+        )
+        .join("");
 }
 
 module.exports = async (req, res) => {
@@ -99,6 +195,7 @@ module.exports = async (req, res) => {
         let posts = [];
         let favorites = [];
         let hasReliableData = false;
+        const isbnCache = new Map();
 
         try {
             const profiles = await supabaseGet(
@@ -119,16 +216,29 @@ module.exports = async (req, res) => {
                 );
 
                 if (fetchedPosts && fetchedPosts.length > 0) {
-                    posts = fetchedPosts.map((p) => ({
-                        id: p.id,
-                        username,
-                        book_title: p.book_id || "book-id未設定",
-                        rating: p.rating,
-                        comment: p.comment,
-                        date: p.created_at
-                            ? new Date(p.created_at).toLocaleDateString("ja-JP")
-                            : "",
-                    }));
+                    posts = await Promise.all(
+                        fetchedPosts.map(async (p) => {
+                            const rawBookId = p.book_id || "書籍ID未設定";
+                            let resolved = isbnCache.get(rawBookId);
+                            if (resolved === undefined) {
+                                resolved = await fetchRakutenBookByIsbn(rawBookId);
+                                isbnCache.set(rawBookId, resolved || null);
+                            }
+
+                            return {
+                                id: p.id,
+                                username,
+                                book_title: resolved?.title || rawBookId,
+                                rating: p.rating,
+                                comment: p.comment,
+                                date: p.created_at
+                                    ? new Date(p.created_at).toLocaleDateString(
+                                          "ja-JP",
+                                      )
+                                    : "",
+                            };
+                        }),
+                    );
                 }
 
                 const favoriteRows = await supabaseGet(
@@ -136,11 +246,22 @@ module.exports = async (req, res) => {
                 );
 
                 if (favoriteRows && favoriteRows.length > 0) {
-                    favorites = favoriteRows.map((row) => ({
-                        title: row.book_id || "書籍ID未設定",
-                        author: "外部APIの書籍ID",
-                        rating_avg: "-",
-                    }));
+                    favorites = await Promise.all(
+                        favoriteRows.map(async (row) => {
+                            const rawBookId = row.book_id || "書籍ID未設定";
+                            let resolved = isbnCache.get(rawBookId);
+                            if (resolved === undefined) {
+                                resolved = await fetchRakutenBookByIsbn(rawBookId);
+                                isbnCache.set(rawBookId, resolved || null);
+                            }
+
+                            return {
+                                title: resolved?.title || rawBookId,
+                                author: resolved?.author || "著者情報なし",
+                                rating_avg: "-",
+                            };
+                        }),
+                    );
                 }
             }
         } catch (err) {
@@ -216,10 +337,31 @@ module.exports = async (req, res) => {
     }
 
     // Default: Book List Page / Landing Page
+    let recommendedBooks = [];
+    let westernBooks = [];
+    let popularBooks = [];
     let recentPosts = [];
     let hasReliableData = false;
 
     try {
+        const [recommended, western, popular] = await Promise.all([
+            fetchRakutenSection("おすすめの本"),
+            fetchRakutenSection("洋書"),
+            fetchRakutenSection("人気作品"),
+        ]);
+
+        recommendedBooks = recommended;
+        westernBooks = western;
+        popularBooks = popular;
+
+        if (
+            recommendedBooks.length > 0 ||
+            westernBooks.length > 0 ||
+            popularBooks.length > 0
+        ) {
+            hasReliableData = true;
+        }
+
         const rawPosts = await supabaseGet(
             "posts?select=id,book_id,rating,comment,created_at,profiles(username)&order=created_at.desc&limit=5",
         );
@@ -262,11 +404,19 @@ module.exports = async (req, res) => {
     const html = renderPage({
         title: "本の一覧・検索・タイムライン",
         description:
-            "BookCaseは、本のレビュー投稿と読書記録ができるアプリです。",
+                        "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
         content: `
       <h2>BookCaseについて</h2>
-      <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
-      <p>通常画面ではおすすめ本、洋書、人気作品、タイムラインを表示します。</p>
+            <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
+
+            <h2>おすすめの本</h2>
+            <div>${renderBookList(recommendedBooks)}</div>
+
+            <h2>洋書</h2>
+            <div>${renderBookList(westernBooks)}</div>
+
+            <h2>人気作品</h2>
+            <div>${renderBookList(popularBooks)}</div>
 
       <h2>タイムライン (最新レビュー)</h2>
       <div>${timelineHtml.length > 0 ? timelineHtml : "<p>現在、表示できる投稿がありません。</p>"}</div>
@@ -276,7 +426,7 @@ module.exports = async (req, res) => {
             "@type": "WebSite",
             name: "BookCase",
             description:
-                "BookCaseは、本のレビュー投稿と読書記録ができるアプリです。",
+                "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
             url: "https://book-case-u9uq.vercel.app/",
         },
         robots: hasReliableData ? "index,follow" : "noindex,nofollow",
