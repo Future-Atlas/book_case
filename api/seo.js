@@ -5,6 +5,11 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
+const RAKUTEN_REFERER =
+    process.env.RAKUTEN_REFERER || "https://book-case-u9uq.vercel.app/";
+const ENABLE_NDL_FALLBACK =
+    String(process.env.SEO_ENABLE_NDL_FALLBACK || "false").toLowerCase() ===
+    "true";
 
 const RAKUTEN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404";
@@ -70,6 +75,20 @@ function rakutenBaseParams() {
     return `format=json&applicationId=${encodeURIComponent(
         RAKUTEN_APP_ID,
     )}&accessKey=${encodeURIComponent(RAKUTEN_ACCESS_KEY)}`;
+}
+
+function rakutenRequestHeaders() {
+    return {
+        Referer: RAKUTEN_REFERER,
+        "User-Agent":
+            "BookCase-SEO-Bot/1.0 (+https://book-case-u9uq.vercel.app)",
+    };
+}
+
+async function rakutenFetch(url) {
+    return fetch(url, {
+        headers: rakutenRequestHeaders(),
+    });
 }
 
 function normalizeRakutenBooks(items, sectionTitle) {
@@ -144,7 +163,7 @@ async function fetchRakutenSection(sectionTitle, diagnostics) {
     }
 
     const url = `${endpoint}?${rakutenBaseParams()}&${extra}`;
-    const response = await fetch(url);
+    const response = await rakutenFetch(url);
     const body = await response.text();
     if (!response.ok) {
         diagnostics.rakutenSectionFailures.push(
@@ -165,16 +184,19 @@ async function fetchNdlSection(sectionTitle, diagnostics) {
     } else if (sectionTitle === "洋書") {
         queryParams += "&any=English";
     } else if (sectionTitle === "人気作品") {
-        queryParams += "&any=%E3%83%99%E3%82%B9%E3%83%88%E3%82%BB%E3%83%A9%E3%83%BC";
+        queryParams +=
+            "&any=%E3%83%99%E3%82%B9%E3%83%88%E3%82%BB%E3%83%A9%E3%83%BC";
     } else {
         return [];
     }
 
     const url = `${NDL_OPENSEARCH_API}?${queryParams}`;
-    const response = await fetch(url);
+    const response = await rakutenFetch(url);
     const body = await response.text();
     if (!response.ok) {
-        diagnostics.ndlSectionFailures.push(`${sectionTitle}:${response.status}`);
+        diagnostics.ndlSectionFailures.push(
+            `${sectionTitle}:${response.status}`,
+        );
         return [];
     }
 
@@ -245,6 +267,7 @@ async function fetchNdlBookByIsbn(isbn, diagnostics) {
 async function resolveBookByIsbn(isbn, diagnostics) {
     const rakuten = await fetchRakutenBookByIsbn(isbn, diagnostics);
     if (rakuten) return rakuten;
+    if (!ENABLE_NDL_FALLBACK) return null;
     return fetchNdlBookByIsbn(isbn, diagnostics);
 }
 
@@ -277,6 +300,7 @@ function setDiagnosticsHeader(res, diagnostics) {
             `rakuten_isbn_fail=${diagnostics.rakutenIsbnFailures}`,
             `ndl_section_fail=${diagnostics.ndlSectionFailures.length}`,
             `ndl_isbn_fail=${diagnostics.ndlIsbnFailures}`,
+            `ndl_fallback=${ENABLE_NDL_FALLBACK ? "on" : "off"}`,
             `supabase_index_err=${diagnostics.supabaseIndexError === "none" ? "no" : "yes"}`,
             `supabase_profile_err=${diagnostics.supabaseProfileError === "none" ? "no" : "yes"}`,
         ].join(";"),
@@ -504,17 +528,19 @@ module.exports = async (req, res) => {
             fetchRakutenSection("人気作品", diagnostics),
         ]);
 
-        const [recommendedN, westernN, popularN] = await Promise.all([
-            recommendedR.length
-                ? Promise.resolve([])
-                : fetchNdlSection("おすすめの本", diagnostics),
-            westernR.length
-                ? Promise.resolve([])
-                : fetchNdlSection("洋書", diagnostics),
-            popularR.length
-                ? Promise.resolve([])
-                : fetchNdlSection("人気作品", diagnostics),
-        ]);
+        const [recommendedN, westernN, popularN] = ENABLE_NDL_FALLBACK
+            ? await Promise.all([
+                  recommendedR.length
+                      ? Promise.resolve([])
+                      : fetchNdlSection("おすすめの本", diagnostics),
+                  westernR.length
+                      ? Promise.resolve([])
+                      : fetchNdlSection("洋書", diagnostics),
+                  popularR.length
+                      ? Promise.resolve([])
+                      : fetchNdlSection("人気作品", diagnostics),
+              ])
+            : [[], [], []];
 
         recommendedBooks = recommendedR.length ? recommendedR : recommendedN;
         westernBooks = westernR.length ? westernR : westernN;
