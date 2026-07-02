@@ -10,6 +10,10 @@ const RAKUTEN_REFERER =
 const ENABLE_NDL_FALLBACK =
     String(process.env.SEO_ENABLE_NDL_FALLBACK || "false").toLowerCase() ===
     "true";
+const ENABLE_SAMPLE_BOOK_FALLBACK =
+    String(
+        process.env.SEO_ENABLE_SAMPLE_BOOK_FALLBACK || "true",
+    ).toLowerCase() === "true";
 
 const RAKUTEN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404";
@@ -104,6 +108,61 @@ function normalizeRakutenBooks(items, sectionTitle) {
     });
 }
 
+function sampleBooksFor(sectionTitle) {
+    const samples = {
+        おすすめの本: [
+            {
+                title: "コンビニ人間",
+                author: "村田 沙耶香",
+                coverUrl: "",
+                genre: sectionTitle,
+                description: "日常の違和感と社会の規範を鋭く描く現代文学。",
+            },
+            {
+                title: "舟を編む",
+                author: "三浦 しをん",
+                coverUrl: "",
+                genre: sectionTitle,
+                description: "辞書づくりに情熱を注ぐ人々の物語。",
+            },
+        ],
+        洋書: [
+            {
+                title: "The Midnight Library",
+                author: "Matt Haig",
+                coverUrl: "",
+                genre: sectionTitle,
+                description: "人生の分岐を見つめ直す現代ファンタジー。",
+            },
+            {
+                title: "Atomic Habits",
+                author: "James Clear",
+                coverUrl: "",
+                genre: sectionTitle,
+                description: "小さな習慣の積み重ねを体系化した実践書。",
+            },
+        ],
+        人気作品: [
+            {
+                title: "そして、バトンは渡された",
+                author: "瀬尾 まいこ",
+                coverUrl: "",
+                genre: sectionTitle,
+                description: "家族のかたちをやさしく描く話題作。",
+            },
+            {
+                title: "汝、星のごとく",
+                author: "凪良 ゆう",
+                coverUrl: "",
+                genre: sectionTitle,
+                description: "地方都市に生きる二人の愛と選択を描く長編。",
+            },
+        ],
+    };
+
+    return samples[sectionTitle] || [];
+}
+
 function decodeXmlEntities(text) {
     return String(text || "")
         .replace(/&lt;/g, "<")
@@ -191,7 +250,7 @@ async function fetchNdlSection(sectionTitle, diagnostics) {
     }
 
     const url = `${NDL_OPENSEARCH_API}?${queryParams}`;
-    const response = await rakutenFetch(url);
+    const response = await fetch(url);
     const body = await response.text();
     if (!response.ok) {
         diagnostics.ndlSectionFailures.push(
@@ -317,6 +376,7 @@ function setDiagnosticsHeader(res, diagnostics) {
             `ndl_section_detail=${asciiToken(ndlDetail)}`,
             `ndl_isbn_fail=${diagnostics.ndlIsbnFailures}`,
             `ndl_fallback=${ENABLE_NDL_FALLBACK ? "on" : "off"}`,
+            `sample_books=${diagnostics.sampleBooksUsed ? "on" : "off"}`,
             `supabase_index_err=${diagnostics.supabaseIndexError === "none" ? "no" : "yes"}`,
             `supabase_profile_err=${diagnostics.supabaseProfileError === "none" ? "no" : "yes"}`,
         ].join(";"),
@@ -331,6 +391,7 @@ module.exports = async (req, res) => {
         rakutenIsbnFailures: 0,
         ndlSectionFailures: [],
         ndlIsbnFailures: 0,
+        sampleBooksUsed: false,
         supabaseIndexError: "none",
         supabaseProfileError: "none",
     };
@@ -536,6 +597,7 @@ module.exports = async (req, res) => {
     let popularBooks = [];
     let recentPosts = [];
     let hasReliableData = false;
+    let usingSampleBooks = false;
 
     try {
         const [recommendedR, westernR, popularR] = await Promise.all([
@@ -561,6 +623,21 @@ module.exports = async (req, res) => {
         recommendedBooks = recommendedR.length ? recommendedR : recommendedN;
         westernBooks = westernR.length ? westernR : westernN;
         popularBooks = popularR.length ? popularR : popularN;
+
+        if (ENABLE_SAMPLE_BOOK_FALLBACK) {
+            if (recommendedBooks.length === 0) {
+                recommendedBooks = sampleBooksFor("おすすめの本");
+                usingSampleBooks = true;
+            }
+            if (westernBooks.length === 0) {
+                westernBooks = sampleBooksFor("洋書");
+                usingSampleBooks = true;
+            }
+            if (popularBooks.length === 0) {
+                popularBooks = sampleBooksFor("人気作品");
+                usingSampleBooks = true;
+            }
+        }
 
         if (
             recommendedBooks.length > 0 ||
@@ -607,6 +684,11 @@ module.exports = async (req, res) => {
   `,
         )
         .join("");
+    diagnostics.sampleBooksUsed = usingSampleBooks;
+
+    const sampleNoticeHtml = usingSampleBooks
+        ? `<p style="background:#fff3cd; border:1px solid #ffe69c; color:#664d03; padding:10px; border-radius:8px;">現在、外部APIの一時的な制約により書籍情報はサンプル表示です。</p>`
+        : "";
 
     const html = renderPage({
         title: "本の一覧・検索・タイムライン",
@@ -615,6 +697,7 @@ module.exports = async (req, res) => {
         content: `
       <h2>BookCaseについて</h2>
       <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
+            ${sampleNoticeHtml}
 
       <h2>おすすめの本</h2>
       <div>${renderBookList(recommendedBooks)}</div>
@@ -636,7 +719,10 @@ module.exports = async (req, res) => {
                 "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
             url: "https://book-case-u9uq.vercel.app/",
         },
-        robots: hasReliableData ? "index,follow" : "noindex,nofollow",
+        robots:
+            hasReliableData && !usingSampleBooks
+                ? "index,follow"
+                : "noindex,nofollow",
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
