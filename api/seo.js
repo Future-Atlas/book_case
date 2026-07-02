@@ -21,6 +21,26 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
+function parseJsonSafe(text) {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
+
+function errorCodeFromText(bodyText) {
+    const parsed = parseJsonSafe(bodyText);
+    if (!parsed) return "unparseable";
+
+    return (
+        parsed?.errors?.errorCode ||
+        parsed?.error?.code ||
+        parsed?.errorCode ||
+        "unknown"
+    );
+}
+
 function supabaseHeaders() {
     return {
         apikey: SUPABASE_ANON_KEY,
@@ -35,12 +55,12 @@ async function supabaseGet(pathAndQuery) {
         headers: supabaseHeaders(),
     });
 
+    const body = await response.text();
     if (!response.ok) {
-        const body = await response.text();
         throw new Error(`Supabase request failed: ${response.status} ${body}`);
     }
 
-    return response.json();
+    return parseJsonSafe(body) || [];
 }
 
 function rakutenEnabled() {
@@ -48,7 +68,9 @@ function rakutenEnabled() {
 }
 
 function rakutenBaseParams() {
-    return `format=json&applicationId=${encodeURIComponent(RAKUTEN_APP_ID)}&accessKey=${encodeURIComponent(RAKUTEN_ACCESS_KEY)}`;
+    return `format=json&applicationId=${encodeURIComponent(
+        RAKUTEN_APP_ID,
+    )}&accessKey=${encodeURIComponent(RAKUTEN_ACCESS_KEY)}`;
 }
 
 function normalizeRakutenBooks(items, sectionTitle) {
@@ -64,8 +86,25 @@ function normalizeRakutenBooks(items, sectionTitle) {
     });
 }
 
-async function fetchRakutenSection(sectionTitle) {
-    if (!rakutenEnabled()) return [];
+function normalizeGoogleBooks(items, sectionTitle) {
+    return (items || []).map((item) => {
+        const info = item?.volumeInfo || {};
+        const image = info.imageLinks || {};
+        return {
+            title: info.title || "不明なタイトル",
+            author: (info.authors && info.authors.join(", ")) || "不明な著者",
+            coverUrl: image.thumbnail || image.smallThumbnail || "",
+            genre: sectionTitle,
+            description: info.description || "",
+        };
+    });
+}
+
+async function fetchRakutenSection(sectionTitle, diagnostics) {
+    if (!rakutenEnabled()) {
+        diagnostics.rakutenSectionFailures.push(`${sectionTitle}:disabled`);
+        return [];
+    }
 
     let endpoint = RAKUTEN_BOOK_API;
     let extra = "page=1&hits=6";
@@ -84,58 +123,68 @@ async function fetchRakutenSection(sectionTitle) {
 
     const url = `${endpoint}?${rakutenBaseParams()}&${extra}`;
     const response = await fetch(url);
-    if (!response.ok) return [];
+    const body = await response.text();
+    if (!response.ok) {
+        diagnostics.rakutenSectionFailures.push(
+            `${sectionTitle}:${response.status}:${errorCodeFromText(body)}`,
+        );
+        return [];
+    }
 
-    const json = await response.json();
+    const json = parseJsonSafe(body);
     return normalizeRakutenBooks(json?.Items, sectionTitle);
 }
 
-function normalizeGoogleBooks(items, sectionTitle) {
-    return (items || []).map((item) => {
-        const info = item?.volumeInfo || {};
-        const image = info.imageLinks || {};
-        return {
-            title: info.title || "不明なタイトル",
-            author: (info.authors && info.authors.join(", ")) || "不明な著者",
-            coverUrl: image.thumbnail || image.smallThumbnail || "",
-            genre: sectionTitle,
-            description: info.description || "",
-        };
-    });
-}
-
-async function fetchGoogleSection(sectionTitle) {
+async function fetchGoogleSection(sectionTitle, diagnostics) {
     let query = "";
     if (sectionTitle === "おすすめの本") {
         query = "subject:fiction OR subject:novel";
     } else if (sectionTitle === "洋書") {
-        query = "subject:fiction+lang:en";
+        query = "subject:fiction lang:en";
     } else if (sectionTitle === "人気作品") {
         query = "bestseller";
     } else {
         return [];
     }
 
-    const url = `${GOOGLE_BOOKS_API}?q=${encodeURIComponent(query)}&maxResults=6&printType=books&orderBy=relevance`;
+    const url = `${GOOGLE_BOOKS_API}?q=${encodeURIComponent(
+        query,
+    )}&maxResults=6&printType=books&orderBy=relevance`;
     const response = await fetch(url);
-    if (!response.ok) return [];
+    const body = await response.text();
+    if (!response.ok) {
+        const code = errorCodeFromText(body);
+        diagnostics.googleSectionFailures.push(
+            `${sectionTitle}:${response.status}:${code}`,
+        );
+        if (String(code) === "429") {
+            diagnostics.googleQuotaExceeded = true;
+        }
+        return [];
+    }
 
-    const json = await response.json();
+    const json = parseJsonSafe(body);
     return normalizeGoogleBooks(json?.items, sectionTitle);
 }
 
-async function fetchRakutenBookByIsbn(isbn) {
+async function fetchRakutenBookByIsbn(isbn, diagnostics) {
     if (!rakutenEnabled()) return null;
     if (!isbn) return null;
 
     const compact = String(isbn).replace(/[^0-9Xx]/g, "");
     if (compact.length !== 10 && compact.length !== 13) return null;
 
-    const url = `${RAKUTEN_BOOK_API}?${rakutenBaseParams()}&isbn=${encodeURIComponent(compact)}&hits=1&page=1`;
+    const url = `${RAKUTEN_BOOK_API}?${rakutenBaseParams()}&isbn=${encodeURIComponent(
+        compact,
+    )}&hits=1&page=1`;
     const response = await fetch(url);
-    if (!response.ok) return null;
+    const body = await response.text();
+    if (!response.ok) {
+        diagnostics.rakutenIsbnFailures += 1;
+        return null;
+    }
 
-    const json = await response.json();
+    const json = parseJsonSafe(body);
     const first = json?.Items?.[0]?.Item;
     if (!first) return null;
 
@@ -146,17 +195,23 @@ async function fetchRakutenBookByIsbn(isbn) {
     };
 }
 
-async function fetchGoogleBookByIsbn(isbn) {
+async function fetchGoogleBookByIsbn(isbn, diagnostics) {
     if (!isbn) return null;
 
     const compact = String(isbn).replace(/[^0-9Xx]/g, "");
     if (compact.length !== 10 && compact.length !== 13) return null;
 
-    const url = `${GOOGLE_BOOKS_API}?q=isbn:${encodeURIComponent(compact)}&maxResults=1&printType=books`;
+    const url = `${GOOGLE_BOOKS_API}?q=isbn:${encodeURIComponent(
+        compact,
+    )}&maxResults=1&printType=books`;
     const response = await fetch(url);
-    if (!response.ok) return null;
+    const body = await response.text();
+    if (!response.ok) {
+        diagnostics.googleIsbnFailures += 1;
+        return null;
+    }
 
-    const json = await response.json();
+    const json = parseJsonSafe(body);
     const first = json?.items?.[0]?.volumeInfo;
     if (!first) return null;
 
@@ -168,10 +223,10 @@ async function fetchGoogleBookByIsbn(isbn) {
     };
 }
 
-async function resolveBookByIsbn(isbn) {
-    const rakuten = await fetchRakutenBookByIsbn(isbn);
+async function resolveBookByIsbn(isbn, diagnostics) {
+    const rakuten = await fetchRakutenBookByIsbn(isbn, diagnostics);
     if (rakuten) return rakuten;
-    return fetchGoogleBookByIsbn(isbn);
+    return fetchGoogleBookByIsbn(isbn, diagnostics);
 }
 
 function renderBookList(books) {
@@ -195,14 +250,36 @@ function renderBookList(books) {
         .join("");
 }
 
+function setDiagnosticsHeader(res, diagnostics) {
+    res.setHeader(
+        "X-SEO-Diagnostics",
+        [
+            `rakuten_section_fail=${diagnostics.rakutenSectionFailures.length}`,
+            `rakuten_isbn_fail=${diagnostics.rakutenIsbnFailures}`,
+            `google_section_fail=${diagnostics.googleSectionFailures.length}`,
+            `google_isbn_fail=${diagnostics.googleIsbnFailures}`,
+            `google_quota=${diagnostics.googleQuotaExceeded ? "yes" : "no"}`,
+            `supabase_index_err=${diagnostics.supabaseIndexError === "none" ? "no" : "yes"}`,
+            `supabase_profile_err=${diagnostics.supabaseProfileError === "none" ? "no" : "yes"}`,
+        ].join(";"),
+    );
+}
+
 module.exports = async (req, res) => {
     const { path } = req.query;
     const decodedPath = decodeURIComponent(path || "");
+    const diagnostics = {
+        rakutenSectionFailures: [],
+        rakutenIsbnFailures: 0,
+        googleSectionFailures: [],
+        googleIsbnFailures: 0,
+        googleQuotaExceeded: false,
+        supabaseIndexError: "none",
+        supabaseProfileError: "none",
+    };
 
-    // Log for debugging inside Vercel Dashboard
     console.log(`SEO Crawler requested path: ${decodedPath}`);
 
-    // Base HTML template builder
     const renderPage = ({ title, description, content, jsonLd, robots }) => `
     <!DOCTYPE html>
     <html lang="ja">
@@ -211,7 +288,7 @@ module.exports = async (req, res) => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${title} | BookCase</title>
       <meta name="description" content="${description}">
-            <meta name="robots" content="${robots || "index,follow"}">
+      <meta name="robots" content="${robots || "index,follow"}">
       <meta property="og:title" content="${title} | BookCase">
       <meta property="og:description" content="${description}">
       <meta property="og:type" content="website">
@@ -239,7 +316,7 @@ module.exports = async (req, res) => {
     <body>
       <header>
         <h1>BookCase</h1>
-                <p>本のレビューと読書記録を管理できるアプリ</p>
+        <p>本のレビューと読書記録を管理できるアプリ</p>
       </header>
       <main>
         ${content}
@@ -251,7 +328,6 @@ module.exports = async (req, res) => {
     </html>
   `;
 
-    // If path contains "/user" or starts with "user", render user profile page
     if (decodedPath.includes("user") || decodedPath.includes("profile")) {
         let username = "ユーザー";
         let bio = "プロフィール情報を準備中です。";
@@ -274,7 +350,6 @@ module.exports = async (req, res) => {
                 stats.followers = user.followers_count || stats.followers;
                 stats.following = user.following_count || stats.following;
 
-                // postsテーブルのみを使い、削除済みbooksテーブルへのjoinは行わない
                 const fetchedPosts = await supabaseGet(
                     `posts?profile_id=eq.${user.id}&select=id,book_id,rating,comment,created_at&order=created_at.desc&limit=10`,
                 );
@@ -285,7 +360,10 @@ module.exports = async (req, res) => {
                             const rawBookId = p.book_id || "書籍ID未設定";
                             let resolved = isbnCache.get(rawBookId);
                             if (resolved === undefined) {
-                                resolved = await resolveBookByIsbn(rawBookId);
+                                resolved = await resolveBookByIsbn(
+                                    rawBookId,
+                                    diagnostics,
+                                );
                                 isbnCache.set(rawBookId, resolved || null);
                             }
 
@@ -315,7 +393,10 @@ module.exports = async (req, res) => {
                             const rawBookId = row.book_id || "書籍ID未設定";
                             let resolved = isbnCache.get(rawBookId);
                             if (resolved === undefined) {
-                                resolved = await resolveBookByIsbn(rawBookId);
+                                resolved = await resolveBookByIsbn(
+                                    rawBookId,
+                                    diagnostics,
+                                );
                                 isbnCache.set(rawBookId, resolved || null);
                             }
 
@@ -329,10 +410,9 @@ module.exports = async (req, res) => {
                 }
             }
         } catch (err) {
-            console.error(
-                "Error fetching Supabase data in SEO worker for user:",
-                err,
-            );
+            diagnostics.supabaseProfileError =
+                err instanceof Error ? err.message.slice(0, 80) : "unknown";
+            console.error("Error fetching profile SEO data:", err);
         }
 
         const postsHtml = posts
@@ -385,22 +465,15 @@ module.exports = async (req, res) => {
                 "@type": "ProfilePage",
                 name: escapeHtml(username),
                 description: escapeHtml(bio),
-                interactionStatistic: [
-                    {
-                        "@type": "InteractionCounter",
-                        interactionType: "https://schema.org/FollowAction",
-                        userInteractionCount: stats.followers,
-                    },
-                ],
             },
             robots: hasReliableData ? "index,follow" : "noindex,nofollow",
         });
 
         res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
         return res.status(200).send(html);
     }
 
-    // Default: Book List Page / Landing Page
     let recommendedBooks = [];
     let westernBooks = [];
     let popularBooks = [];
@@ -409,19 +482,21 @@ module.exports = async (req, res) => {
 
     try {
         const [recommendedR, westernR, popularR] = await Promise.all([
-            fetchRakutenSection("おすすめの本"),
-            fetchRakutenSection("洋書"),
-            fetchRakutenSection("人気作品"),
+            fetchRakutenSection("おすすめの本", diagnostics),
+            fetchRakutenSection("洋書", diagnostics),
+            fetchRakutenSection("人気作品", diagnostics),
         ]);
 
         const [recommendedG, westernG, popularG] = await Promise.all([
             recommendedR.length
                 ? Promise.resolve([])
-                : fetchGoogleSection("おすすめの本"),
-            westernR.length ? Promise.resolve([]) : fetchGoogleSection("洋書"),
+                : fetchGoogleSection("おすすめの本", diagnostics),
+            westernR.length
+                ? Promise.resolve([])
+                : fetchGoogleSection("洋書", diagnostics),
             popularR.length
                 ? Promise.resolve([])
-                : fetchGoogleSection("人気作品"),
+                : fetchGoogleSection("人気作品", diagnostics),
         ]);
 
         recommendedBooks = recommendedR.length ? recommendedR : recommendedG;
@@ -454,10 +529,9 @@ module.exports = async (req, res) => {
             }));
         }
     } catch (err) {
-        console.error(
-            "Error fetching Supabase data in SEO worker for index:",
-            err,
-        );
+        diagnostics.supabaseIndexError =
+            err instanceof Error ? err.message.slice(0, 80) : "unknown";
+        console.error("Error fetching index SEO data:", err);
     }
 
     const timelineHtml = recentPosts
@@ -481,16 +555,16 @@ module.exports = async (req, res) => {
             "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
         content: `
       <h2>BookCaseについて</h2>
-            <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
+      <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
 
-            <h2>おすすめの本</h2>
-            <div>${renderBookList(recommendedBooks)}</div>
+      <h2>おすすめの本</h2>
+      <div>${renderBookList(recommendedBooks)}</div>
 
-            <h2>洋書</h2>
-            <div>${renderBookList(westernBooks)}</div>
+      <h2>洋書</h2>
+      <div>${renderBookList(westernBooks)}</div>
 
-            <h2>人気作品</h2>
-            <div>${renderBookList(popularBooks)}</div>
+      <h2>人気作品</h2>
+      <div>${renderBookList(popularBooks)}</div>
 
       <h2>タイムライン (最新レビュー)</h2>
       <div>${timelineHtml.length > 0 ? timelineHtml : "<p>現在、表示できる投稿がありません。</p>"}</div>
@@ -507,5 +581,6 @@ module.exports = async (req, res) => {
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
+    setDiagnosticsHeader(res, diagnostics);
     return res.status(200).send(html);
 };
