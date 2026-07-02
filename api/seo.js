@@ -720,7 +720,7 @@ module.exports = async (req, res) => {
             url: "https://book-case-u9uq.vercel.app/",
         },
         robots:
-            hasReliableData && !usingSampleBooks
+            hasReliableData || usingSampleBooks
                 ? "index,follow"
                 : "noindex,nofollow",
     });
