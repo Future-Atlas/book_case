@@ -10,6 +10,7 @@ const RAKUTEN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404";
 const RAKUTEN_FOREIGN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
+const GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -89,6 +90,40 @@ async function fetchRakutenSection(sectionTitle) {
     return normalizeRakutenBooks(json?.Items, sectionTitle);
 }
 
+function normalizeGoogleBooks(items, sectionTitle) {
+    return (items || []).map((item) => {
+        const info = item?.volumeInfo || {};
+        const image = info.imageLinks || {};
+        return {
+            title: info.title || "不明なタイトル",
+            author: (info.authors && info.authors.join(", ")) || "不明な著者",
+            coverUrl: image.thumbnail || image.smallThumbnail || "",
+            genre: sectionTitle,
+            description: info.description || "",
+        };
+    });
+}
+
+async function fetchGoogleSection(sectionTitle) {
+    let query = "";
+    if (sectionTitle === "おすすめの本") {
+        query = "subject:fiction OR subject:novel";
+    } else if (sectionTitle === "洋書") {
+        query = "subject:fiction+lang:en";
+    } else if (sectionTitle === "人気作品") {
+        query = "bestseller";
+    } else {
+        return [];
+    }
+
+    const url = `${GOOGLE_BOOKS_API}?q=${encodeURIComponent(query)}&maxResults=6&printType=books&orderBy=relevance`;
+    const response = await fetch(url);
+    if (!response.ok) return [];
+
+    const json = await response.json();
+    return normalizeGoogleBooks(json?.items, sectionTitle);
+}
+
 async function fetchRakutenBookByIsbn(isbn) {
     if (!rakutenEnabled()) return null;
     if (!isbn) return null;
@@ -109,6 +144,34 @@ async function fetchRakutenBookByIsbn(isbn) {
         author: first.author || "不明な著者",
         coverUrl: first.largeImageUrl || "",
     };
+}
+
+async function fetchGoogleBookByIsbn(isbn) {
+    if (!isbn) return null;
+
+    const compact = String(isbn).replace(/[^0-9Xx]/g, "");
+    if (compact.length !== 10 && compact.length !== 13) return null;
+
+    const url = `${GOOGLE_BOOKS_API}?q=isbn:${encodeURIComponent(compact)}&maxResults=1&printType=books`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const json = await response.json();
+    const first = json?.items?.[0]?.volumeInfo;
+    if (!first) return null;
+
+    const image = first.imageLinks || {};
+    return {
+        title: first.title || compact,
+        author: (first.authors && first.authors.join(", ")) || "不明な著者",
+        coverUrl: image.thumbnail || image.smallThumbnail || "",
+    };
+}
+
+async function resolveBookByIsbn(isbn) {
+    const rakuten = await fetchRakutenBookByIsbn(isbn);
+    if (rakuten) return rakuten;
+    return fetchGoogleBookByIsbn(isbn);
 }
 
 function renderBookList(books) {
@@ -222,8 +285,7 @@ module.exports = async (req, res) => {
                             const rawBookId = p.book_id || "書籍ID未設定";
                             let resolved = isbnCache.get(rawBookId);
                             if (resolved === undefined) {
-                                resolved =
-                                    await fetchRakutenBookByIsbn(rawBookId);
+                                resolved = await resolveBookByIsbn(rawBookId);
                                 isbnCache.set(rawBookId, resolved || null);
                             }
 
@@ -253,8 +315,7 @@ module.exports = async (req, res) => {
                             const rawBookId = row.book_id || "書籍ID未設定";
                             let resolved = isbnCache.get(rawBookId);
                             if (resolved === undefined) {
-                                resolved =
-                                    await fetchRakutenBookByIsbn(rawBookId);
+                                resolved = await resolveBookByIsbn(rawBookId);
                                 isbnCache.set(rawBookId, resolved || null);
                             }
 
@@ -347,15 +408,25 @@ module.exports = async (req, res) => {
     let hasReliableData = false;
 
     try {
-        const [recommended, western, popular] = await Promise.all([
+        const [recommendedR, westernR, popularR] = await Promise.all([
             fetchRakutenSection("おすすめの本"),
             fetchRakutenSection("洋書"),
             fetchRakutenSection("人気作品"),
         ]);
 
-        recommendedBooks = recommended;
-        westernBooks = western;
-        popularBooks = popular;
+        const [recommendedG, westernG, popularG] = await Promise.all([
+            recommendedR.length
+                ? Promise.resolve([])
+                : fetchGoogleSection("おすすめの本"),
+            westernR.length ? Promise.resolve([]) : fetchGoogleSection("洋書"),
+            popularR.length
+                ? Promise.resolve([])
+                : fetchGoogleSection("人気作品"),
+        ]);
+
+        recommendedBooks = recommendedR.length ? recommendedR : recommendedG;
+        westernBooks = westernR.length ? westernR : westernG;
+        popularBooks = popularR.length ? popularR : popularG;
 
         if (
             recommendedBooks.length > 0 ||
