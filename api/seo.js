@@ -1,5 +1,5 @@
-// Vercel serverless function to handle crawler requests for SEO.
-// This route prioritizes truthful metadata and avoids publishing sample data.
+// Vercel serverless function to return crawler-friendly HTML for BookCase.
+// Policy: no Google APIs. Data source order is Rakuten first, then NDL fallback.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
@@ -10,7 +10,7 @@ const RAKUTEN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404";
 const RAKUTEN_FOREIGN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
-const GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes";
+const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -32,7 +32,6 @@ function parseJsonSafe(text) {
 function errorCodeFromText(bodyText) {
     const parsed = parseJsonSafe(bodyText);
     if (!parsed) return "unparseable";
-
     return (
         parsed?.errors?.errorCode ||
         parsed?.error?.code ||
@@ -86,16 +85,39 @@ function normalizeRakutenBooks(items, sectionTitle) {
     });
 }
 
-function normalizeGoogleBooks(items, sectionTitle) {
-    return (items || []).map((item) => {
-        const info = item?.volumeInfo || {};
-        const image = info.imageLinks || {};
+function decodeXmlEntities(text) {
+    return String(text || "")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/&amp;/g, "&");
+}
+
+function extractXmlTag(block, tags) {
+    for (const tag of tags) {
+        const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i");
+        const match = block.match(re);
+        if (match && match[1]) {
+            return decodeXmlEntities(match[1].trim());
+        }
+    }
+    return "";
+}
+
+function normalizeNdlBooks(xmlText, sectionTitle) {
+    const items = xmlText.match(/<item>[\s\S]*?<\/item>/gi) || [];
+    return items.slice(0, 6).map((itemBlock) => {
+        const title = extractXmlTag(itemBlock, ["title", "dc:title"]);
+        const author = extractXmlTag(itemBlock, ["author", "dc:creator"]);
+        const description = extractXmlTag(itemBlock, ["dc:description"]);
         return {
-            title: info.title || "不明なタイトル",
-            author: (info.authors && info.authors.join(", ")) || "不明な著者",
-            coverUrl: image.thumbnail || image.smallThumbnail || "",
+            title: title || "不明なタイトル",
+            author: author || "不明な著者",
+            coverUrl: "",
             genre: sectionTitle,
-            description: info.description || "",
+            description,
         };
     });
 }
@@ -135,36 +157,32 @@ async function fetchRakutenSection(sectionTitle, diagnostics) {
     return normalizeRakutenBooks(json?.Items, sectionTitle);
 }
 
-async function fetchGoogleSection(sectionTitle, diagnostics) {
-    let query = "";
+async function fetchNdlSection(sectionTitle, diagnostics) {
+    let queryParams = "cnt=6&startPage=1&mediatype=1";
+
     if (sectionTitle === "おすすめの本") {
-        query = "subject:fiction OR subject:novel";
+        queryParams += "&any=%E8%A9%B1%E9%A1%8C%20%E6%9C%AC";
     } else if (sectionTitle === "洋書") {
-        query = "subject:fiction lang:en";
+        queryParams += "&any=English";
     } else if (sectionTitle === "人気作品") {
-        query = "bestseller";
+        queryParams += "&any=%E3%83%99%E3%82%B9%E3%83%88%E3%82%BB%E3%83%A9%E3%83%BC";
     } else {
         return [];
     }
 
-    const url = `${GOOGLE_BOOKS_API}?q=${encodeURIComponent(
-        query,
-    )}&maxResults=6&printType=books&orderBy=relevance`;
+    const url = `${NDL_OPENSEARCH_API}?${queryParams}`;
     const response = await fetch(url);
     const body = await response.text();
     if (!response.ok) {
-        const code = errorCodeFromText(body);
-        diagnostics.googleSectionFailures.push(
-            `${sectionTitle}:${response.status}:${code}`,
-        );
-        if (String(code) === "429") {
-            diagnostics.googleQuotaExceeded = true;
-        }
+        diagnostics.ndlSectionFailures.push(`${sectionTitle}:${response.status}`);
         return [];
     }
 
-    const json = parseJsonSafe(body);
-    return normalizeGoogleBooks(json?.items, sectionTitle);
+    const books = normalizeNdlBooks(body, sectionTitle);
+    if (books.length === 0) {
+        diagnostics.ndlSectionFailures.push(`${sectionTitle}:empty`);
+    }
+    return books;
 }
 
 async function fetchRakutenBookByIsbn(isbn, diagnostics) {
@@ -195,38 +213,39 @@ async function fetchRakutenBookByIsbn(isbn, diagnostics) {
     };
 }
 
-async function fetchGoogleBookByIsbn(isbn, diagnostics) {
+async function fetchNdlBookByIsbn(isbn, diagnostics) {
     if (!isbn) return null;
 
     const compact = String(isbn).replace(/[^0-9Xx]/g, "");
     if (compact.length !== 10 && compact.length !== 13) return null;
 
-    const url = `${GOOGLE_BOOKS_API}?q=isbn:${encodeURIComponent(
+    const url = `${NDL_OPENSEARCH_API}?cnt=1&startPage=1&mediatype=1&any=${encodeURIComponent(
         compact,
-    )}&maxResults=1&printType=books`;
+    )}`;
     const response = await fetch(url);
     const body = await response.text();
     if (!response.ok) {
-        diagnostics.googleIsbnFailures += 1;
+        diagnostics.ndlIsbnFailures += 1;
         return null;
     }
 
-    const json = parseJsonSafe(body);
-    const first = json?.items?.[0]?.volumeInfo;
-    if (!first) return null;
+    const books = normalizeNdlBooks(body, "isbn");
+    if (!books.length) {
+        diagnostics.ndlIsbnFailures += 1;
+        return null;
+    }
 
-    const image = first.imageLinks || {};
     return {
-        title: first.title || compact,
-        author: (first.authors && first.authors.join(", ")) || "不明な著者",
-        coverUrl: image.thumbnail || image.smallThumbnail || "",
+        title: books[0].title,
+        author: books[0].author,
+        coverUrl: "",
     };
 }
 
 async function resolveBookByIsbn(isbn, diagnostics) {
     const rakuten = await fetchRakutenBookByIsbn(isbn, diagnostics);
     if (rakuten) return rakuten;
-    return fetchGoogleBookByIsbn(isbn, diagnostics);
+    return fetchNdlBookByIsbn(isbn, diagnostics);
 }
 
 function renderBookList(books) {
@@ -256,9 +275,8 @@ function setDiagnosticsHeader(res, diagnostics) {
         [
             `rakuten_section_fail=${diagnostics.rakutenSectionFailures.length}`,
             `rakuten_isbn_fail=${diagnostics.rakutenIsbnFailures}`,
-            `google_section_fail=${diagnostics.googleSectionFailures.length}`,
-            `google_isbn_fail=${diagnostics.googleIsbnFailures}`,
-            `google_quota=${diagnostics.googleQuotaExceeded ? "yes" : "no"}`,
+            `ndl_section_fail=${diagnostics.ndlSectionFailures.length}`,
+            `ndl_isbn_fail=${diagnostics.ndlIsbnFailures}`,
             `supabase_index_err=${diagnostics.supabaseIndexError === "none" ? "no" : "yes"}`,
             `supabase_profile_err=${diagnostics.supabaseProfileError === "none" ? "no" : "yes"}`,
         ].join(";"),
@@ -271,9 +289,8 @@ module.exports = async (req, res) => {
     const diagnostics = {
         rakutenSectionFailures: [],
         rakutenIsbnFailures: 0,
-        googleSectionFailures: [],
-        googleIsbnFailures: 0,
-        googleQuotaExceeded: false,
+        ndlSectionFailures: [],
+        ndlIsbnFailures: 0,
         supabaseIndexError: "none",
         supabaseProfileError: "none",
     };
@@ -487,21 +504,21 @@ module.exports = async (req, res) => {
             fetchRakutenSection("人気作品", diagnostics),
         ]);
 
-        const [recommendedG, westernG, popularG] = await Promise.all([
+        const [recommendedN, westernN, popularN] = await Promise.all([
             recommendedR.length
                 ? Promise.resolve([])
-                : fetchGoogleSection("おすすめの本", diagnostics),
+                : fetchNdlSection("おすすめの本", diagnostics),
             westernR.length
                 ? Promise.resolve([])
-                : fetchGoogleSection("洋書", diagnostics),
+                : fetchNdlSection("洋書", diagnostics),
             popularR.length
                 ? Promise.resolve([])
-                : fetchGoogleSection("人気作品", diagnostics),
+                : fetchNdlSection("人気作品", diagnostics),
         ]);
 
-        recommendedBooks = recommendedR.length ? recommendedR : recommendedG;
-        westernBooks = westernR.length ? westernR : westernG;
-        popularBooks = popularR.length ? popularR : popularG;
+        recommendedBooks = recommendedR.length ? recommendedR : recommendedN;
+        westernBooks = westernR.length ? westernR : westernN;
+        popularBooks = popularR.length ? popularR : popularN;
 
         if (
             recommendedBooks.length > 0 ||
