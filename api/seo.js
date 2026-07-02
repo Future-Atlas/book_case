@@ -293,12 +293,25 @@ function renderBookList(books) {
 }
 
 function setDiagnosticsHeader(res, diagnostics) {
+    const rakutenDetail = diagnostics.rakutenSectionFailures
+        .slice(0, 3)
+        .join("|")
+        .replace(/\s+/g, "_")
+        .replace(/;/g, ",");
+    const ndlDetail = diagnostics.ndlSectionFailures
+        .slice(0, 3)
+        .join("|")
+        .replace(/\s+/g, "_")
+        .replace(/;/g, ",");
+
     res.setHeader(
         "X-SEO-Diagnostics",
         [
             `rakuten_section_fail=${diagnostics.rakutenSectionFailures.length}`,
+            `rakuten_section_detail=${rakutenDetail || "none"}`,
             `rakuten_isbn_fail=${diagnostics.rakutenIsbnFailures}`,
             `ndl_section_fail=${diagnostics.ndlSectionFailures.length}`,
+            `ndl_section_detail=${ndlDetail || "none"}`,
             `ndl_isbn_fail=${diagnostics.ndlIsbnFailures}`,
             `ndl_fallback=${ENABLE_NDL_FALLBACK ? "on" : "off"}`,
             `supabase_index_err=${diagnostics.supabaseIndexError === "none" ? "no" : "yes"}`,
