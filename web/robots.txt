@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://book-case-u9uq.vercel.app/sitemap.xml

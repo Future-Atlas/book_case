@@ -20,6 +20,7 @@ const RAKUTEN_BOOK_API =
 const RAKUTEN_FOREIGN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
 const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
+const SITE_URL = "https://book-case-u9uq.vercel.app";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -383,6 +384,55 @@ function setDiagnosticsHeader(res, diagnostics) {
     );
 }
 
+function toAbsoluteUrl(pathname) {
+    const normalized = String(pathname || "/").startsWith("/")
+        ? String(pathname || "/")
+        : `/${String(pathname || "")}`;
+    return `${SITE_URL}${normalized}`;
+}
+
+function faqStructuredData() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+            {
+                "@type": "Question",
+                name: "BookCaseでは何ができますか？",
+                acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "本の検索、レビュー投稿、読書記録の管理、タイムライン閲覧ができます。",
+                },
+            },
+            {
+                "@type": "Question",
+                name: "レビューは誰でも投稿できますか？",
+                acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "アプリ内アカウントでログインしたユーザーがレビュー投稿できます。",
+                },
+            },
+            {
+                "@type": "Question",
+                name: "BookCaseの対象ジャンルは何ですか？",
+                acceptedAnswer: {
+                    "@type": "Answer",
+                    text: "おすすめの本、洋書、人気作品を中心に紹介しています。",
+                },
+            },
+        ],
+    };
+}
+
+function sectionByGenrePath(pathname) {
+    const map = {
+        "/genre/recommended": "おすすめの本",
+        "/genre/western": "洋書",
+        "/genre/popular": "人気作品",
+    };
+    return map[pathname] || "";
+}
+
 module.exports = async (req, res) => {
     const { path } = req.query;
     const decodedPath = decodeURIComponent(path || "");
@@ -398,7 +448,18 @@ module.exports = async (req, res) => {
 
     console.log(`SEO Crawler requested path: ${decodedPath}`);
 
-    const renderPage = ({ title, description, content, jsonLd, robots }) => `
+    const renderPage = ({
+        title,
+        description,
+        content,
+        jsonLd,
+        robots,
+        pagePath = "/",
+        extraJsonLd = [],
+    }) => {
+        const absoluteUrl = toAbsoluteUrl(pagePath);
+        const jsonLdList = [jsonLd, ...extraJsonLd].filter(Boolean);
+        return `
     <!DOCTYPE html>
     <html lang="ja">
     <head>
@@ -407,13 +468,20 @@ module.exports = async (req, res) => {
       <title>${title} | BookCase</title>
       <meta name="description" content="${description}">
       <meta name="robots" content="${robots || "index,follow"}">
+      <link rel="canonical" href="${absoluteUrl}">
       <meta property="og:title" content="${title} | BookCase">
       <meta property="og:description" content="${description}">
       <meta property="og:type" content="website">
+      <meta property="og:url" content="${absoluteUrl}">
       <meta name="twitter:card" content="summary_large_image">
       <meta name="twitter:title" content="${title}">
       <meta name="twitter:description" content="${description}">
-      ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ""}
+      ${jsonLdList
+          .map(
+              (item) =>
+                  `<script type="application/ld+json">${JSON.stringify(item)}</script>`,
+          )
+          .join("")}
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
         header { border-bottom: 2px solid #ff3b30; padding-bottom: 10px; margin-bottom: 20px; }
@@ -445,6 +513,7 @@ module.exports = async (req, res) => {
     </body>
     </html>
   `;
+    };
 
     if (decodedPath.includes("user") || decodedPath.includes("profile")) {
         let username = "ユーザー";
@@ -592,6 +661,44 @@ module.exports = async (req, res) => {
         return res.status(200).send(html);
     }
 
+    const genreSection = sectionByGenrePath(decodedPath);
+    if (genreSection) {
+        let books = [];
+        try {
+            books = await fetchRakutenSection(genreSection, diagnostics);
+        } catch {
+            books = [];
+        }
+
+        if (books.length === 0) {
+            books = sampleBooksFor(genreSection);
+            diagnostics.sampleBooksUsed = true;
+        }
+
+        const html = renderPage({
+            title: `${genreSection}一覧`,
+            description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
+            content: `
+        <h2>${genreSection}について</h2>
+        <p>BookCaseが注目する${genreSection}を一覧で紹介します。</p>
+        <div>${renderBookList(books)}</div>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                name: `${genreSection}一覧 | BookCase`,
+                description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
+                url: toAbsoluteUrl(decodedPath),
+            },
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
     let recommendedBooks = [];
     let westernBooks = [];
     let popularBooks = [];
@@ -689,6 +796,21 @@ module.exports = async (req, res) => {
     const sampleNoticeHtml = usingSampleBooks
         ? `<p style="background:#fff3cd; border:1px solid #ffe69c; color:#664d03; padding:10px; border-radius:8px;">現在、外部APIの一時的な制約により書籍情報はサンプル表示です。</p>`
         : "";
+    const faqHtml = `
+            <h2>よくある質問</h2>
+            <div class="post-card">
+                <strong>BookCaseでは何ができますか？</strong>
+                <p>本の検索、レビュー投稿、読書記録の管理、タイムライン閲覧ができます。</p>
+            </div>
+            <div class="post-card">
+                <strong>レビューは誰でも投稿できますか？</strong>
+                <p>アプリ内アカウントでログインしたユーザーがレビュー投稿できます。</p>
+            </div>
+            <div class="post-card">
+                <strong>BookCaseの対象ジャンルは何ですか？</strong>
+                <p>おすすめの本、洋書、人気作品を中心に紹介しています。</p>
+            </div>
+        `;
 
     const html = renderPage({
         title: "本の一覧・検索・タイムライン",
@@ -710,6 +832,8 @@ module.exports = async (req, res) => {
 
       <h2>タイムライン (最新レビュー)</h2>
       <div>${timelineHtml.length > 0 ? timelineHtml : "<p>現在、表示できる投稿がありません。</p>"}</div>
+
+      ${faqHtml}
     `,
         jsonLd: {
             "@context": "https://schema.org",
@@ -717,8 +841,10 @@ module.exports = async (req, res) => {
             name: "BookCase",
             description:
                 "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
-            url: "https://book-case-u9uq.vercel.app/",
+            url: `${SITE_URL}/`,
         },
+        extraJsonLd: [faqStructuredData()],
+        pagePath: decodedPath || "/",
         robots:
             hasReliableData || usingSampleBooks
                 ? "index,follow"
