@@ -164,6 +164,61 @@ function sampleBooksFor(sectionTitle) {
     return samples[sectionTitle] || [];
 }
 
+function sampleBookCatalog() {
+    return [
+        {
+            slug: "konbini-ningen",
+            section: "おすすめの本",
+            title: "コンビニ人間",
+            author: "村田 沙耶香",
+            description: "日常の違和感と社会の規範を鋭く描く現代文学。",
+        },
+        {
+            slug: "fune-wo-amu",
+            section: "おすすめの本",
+            title: "舟を編む",
+            author: "三浦 しをん",
+            description: "辞書づくりに情熱を注ぐ人々の物語。",
+        },
+        {
+            slug: "midnight-library",
+            section: "洋書",
+            title: "The Midnight Library",
+            author: "Matt Haig",
+            description: "人生の分岐を見つめ直す現代ファンタジー。",
+        },
+        {
+            slug: "atomic-habits",
+            section: "洋書",
+            title: "Atomic Habits",
+            author: "James Clear",
+            description: "小さな習慣の積み重ねを体系化した実践書。",
+        },
+        {
+            slug: "baton-wa-watasareta",
+            section: "人気作品",
+            title: "そして、バトンは渡された",
+            author: "瀬尾 まいこ",
+            description: "家族のかたちをやさしく描く話題作。",
+        },
+        {
+            slug: "nanji-hoshi-no-gotoku",
+            section: "人気作品",
+            title: "汝、星のごとく",
+            author: "凪良 ゆう",
+            description: "地方都市に生きる二人の愛と選択を描く長編。",
+        },
+    ];
+}
+
+function sampleBookBySlug(slug) {
+    return sampleBookCatalog().find((book) => book.slug === slug) || null;
+}
+
+function sampleBookLinksBySection(sectionTitle) {
+    return sampleBookCatalog().filter((book) => book.section === sectionTitle);
+}
+
 function decodeXmlEntities(text) {
     return String(text || "")
         .replace(/&lt;/g, "<")
@@ -433,6 +488,15 @@ function sectionByGenrePath(pathname) {
     return map[pathname] || "";
 }
 
+function genrePathBySection(sectionTitle) {
+    const map = {
+        おすすめの本: "/genre/recommended",
+        洋書: "/genre/western",
+        人気作品: "/genre/popular",
+    };
+    return map[sectionTitle] || "/";
+}
+
 module.exports = async (req, res) => {
     const { path } = req.query;
     const decodedPath = decodeURIComponent(path || "");
@@ -675,6 +739,13 @@ module.exports = async (req, res) => {
             diagnostics.sampleBooksUsed = true;
         }
 
+        const detailLinks = sampleBookLinksBySection(genreSection)
+            .map(
+                (book) =>
+                    `<li><a href="${toAbsoluteUrl(`/book/${book.slug}`)}">${escapeHtml(book.title)}</a></li>`,
+            )
+            .join("");
+
         const html = renderPage({
             title: `${genreSection}一覧`,
             description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
@@ -682,6 +753,8 @@ module.exports = async (req, res) => {
         <h2>${genreSection}について</h2>
         <p>BookCaseが注目する${genreSection}を一覧で紹介します。</p>
         <div>${renderBookList(books)}</div>
+        <h2>${genreSection}の詳細ページ</h2>
+        <ul>${detailLinks}</ul>
       `,
             jsonLd: {
                 "@context": "https://schema.org",
@@ -690,6 +763,87 @@ module.exports = async (req, res) => {
                 description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
                 url: toAbsoluteUrl(decodedPath),
             },
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath.startsWith("/book/")) {
+        const slug = decodedPath.replace("/book/", "").split("/")[0];
+        const book = sampleBookBySlug(slug);
+
+        if (!book) {
+            const notFoundHtml = renderPage({
+                title: "書籍ページが見つかりません",
+                description: "指定された書籍ページは見つかりませんでした。",
+                content: `<h2>書籍ページが見つかりません</h2><p>URLをご確認ください。</p>`,
+                jsonLd: {
+                    "@context": "https://schema.org",
+                    "@type": "WebPage",
+                    name: "書籍ページが見つかりません",
+                    description: "指定された書籍ページは見つかりませんでした。",
+                    url: toAbsoluteUrl(decodedPath),
+                },
+                pagePath: decodedPath,
+                robots: "noindex,nofollow",
+            });
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            setDiagnosticsHeader(res, diagnostics);
+            return res.status(404).send(notFoundHtml);
+        }
+
+        diagnostics.sampleBooksUsed = true;
+        const genrePath = genrePathBySection(book.section);
+        const html = renderPage({
+            title: `${book.title} の紹介`,
+            description: `${book.title}（${book.author}）の概要と関連ジャンル情報を掲載しています。`,
+            content: `
+        <h2>${escapeHtml(book.title)}</h2>
+        <p><strong>著者:</strong> ${escapeHtml(book.author)}</p>
+        <p>${escapeHtml(book.description)}</p>
+        <p><strong>ジャンル:</strong> <a href="${toAbsoluteUrl(genrePath)}">${escapeHtml(book.section)}</a></p>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "Book",
+                name: book.title,
+                author: {
+                    "@type": "Person",
+                    name: book.author,
+                },
+                description: book.description,
+                url: toAbsoluteUrl(decodedPath),
+            },
+            extraJsonLd: [
+                {
+                    "@context": "https://schema.org",
+                    "@type": "BreadcrumbList",
+                    itemListElement: [
+                        {
+                            "@type": "ListItem",
+                            position: 1,
+                            name: "ホーム",
+                            item: `${SITE_URL}/`,
+                        },
+                        {
+                            "@type": "ListItem",
+                            position: 2,
+                            name: book.section,
+                            item: toAbsoluteUrl(genrePath),
+                        },
+                        {
+                            "@type": "ListItem",
+                            position: 3,
+                            name: book.title,
+                            item: toAbsoluteUrl(decodedPath),
+                        },
+                    ],
+                },
+            ],
             pagePath: decodedPath,
             robots: "index,follow",
         });
