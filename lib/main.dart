@@ -104,6 +104,7 @@ class MyApp extends StatelessWidget {
         dividerColor: const Color(0xFF2A3447),
       ),
       themeMode: ThemeMode.system, // Dynamically follow device preference
+      routes: {'/login': (context) => const AuthScreen()},
 
       home: const MainNavigationShell(),
     );
@@ -119,26 +120,25 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentScreenIndex = 0; // 0 = BookList, 1 = UserProfile
-  bool _showAuthScreen = false;
 
   Future<void> _goToProfile() async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     if (!service.isAuthenticated) {
-      setState(() => _showAuthScreen = true);
-      return;
+      final result = await Navigator.of(context).pushNamed('/login');
+      if (result != true && !service.isAuthenticated) {
+        return;
+      }
     }
 
     await service.ensureCurrentUserProfile();
     if (!mounted) return;
     setState(() {
-      _showAuthScreen = false;
       _currentScreenIndex = 1;
     });
   }
 
   void _goToBookList() {
     setState(() {
-      _showAuthScreen = false;
       _currentScreenIndex = 0;
     });
   }
@@ -147,14 +147,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     return Consumer<SupabaseService>(
       builder: (context, service, _) {
-        if (_showAuthScreen && service.isAuthenticated) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _goToProfile();
-            }
-          });
-        }
-
         // If auth is lost while on profile, force navigation back to list.
         if (!service.isAuthenticated && _currentScreenIndex == 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -168,12 +160,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           body: SafeArea(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              child: _showAuthScreen
-                  ? AuthScreen(
-                      key: const ValueKey('AuthScreen'),
-                      onBack: _goToBookList,
-                    )
-                  : _currentScreenIndex == 0
+              child: _currentScreenIndex == 0
                   ? BookListScreen(
                       key: const ValueKey('BookListScreen'),
                       onNavigateToProfile: _goToProfile,
