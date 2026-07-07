@@ -151,6 +151,202 @@ class _BookListScreenState extends State<BookListScreen> {
     );
   }
 
+  void _showBookDetailDialog(Book book) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final hasCover = book.coverUrl.trim().isNotEmpty;
+
+        return Dialog(
+          backgroundColor: const Color(0xFFE6E6E6),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 560;
+
+                      final coverBlock = SizedBox(
+                        width: isNarrow ? double.infinity : 160,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: isNarrow ? double.infinity : 140,
+                              height: 210,
+                              color: Colors.grey[400],
+                              child: hasCover
+                                  ? Image.network(
+                                      book.coverUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return _buildMissingCoverFallback(
+                                              book,
+                                            );
+                                          },
+                                    )
+                                  : _buildMissingCoverFallback(book),
+                            ),
+                            const SizedBox(height: 12),
+                            if (!hasCover) ...[
+                              Text(
+                                book.title,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                book.author,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+
+                      final detailBlock = Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: SizedBox(
+                              width: 190,
+                              height: 64,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  _showAddReviewDialog(book);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: const Color(0xFFFF1F1F),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                child: const Text(
+                                  '読了',
+                                  style: TextStyle(
+                                    fontSize: 52 / 2,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              ...List.generate(5, (index) {
+                                final isFilled = index < book.ratingAvg.floor();
+                                return Icon(
+                                  isFilled ? Icons.star : Icons.star_border,
+                                  color: const Color(0xFFE0B400),
+                                  size: 42,
+                                );
+                              }),
+                              const SizedBox(width: 12),
+                              Text(
+                                book.ratingAvg.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Color(0xFFE0B400),
+                                  fontSize: 52 / 2,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            color: const Color(0xFFD8D8D8),
+                            child: Text(
+                              book.description.trim().isNotEmpty
+                                  ? book.description
+                                  : 'あらすじ情報はまだ登録されていません。',
+                              style: const TextStyle(
+                                fontSize: 20 / 2,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            coverBlock,
+                            const SizedBox(height: 12),
+                            detailBlock,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          coverBlock,
+                          const SizedBox(width: 20),
+                          Expanded(child: detailBlock),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMissingCoverFallback(Book book) {
+    return Container(
+      color: Colors.grey[300],
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.menu_book, size: 28, color: Colors.black54),
+          const SizedBox(height: 8),
+          Text(
+            book.title,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            book.author,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -364,11 +560,7 @@ class _BookListScreenState extends State<BookListScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          title,
-          sectionCode,
-          failedToLoad: bookList.isEmpty,
-        ),
+        _buildSectionHeader(title, sectionCode, failedToLoad: bookList.isEmpty),
         _buildBookCarousel(bookList, onLoadMore),
       ],
     );
@@ -397,7 +589,10 @@ class _BookListScreenState extends State<BookListScreen> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(4),
@@ -509,7 +704,7 @@ class _BookListScreenState extends State<BookListScreen> {
         itemCount: bookList.length,
         itemBuilder: (context, index) {
           final book = bookList[index];
-          return BookCard(book: book, onTap: () => _showAddReviewDialog(book));
+          return BookCard(book: book, onTap: () => _showBookDetailDialog(book));
         },
       ),
     );
@@ -561,7 +756,7 @@ class _BookListScreenState extends State<BookListScreen> {
               return BookCard(
                 book: book,
                 width: double.infinity,
-                onTap: () => _showAddReviewDialog(book),
+                onTap: () => _showBookDetailDialog(book),
               );
             },
           ),
