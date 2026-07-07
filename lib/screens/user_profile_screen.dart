@@ -41,9 +41,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
+    final uid = service.activeProfileId;
 
-    // ⭕ 認証を実装するまでの間、指定のダミーUUIDを直接使用して通信します
-    const uid = 'd3b07384-d113-4ec5-a587-f3e098a58f4a';
+    if (uid.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _profile = null;
+          _userPosts = [];
+          _collections = [];
+          _favorites = [];
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     final profile = await service.fetchUserProfile(uid);
     final posts = await service.fetchUserPosts(uid);
@@ -71,6 +82,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: widget.onBack,
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black87),
+            onPressed: () async {
+              final service = Provider.of<SupabaseService>(
+                context,
+                listen: false,
+              );
+              await service.signOut();
+              if (!mounted) return;
+              widget.onBack();
+            },
+          ),
+        ],
         title: const Text(
           'マイプロフィール',
           style: TextStyle(

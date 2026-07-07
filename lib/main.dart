@@ -4,18 +4,24 @@ import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
 import 'screens/book_list_screen.dart'; // 👈 これを追加
 import 'screens/user_profile_screen.dart';
+import 'screens/auth_screen.dart';
 
 final supabaseService = SupabaseService();
 
 // 💡 パッケージを使わず、環境変数（JSON）から直接安全に引き抜く
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+const supabaseRedirectUrl = String.fromEnvironment('SUPABASE_REDIRECT_URL');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase service
-  await supabaseService.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await supabaseService.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseKey,
+    redirectUrl: supabaseRedirectUrl,
+  );
 
   runApp(
     MultiProvider(
@@ -113,28 +119,73 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentScreenIndex = 0; // 0 = BookList, 1 = UserProfile
+  bool _showAuthScreen = false;
+
+  Future<void> _goToProfile() async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (!service.isAuthenticated) {
+      setState(() => _showAuthScreen = true);
+      return;
+    }
+
+    await service.ensureCurrentUserProfile();
+    if (!mounted) return;
+    setState(() {
+      _showAuthScreen = false;
+      _currentScreenIndex = 1;
+    });
+  }
+
+  void _goToBookList() {
+    setState(() {
+      _showAuthScreen = false;
+      _currentScreenIndex = 0;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: _currentScreenIndex == 0
-              ? BookListScreen(
-                  key: const ValueKey('BookListScreen'),
-                  onNavigateToProfile: () {
-                    setState(() => _currentScreenIndex = 1);
-                  },
-                )
-              : UserProfileScreen(
-                  key: const ValueKey('UserProfileScreen'),
-                  onBack: () {
-                    setState(() => _currentScreenIndex = 0);
-                  },
-                ),
-        ),
-      ),
+    return Consumer<SupabaseService>(
+      builder: (context, service, _) {
+        if (_showAuthScreen && service.isAuthenticated) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _goToProfile();
+            }
+          });
+        }
+
+        // If auth is lost while on profile, force navigation back to list.
+        if (!service.isAuthenticated && _currentScreenIndex == 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _goToBookList();
+            }
+          });
+        }
+
+        return Scaffold(
+          body: SafeArea(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: _showAuthScreen
+                  ? AuthScreen(
+                      key: const ValueKey('AuthScreen'),
+                      onBack: _goToBookList,
+                    )
+                  : _currentScreenIndex == 0
+                  ? BookListScreen(
+                      key: const ValueKey('BookListScreen'),
+                      onNavigateToProfile: _goToProfile,
+                    )
+                  : UserProfileScreen(
+                      key: const ValueKey('UserProfileScreen'),
+                      onBack: _goToBookList,
+                    ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

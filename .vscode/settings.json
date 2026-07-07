@@ -3,6 +3,7 @@
         "/^node --check api/seo\\.js$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "flutter": true
     }
 }

@@ -1,5 +1,7 @@
 // SupabaseService: handles real Supabase interactions only – no mock data.
 // Mock book data removed – books are fetched from external APIs via BookRepository.
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/book.dart';
@@ -13,17 +15,37 @@ class SupabaseService extends ChangeNotifier {
 
   bool _isInitialized = false;
   SupabaseClient? _client;
+  StreamSubscription<AuthState>? _authStateSubscription;
+  String? _redirectUrl;
 
   // ----- Initialization ----------------------------------------------------
-  Future<void> initialize({String? url, String? anonKey}) async {
+  Future<void> initialize({
+    String? url,
+    String? anonKey,
+    String? redirectUrl,
+  }) async {
     if (url != null &&
         anonKey != null &&
         url.isNotEmpty &&
         anonKey.isNotEmpty) {
       try {
-        await Supabase.initialize(url: url, anonKey: anonKey);
+        _redirectUrl = redirectUrl?.trim().isNotEmpty == true
+            ? redirectUrl!.trim()
+            : null;
+
+        await Supabase.initialize(url: url, publishableKey: anonKey);
         _client = Supabase.instance.client;
         _isInitialized = true;
+
+        _authStateSubscription?.cancel();
+        _authStateSubscription = _client!.auth.onAuthStateChange.listen((evt) {
+          final user = evt.session?.user;
+          if (user != null) {
+            _upsertProfile(userId: user.id, email: user.email);
+          }
+          notifyListeners();
+        });
+
         debugPrint('Supabase initialized successfully.');
       } catch (e) {
         debugPrint('Supabase initialization failed: $e');
@@ -38,6 +60,137 @@ class SupabaseService extends ChangeNotifier {
   // ----- Helper -----------------------------------------------------------
   // Returns the current authenticated user ID, or an empty string if not logged in.
   String get activeProfileId => _client?.auth.currentUser?.id ?? '';
+
+  bool get isAuthenticated => _client?.auth.currentSession != null;
+
+  User? get currentUser => _client?.auth.currentUser;
+
+  // ----- AUTH -------------------------------------------------------------
+  Future<String?> sendMagicLink({required String email}) async {
+    if (!_isInitialized || _client == null) {
+      return 'Supabaseが初期化されていません。';
+    }
+
+    try {
+      await _client!.auth.signInWithOtp(
+        email: email,
+        shouldCreateUser: true,
+        emailRedirectTo: _redirectUrl,
+      );
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'マジックリンク送信に失敗しました: $e';
+    }
+  }
+
+  Future<String?> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    if (!_isInitialized || _client == null) {
+      return 'Supabaseが初期化されていません。';
+    }
+
+    try {
+      final response = await _client!.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      final user = response.user;
+      if (user != null) {
+        await _upsertProfile(
+          userId: user.id,
+          email: user.email,
+          preferredUsername: null,
+        );
+      }
+      notifyListeners();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'ログインに失敗しました: $e';
+    }
+  }
+
+  Future<String?> signUpWithEmail({
+    required String email,
+    required String password,
+    String? username,
+  }) async {
+    if (!_isInitialized || _client == null) {
+      return 'Supabaseが初期化されていません。';
+    }
+
+    try {
+      final response = await _client!.auth.signUp(
+        email: email,
+        password: password,
+      );
+      final user = response.user;
+      if (user != null) {
+        await _upsertProfile(
+          userId: user.id,
+          email: email,
+          preferredUsername: username,
+        );
+      }
+      notifyListeners();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return '新規登録に失敗しました: $e';
+    }
+  }
+
+  Future<void> signOut() async {
+    if (!_isInitialized || _client == null) return;
+    try {
+      await _client!.auth.signOut();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error signing out: $e');
+    }
+  }
+
+  Future<void> ensureCurrentUserProfile() async {
+    final user = currentUser;
+    if (user == null) return;
+    await _upsertProfile(userId: user.id, email: user.email);
+  }
+
+  Future<void> _upsertProfile({
+    required String userId,
+    String? email,
+    String? preferredUsername,
+  }) async {
+    if (!_isInitialized || _client == null) return;
+
+    final generatedUsername = preferredUsername?.trim().isNotEmpty == true
+        ? preferredUsername!.trim()
+        : _usernameFromEmail(email);
+
+    try {
+      await _client!.from('profiles').upsert({
+        'id': userId,
+        'username': generatedUsername,
+        'avatar_url': '',
+        'bio': '',
+      }, onConflict: 'id');
+    } catch (e) {
+      debugPrint('Error upserting profile: $e');
+    }
+  }
+
+  String _usernameFromEmail(String? email) {
+    final source = (email ?? 'bookcase_user').split('@').first;
+    final sanitized = source.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    if (sanitized.isEmpty) return 'bookcase_user';
+    return sanitized;
+  }
 
   // ----- BOOK QUERIES -----------------------------------------------------
   // NOTE: Book data is now fetched via external APIs, not stored in Supabase.
@@ -108,7 +261,7 @@ class SupabaseService extends ChangeNotifier {
   Future<List<Book>> fetchUserCollections(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        final response = await _client!
+        await _client!
             .from('collections')
             .select('book_id')
             .eq('profile_id', profileId);
@@ -124,7 +277,7 @@ class SupabaseService extends ChangeNotifier {
   Future<List<Book>> fetchUserFavorites(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        final response = await _client!
+        await _client!
             .from('favorites')
             .select('book_id')
             .eq('profile_id', profileId);
@@ -228,5 +381,11 @@ class SupabaseService extends ChangeNotifier {
     }
     debugPrint('Supabase not initialized – favorite not toggled.');
     return false;
+  }
+
+  @override
+  void dispose() {
+    _authStateSubscription?.cancel();
+    super.dispose();
   }
 }
