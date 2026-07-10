@@ -9,8 +9,13 @@ import '../widgets/book_card.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
+  final bool showAppBar;
 
-  const UserProfileScreen({super.key, required this.onBack});
+  const UserProfileScreen({
+    super.key,
+    required this.onBack,
+    this.showAppBar = true,
+  });
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -75,37 +80,39 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: widget.onBack,
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black87),
-            onPressed: () async {
-              final service = Provider.of<SupabaseService>(
-                context,
-                listen: false,
-              );
-              await service.signOut();
-              if (!mounted) return;
-              widget.onBack();
-            },
-          ),
-        ],
-        title: const Text(
-          'マイプロフィール',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                onPressed: widget.onBack,
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.black87),
+                  onPressed: () async {
+                    final service = Provider.of<SupabaseService>(
+                      context,
+                      listen: false,
+                    );
+                    await service.signOut();
+                    if (!mounted) return;
+                    widget.onBack();
+                  },
+                ),
+              ],
+              title: const Text(
+                'マイプロフィール',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              centerTitle: true,
+            )
+          : null,
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
