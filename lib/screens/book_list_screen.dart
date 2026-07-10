@@ -860,7 +860,7 @@ class _BookListScreenState extends State<BookListScreen> {
           Divider(color: Colors.grey[200]),
           const SizedBox(height: 16),
           Text(
-            '© 2026 BookCase. All rights reserved.',
+            '© 2026 Sharemarium. All rights reserved.',
             style: TextStyle(color: Colors.grey[400], fontSize: 11),
           ),
           const SizedBox(height: 4),

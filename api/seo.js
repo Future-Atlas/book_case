@@ -572,7 +572,7 @@ module.exports = async (req, res) => {
         ${content}
       </main>
       <footer>
-        <p>© 2026 BookCase. All rights reserved.</p>
+        <p>© 2026 Sharemarium. All rights reserved.</p>
       </footer>
     </body>
     </html>
