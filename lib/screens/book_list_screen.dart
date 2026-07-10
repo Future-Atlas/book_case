@@ -18,7 +18,6 @@ class BookListScreen extends StatefulWidget {
 
 class _BookListScreenState extends State<BookListScreen> {
   late final BookListController _controller;
-  final TextEditingController commentController = TextEditingController();
 
   @override
   void initState() {
@@ -29,74 +28,134 @@ class _BookListScreenState extends State<BookListScreen> {
 
   @override
   void dispose() {
-    commentController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  void _showAddReviewDialog(Book book) {
+  Future<void> _showPostComposerDialog(Book book) async {
     double rating = 5.0;
+    bool isSpoiler = false;
+    final commentController = TextEditingController();
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              backgroundColor: const Color(0xFFE9E9E9),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Text(
-                '『${book.title}』のレビューを投稿',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                borderRadius: BorderRadius.circular(8),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '評価点数:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final starVal = index + 1.0;
-                      return IconButton(
-                        icon: Icon(
-                          rating >= starVal ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 32,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 92,
+                        height: 132,
+                        color: Colors.grey[350],
+                        child: book.coverUrl.trim().isNotEmpty
+                            ? Image.network(
+                                book.coverUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildMissingCoverFallback(book),
+                              )
+                            : _buildMissingCoverFallback(book),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      setDialogState(() => isSpoiler = false);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: isSpoiler
+                                          ? Colors.white70
+                                          : const Color(0xFFFF1F1F),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Text('ネタバレなし投稿'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      setDialogState(() => isSpoiler = true);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: isSpoiler
+                                          ? const Color(0xFFFF1F1F)
+                                          : Colors.white70,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Text('ネタバレあり投稿'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                ...List.generate(5, (index) {
+                                  final starVal = index + 1.0;
+                                  return IconButton(
+                                    icon: Icon(
+                                      rating >= starVal
+                                          ? Icons.star
+                                          : Icons.star_border,
+                                      color: const Color(0xFFE0B400),
+                                      size: 42,
+                                    ),
+                                    onPressed: () {
+                                      setDialogState(() => rating = starVal);
+                                    },
+                                  );
+                                }),
+                                Text(
+                                  rating.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    fontSize: 52 / 2,
+                                    color: Color(0xFFE0B400),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        onPressed: () {
-                          setDialogState(() => rating = starVal);
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'コメント:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: commentController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: '読んだ感想を入力してください...',
-                      hintStyle: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 13,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    color: const Color(0xFFD2D2D2),
+                    padding: const EdgeInsets.all(10),
+                    child: TextField(
+                      controller: commentController,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        hintText: '感想を書いてください',
+                        border: InputBorder.none,
+                        isCollapsed: true,
                       ),
-                      contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
                 ],
@@ -127,10 +186,14 @@ class _BookListScreenState extends State<BookListScreen> {
                       context,
                       listen: false,
                     );
+                    final comment = isSpoiler
+                        ? '[ネタバレあり]\n${commentController.text.trim()}'
+                        : '[ネタバレなし]\n${commentController.text.trim()}';
+
                     final success = await service.createPost(
                       bookId: book.id,
                       rating: rating,
-                      comment: commentController.text.trim(),
+                      comment: comment,
                     );
 
                     if (success && mounted) {
@@ -149,6 +212,7 @@ class _BookListScreenState extends State<BookListScreen> {
         );
       },
     );
+    commentController.dispose();
   }
 
   void _showBookDetailDialog(Book book) {
@@ -229,7 +293,7 @@ class _BookListScreenState extends State<BookListScreen> {
                               child: ElevatedButton(
                                 onPressed: () {
                                   Navigator.of(context).pop();
-                                  _showAddReviewDialog(book);
+                                  _showPostComposerDialog(book);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.black,
