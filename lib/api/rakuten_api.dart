@@ -94,6 +94,10 @@ class RakutenApi {
 
         final description = bookData['itemCaption'] as String? ?? '';
         final itemUrl = bookData['itemUrl'] as String? ?? '';
+        final rawReviewAverage = bookData['reviewAverage'];
+        final parsedReviewAverage = rawReviewAverage is num
+            ? rawReviewAverage.toDouble()
+            : double.tryParse(rawReviewAverage?.toString() ?? '') ?? 0.0;
 
         books.add(
           Book(
@@ -106,6 +110,7 @@ class RakutenApi {
             pubDate: pubDate,
             isbn: isbn,
             coverUrl: coverUrl,
+            ratingAvg: parsedReviewAverage,
             genre: selectedGenre,
             description: description,
           ),
