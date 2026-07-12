@@ -151,8 +151,17 @@ class _BookListScreenState extends State<BookListScreen> {
                     child: TextField(
                       controller: commentController,
                       maxLines: 5,
+                      style: const TextStyle(
+                        color: Color(0xFF1E1E1E),
+                        fontSize: 16,
+                        height: 1.4,
+                      ),
                       decoration: const InputDecoration(
                         hintText: '感想を書いてください',
+                        hintStyle: TextStyle(
+                          color: Color(0xFF6A6A6A),
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
                         isCollapsed: true,
                       ),
@@ -267,6 +276,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E1E1E),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -344,6 +354,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                   ? book.description
                                   : 'あらすじ情報はまだ登録されていません。',
                               style: const TextStyle(
+                                color: Color(0xFF1E1E1E),
                                 fontSize: 20 / 2,
                                 height: 1.5,
                               ),
