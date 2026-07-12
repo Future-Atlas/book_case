@@ -47,127 +47,134 @@ class _BookListScreenState extends State<BookListScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 92,
-                        height: 132,
-                        color: Colors.grey[350],
-                        child: book.coverUrl.trim().isNotEmpty
-                            ? Image.network(
-                                book.coverUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildMissingCoverFallback(book),
-                              )
-                            : _buildMissingCoverFallback(book),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      setDialogState(() => isSpoiler = false);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      foregroundColor: isSpoiler
-                                          ? Colors.white70
-                                          : const Color(0xFFFF1F1F),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Text('ネタバレなし投稿'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      setDialogState(() => isSpoiler = true);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      foregroundColor: isSpoiler
-                                          ? const Color(0xFFFF1F1F)
-                                          : Colors.white70,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Text('ネタバレあり投稿'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                ...List.generate(5, (index) {
-                                  final starVal = index + 1.0;
-                                  return IconButton(
-                                    icon: Icon(
-                                      rating >= starVal
-                                          ? Icons.star
-                                          : Icons.star_border,
-                                      color: const Color(0xFFE0B400),
-                                      size: 42,
-                                    ),
-                                    onPressed: () {
-                                      setDialogState(() => rating = starVal);
-                                    },
-                                  );
-                                }),
-                                Text(
-                                  rating.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    fontSize: 52 / 2,
-                                    color: Color(0xFFE0B400),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+              content: DefaultTextStyle.merge(
+                style: const TextStyle(color: Color(0xFF1E1E1E)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 92,
+                          height: 132,
+                          color: Colors.grey[350],
+                          child: book.coverUrl.trim().isNotEmpty
+                              ? Image.network(
+                                  book.coverUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      _buildMissingCoverFallback(book),
+                                )
+                              : _buildMissingCoverFallback(book),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    color: const Color(0xFFD2D2D2),
-                    padding: const EdgeInsets.all(10),
-                    child: TextField(
-                      controller: commentController,
-                      maxLines: 5,
-                      style: const TextStyle(
-                        color: Color(0xFF1E1E1E),
-                        fontSize: 16,
-                        height: 1.4,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '感想を書いてください',
-                        hintStyle: TextStyle(
-                          color: Color(0xFF6A6A6A),
-                          fontSize: 14,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        setDialogState(() => isSpoiler = false);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.black,
+                                        foregroundColor: isSpoiler
+                                            ? Colors.white70
+                                            : const Color(0xFFFF1F1F),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text('ネタバレなし投稿'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        setDialogState(() => isSpoiler = true);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.black,
+                                        foregroundColor: isSpoiler
+                                            ? const Color(0xFFFF1F1F)
+                                            : Colors.white70,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text('ネタバレあり投稿'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  ...List.generate(5, (index) {
+                                    final starVal = index + 1.0;
+                                    return IconButton(
+                                      icon: Icon(
+                                        rating >= starVal
+                                            ? Icons.star
+                                            : Icons.star_border,
+                                        color: const Color(0xFFE0B400),
+                                        size: 42,
+                                      ),
+                                      onPressed: () {
+                                        setDialogState(() => rating = starVal);
+                                      },
+                                    );
+                                  }),
+                                  Text(
+                                    rating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontSize: 52 / 2,
+                                      color: Color(0xFFE0B400),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        border: InputBorder.none,
-                        isCollapsed: true,
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      color: const Color(0xFFD2D2D2),
+                      padding: const EdgeInsets.all(10),
+                      child: TextField(
+                        controller: commentController,
+                        maxLines: 5,
+                        style: const TextStyle(
+                          color: Color(0xFF1E1E1E),
+                          fontSize: 16,
+                          height: 1.4,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: '感想を書いてください',
+                          hintStyle: TextStyle(
+                            color: Color(0xFF6A6A6A),
+                            fontSize: 14,
+                          ),
+                          border: InputBorder.none,
+                          isCollapsed: true,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -240,151 +247,155 @@ class _BookListScreenState extends State<BookListScreen> {
             constraints: const BoxConstraints(maxWidth: 760),
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isNarrow = constraints.maxWidth < 560;
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(color: Color(0xFF1E1E1E)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 560;
 
-                      final coverBlock = SizedBox(
-                        width: isNarrow ? double.infinity : 160,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: isNarrow ? double.infinity : 140,
-                              height: 210,
-                              color: Colors.grey[400],
-                              child: hasCover
-                                  ? Image.network(
-                                      book.coverUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return _buildMissingCoverFallback(
-                                              book,
-                                            );
-                                          },
-                                    )
-                                  : _buildMissingCoverFallback(book),
-                            ),
-                            const SizedBox(height: 12),
-                            if (!hasCover) ...[
-                              Text(
-                                book.title,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E1E1E),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                book.author,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-
-                      final detailBlock = Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Align(
-                            alignment: Alignment.topCenter,
-                            child: SizedBox(
-                              width: 190,
-                              height: 64,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  _showPostComposerDialog(book);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black,
-                                  foregroundColor: const Color(0xFFFF1F1F),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                ),
-                                child: const Text(
-                                  '読了',
-                                  style: TextStyle(
-                                    fontSize: 52 / 2,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
+                        final coverBlock = SizedBox(
+                          width: isNarrow ? double.infinity : 160,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ...List.generate(5, (index) {
-                                final isFilled = index < book.ratingAvg.floor();
-                                return Icon(
-                                  isFilled ? Icons.star : Icons.star_border,
-                                  color: const Color(0xFFE0B400),
-                                  size: 42,
-                                );
-                              }),
-                              const SizedBox(width: 12),
-                              Text(
-                                book.ratingAvg.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  color: Color(0xFFE0B400),
-                                  fontSize: 52 / 2,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              Container(
+                                width: isNarrow ? double.infinity : 140,
+                                height: 210,
+                                color: Colors.grey[400],
+                                child: hasCover
+                                    ? Image.network(
+                                        book.coverUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                              return _buildMissingCoverFallback(
+                                                book,
+                                              );
+                                            },
+                                      )
+                                    : _buildMissingCoverFallback(book),
                               ),
+                              const SizedBox(height: 12),
+                              if (!hasCover) ...[
+                                Text(
+                                  book.title,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1E1E1E),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  book.author,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            color: const Color(0xFFD8D8D8),
-                            child: Text(
-                              book.description.trim().isNotEmpty
-                                  ? book.description
-                                  : 'あらすじ情報はまだ登録されていません。',
-                              style: const TextStyle(
-                                color: Color(0xFF1E1E1E),
-                                fontSize: 20 / 2,
-                                height: 1.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
+                        );
 
-                      if (isNarrow) {
-                        return Column(
+                        final detailBlock = Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            coverBlock,
-                            const SizedBox(height: 12),
-                            detailBlock,
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: SizedBox(
+                                width: 190,
+                                height: 64,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    _showPostComposerDialog(book);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: const Color(0xFFFF1F1F),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    '読了',
+                                    style: TextStyle(
+                                      fontSize: 52 / 2,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                ...List.generate(5, (index) {
+                                  final isFilled =
+                                      index < book.ratingAvg.floor();
+                                  return Icon(
+                                    isFilled ? Icons.star : Icons.star_border,
+                                    color: const Color(0xFFE0B400),
+                                    size: 42,
+                                  );
+                                }),
+                                const SizedBox(width: 12),
+                                Text(
+                                  book.ratingAvg.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    color: Color(0xFFE0B400),
+                                    fontSize: 52 / 2,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              color: const Color(0xFFD8D8D8),
+                              child: Text(
+                                book.description.trim().isNotEmpty
+                                    ? book.description
+                                    : 'あらすじ情報はまだ登録されていません。',
+                                style: const TextStyle(
+                                  color: Color(0xFF1E1E1E),
+                                  fontSize: 20 / 2,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
                           ],
                         );
-                      }
 
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          coverBlock,
-                          const SizedBox(width: 20),
-                          Expanded(child: detailBlock),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                        if (isNarrow) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              coverBlock,
+                              const SizedBox(height: 12),
+                              detailBlock,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            coverBlock,
+                            const SizedBox(width: 20),
+                            Expanded(child: detailBlock),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
