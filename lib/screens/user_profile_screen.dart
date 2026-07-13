@@ -375,7 +375,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           book: book,
           width: double.infinity,
           height: 140,
-          coverHeightRatio: showDescription ? 0.82 : 0.7,
+          coverHeightRatio: showDescription ? (2 / 3) : (1 / 3),
           showDescription: showDescription,
           descriptionMaxLines: 3,
         );
