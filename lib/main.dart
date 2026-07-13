@@ -186,6 +186,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     return Consumer<SupabaseService>(
       builder: (context, service, _) {
+        final menuIconColor = Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : Colors.black;
+
         // If auth is lost while on profile, force navigation back to list.
         if (!service.isAuthenticated && _currentScreenIndex == 1) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -213,11 +217,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     children: [
                       PopupMenuButton<_HeaderMenuAction>(
                         tooltip: 'メニュー',
-                        icon: const Icon(
-                          Icons.menu,
-                          size: 38,
-                          color: Colors.black,
-                        ),
+                        icon: Icon(Icons.menu, size: 38, color: menuIconColor),
                         position: PopupMenuPosition.under,
                         color: Colors.white,
                         onSelected: _onMenuAction,
