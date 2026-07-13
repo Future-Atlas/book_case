@@ -311,6 +311,12 @@ class _BookListScreenState extends State<BookListScreen> {
                                 height: 64,
                                 child: ElevatedButton(
                                   onPressed: () {
+                                    final service =
+                                        Provider.of<SupabaseService>(
+                                          context,
+                                          listen: false,
+                                        );
+                                    service.markBookAsRead(bookId: book.id);
                                     Navigator.of(context).pop();
                                     _showPostComposerDialog(book);
                                   },
