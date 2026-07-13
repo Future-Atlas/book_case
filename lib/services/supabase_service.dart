@@ -387,7 +387,33 @@ class SupabaseService extends ChangeNotifier {
     final results = await Future.wait(
       bookIds.map((id) => RakutenApi.fetchBookById(id)),
     );
-    return results.whereType<Book>().toList();
+
+    final books = <Book>[];
+    for (var i = 0; i < bookIds.length; i++) {
+      final id = bookIds[i];
+      final resolved = results[i];
+      if (resolved != null) {
+        books.add(resolved);
+        continue;
+      }
+
+      // Keep unresolved items visible in collections instead of dropping them.
+      books.add(
+        Book(
+          id: id,
+          title: id,
+          author: '著者情報なし',
+          publisher: '',
+          pubDate: '',
+          isbn: id,
+          coverUrl: '',
+          ratingAvg: 0,
+          genre: '',
+          description: '書誌情報を取得できませんでした。',
+        ),
+      );
+    }
+    return books;
   }
 
   Future<void> _upsertReadCollection({

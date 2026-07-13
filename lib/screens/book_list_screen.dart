@@ -310,9 +310,6 @@ class _BookListScreenState extends State<BookListScreen> {
                               future: isReadFuture,
                               builder: (context, snapshot) {
                                 final isRead = snapshot.data ?? false;
-                                if (isRead) {
-                                  return const SizedBox.shrink();
-                                }
                                 return Align(
                                   alignment: Alignment.topCenter,
                                   child: SizedBox(
@@ -320,11 +317,13 @@ class _BookListScreenState extends State<BookListScreen> {
                                     height: 64,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        await service.markBookAsRead(
-                                          bookId: book.id,
-                                        );
-                                        if (!context.mounted) return;
-                                        Navigator.of(context).pop();
+                                        if (!isRead) {
+                                          await service.markBookAsRead(
+                                            bookId: book.id,
+                                          );
+                                        }
+                                        if (!mounted) return;
+                                        Navigator.of(this.context).pop();
                                         _showPostComposerDialog(book);
                                       },
                                       style: ElevatedButton.styleFrom(
@@ -338,8 +337,8 @@ class _BookListScreenState extends State<BookListScreen> {
                                           ),
                                         ),
                                       ),
-                                      child: const Text(
-                                        '読了',
+                                      child: Text(
+                                        isRead ? '投稿する' : '読了',
                                         style: TextStyle(
                                           fontSize: 52 / 2,
                                           fontWeight: FontWeight.bold,
