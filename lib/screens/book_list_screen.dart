@@ -53,102 +53,110 @@ class _BookListScreenState extends State<BookListScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 92,
-                          height: 132,
-                          color: Colors.grey[350],
-                          child: book.coverUrl.trim().isNotEmpty
-                              ? Image.network(
-                                  book.coverUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      _buildMissingCoverFallback(book),
-                                )
-                              : _buildMissingCoverFallback(book),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setDialogState(() => isSpoiler = false);
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.black,
-                                        foregroundColor: isSpoiler
-                                            ? Colors.white70
-                                            : const Color(0xFFFF1F1F),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text('ネタバレなし投稿'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        setDialogState(() => isSpoiler = true);
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.black,
-                                        foregroundColor: isSpoiler
-                                            ? const Color(0xFFFF1F1F)
-                                            : Colors.white70,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text('ネタバレあり投稿'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  ...List.generate(5, (index) {
-                                    final starVal = index + 1.0;
-                                    return IconButton(
-                                      icon: Icon(
-                                        rating >= starVal
-                                            ? Icons.star
-                                            : Icons.star_border,
-                                        color: const Color(0xFFE0B400),
-                                        size: 42,
-                                      ),
-                                      onPressed: () {
-                                        setDialogState(() => rating = starVal);
-                                      },
-                                    );
-                                  }),
-                                  Text(
-                                    rating.toStringAsFixed(1),
-                                    style: const TextStyle(
-                                      fontSize: 52 / 2,
-                                      color: Color(0xFFE0B400),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 110,
+                            color: Colors.grey[350],
+                            child: book.coverUrl.trim().isNotEmpty
+                                ? Image.network(
+                                    book.coverUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return _buildMissingCoverFallback(book);
+                                    },
+                                  )
+                                : _buildMissingCoverFallback(book),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          setDialogState(
+                                            () => isSpoiler = false,
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.black,
+                                          foregroundColor: isSpoiler
+                                              ? Colors.white70
+                                              : const Color(0xFFFF1F1F),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text('ネタバレなし投稿'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          setDialogState(
+                                            () => isSpoiler = true,
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.black,
+                                          foregroundColor: isSpoiler
+                                              ? const Color(0xFFFF1F1F)
+                                              : Colors.white70,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text('ネタバレあり投稿'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    ...List.generate(5, (index) {
+                                      final starVal = index + 1.0;
+                                      return IconButton(
+                                        icon: Icon(
+                                          rating >= starVal
+                                              ? Icons.star
+                                              : Icons.star_border,
+                                          color: const Color(0xFFE0B400),
+                                          size: 42,
+                                        ),
+                                        onPressed: () {
+                                          setDialogState(
+                                            () => rating = starVal,
+                                          );
+                                        },
+                                      );
+                                    }),
+                                    Text(
+                                      rating.toStringAsFixed(1),
+                                      style: const TextStyle(
+                                        fontSize: 52 / 2,
+                                        color: Color(0xFFE0B400),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Container(
