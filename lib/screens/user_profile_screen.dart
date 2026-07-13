@@ -6,6 +6,7 @@ import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
+import '../repositories/book_repository.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -24,11 +25,17 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _footerSearchController = TextEditingController();
+  final BookRepository _bookRepository = BookRepository();
   UserProfile? _profile;
   List<Post> _userPosts = [];
   List<Book> _collections = [];
   List<Book> _favorites = [];
+  List<Book> _searchResults = [];
   bool _isLoading = true;
+  bool _isSearchPanelOpen = false;
+  bool _isSearchingBooks = false;
+  String? _searchError;
 
   @override
   void initState() {
@@ -40,7 +47,55 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _footerSearchController.dispose();
     super.dispose();
+  }
+
+  void _toggleSearchPanel() {
+    setState(() {
+      _isSearchPanelOpen = !_isSearchPanelOpen;
+      if (!_isSearchPanelOpen) {
+        _footerSearchController.clear();
+        _searchResults = [];
+        _searchError = null;
+        _isSearchingBooks = false;
+      }
+    });
+  }
+
+  Future<void> _searchBooksFromFooter(String query) async {
+    final keyword = query.trim();
+    if (keyword.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _searchError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearchingBooks = true;
+      _searchError = null;
+    });
+
+    try {
+      final books = await _bookRepository.searchBooks(keyword);
+      if (!mounted) return;
+      setState(() {
+        _searchResults = books;
+        _searchError = books.isEmpty ? '該当する本が見つかりませんでした。' : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _searchError = '検索に失敗しました。しばらくしてから再試行してください。';
+        _searchResults = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isSearchingBooks = false);
+      }
+    }
   }
 
   Future<void> _loadProfileData() async {
@@ -113,6 +168,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               centerTitle: true,
             )
           : null,
+      bottomNavigationBar: _buildFooterSearchPanel(),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
@@ -378,6 +434,289 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           coverHeightRatio: showDescription ? (2 / 3) : (1 / 3),
           showDescription: showDescription,
           descriptionMaxLines: 3,
+        );
+      },
+    );
+  }
+
+  Widget _buildFooterSearchPanel() {
+    return SafeArea(
+      top: false,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        height: _isSearchPanelOpen ? 310 : 74,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          border: Border(top: BorderSide(color: Colors.grey[300]!)),
+        ),
+        child: _isSearchPanelOpen
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _footerSearchController,
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: _searchBooksFromFooter,
+                          decoration: InputDecoration(
+                            hintText: '検索',
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: '検索',
+                        onPressed: () => _searchBooksFromFooter(
+                          _footerSearchController.text,
+                        ),
+                        icon: const Icon(Icons.search),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(child: _buildSearchResultContent()),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      radius: 20,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.close, size: 30),
+                        onPressed: _toggleSearchPanel,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Align(
+                alignment: Alignment.bottomRight,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  radius: 20,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.add, size: 34),
+                    onPressed: _toggleSearchPanel,
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultContent() {
+    if (_isSearchingBooks) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
+      );
+    }
+
+    if (_searchError != null) {
+      return Center(
+        child: Text(
+          _searchError!,
+          style: TextStyle(color: Colors.grey[700], fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return Center(
+        child: Text(
+          '本のタイトルや著者名を入力してください。',
+          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: _searchResults.length,
+      separatorBuilder: (_, index) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final book = _searchResults[index];
+        return _buildSearchResultCard(book);
+      },
+    );
+  }
+
+  Widget _buildSearchResultCard(Book book) {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+
+    return InkWell(
+      onTap: () => _showSearchedBookDetailDialog(book),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.black54, width: 1),
+          borderRadius: BorderRadius.circular(8),
+          color: Theme.of(context).cardColor,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 62,
+              height: 96,
+              color: Colors.grey[300],
+              child: book.coverUrl.trim().isNotEmpty
+                  ? Image.network(
+                      book.coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.menu_book, color: Colors.black54),
+                    )
+                  : const Icon(Icons.menu_book, color: Colors.black54),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FutureBuilder<bool>(
+                      future: service.isBookReadByCurrentUser(bookId: book.id),
+                      builder: (context, snapshot) {
+                        final isRead = snapshot.data ?? false;
+                        return SizedBox(
+                          height: 34,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: const Color(0xFFFF1F1F),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                            ),
+                            onPressed: () async {
+                              if (!isRead) {
+                                await service.markBookAsRead(bookId: book.id);
+                                if (mounted) {
+                                  await _loadProfileData();
+                                }
+                              }
+                              if (!mounted) return;
+                              _showSearchedBookDetailDialog(book);
+                            },
+                            child: Text(isRead ? '投稿する' : '読了'),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      ...List.generate(5, (i) {
+                        final filled = i < book.ratingAvg.floor();
+                        return Icon(
+                          filled ? Icons.star : Icons.star_border,
+                          size: 18,
+                          color: const Color(0xFFE0B400),
+                        );
+                      }),
+                      const SizedBox(width: 6),
+                      Text(
+                        book.ratingAvg.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFE0B400),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    book.description.trim().isEmpty
+                        ? 'あらすじ情報はまだ登録されていません。'
+                        : book.description,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSearchedBookDetailDialog(Book book) async {
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFFE9E9E9),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          content: SizedBox(
+            width: 640,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E1E1E),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  book.author,
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 220,
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      child: Text(
+                        book.description.trim().isEmpty
+                            ? 'あらすじ情報はまだ登録されていません。'
+                            : book.description,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF1E1E1E),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('閉じる'),
+            ),
+          ],
         );
       },
     );
