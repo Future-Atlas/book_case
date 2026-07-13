@@ -481,6 +481,50 @@ function faqStructuredData() {
     };
 }
 
+function organizationStructuredData() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: SITE_NAME,
+        alternateName: SITE_ALT_NAME,
+        url: `${SITE_URL}/`,
+        logo: `${SITE_URL}/icons/Icon-192.png`,
+    };
+}
+
+function breadcrumbStructuredData(items) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: items.map((item, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            name: item.name,
+            item: item.url,
+        })),
+    };
+}
+
+function itemListStructuredData(sectionTitle, books, pagePath) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: `${sectionTitle}一覧`,
+        url: toAbsoluteUrl(pagePath),
+        numberOfItems: books.length,
+        itemListElement: books.map((book, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            item: {
+                "@type": "Book",
+                name: book.title,
+                author: book.author,
+                description: book.description || "",
+            },
+        })),
+    };
+}
+
 function sectionByGenrePath(pathname) {
     const map = {
         "/genre/recommended": "おすすめの本",
@@ -524,7 +568,11 @@ module.exports = async (req, res) => {
         extraJsonLd = [],
     }) => {
         const absoluteUrl = toAbsoluteUrl(pagePath);
-        const jsonLdList = [jsonLd, ...extraJsonLd].filter(Boolean);
+        const jsonLdList = [
+            organizationStructuredData(),
+            jsonLd,
+            ...extraJsonLd,
+        ].filter(Boolean);
         return `
     <!DOCTYPE html>
     <html lang="ja">
@@ -571,6 +619,12 @@ module.exports = async (req, res) => {
         <p>本のレビューと読書記録を管理できるアプリ</p>
       </header>
       <main>
+                <nav style="margin: 0 0 16px 0; font-size: 0.95em;">
+                    <a href="${SITE_URL}/">ホーム</a> |
+                    <a href="${SITE_URL}/genre/recommended">おすすめの本</a> |
+                    <a href="${SITE_URL}/genre/western">洋書</a> |
+                    <a href="${SITE_URL}/genre/popular">人気作品</a>
+                </nav>
         ${content}
       </main>
       <footer>
@@ -765,6 +819,13 @@ module.exports = async (req, res) => {
                 description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
                 url: toAbsoluteUrl(decodedPath),
             },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: genreSection, url: toAbsoluteUrl(decodedPath) },
+                ]),
+                itemListStructuredData(genreSection, books, decodedPath),
+            ],
             pagePath: decodedPath,
             robots: "index,follow",
         });
@@ -821,30 +882,11 @@ module.exports = async (req, res) => {
                 url: toAbsoluteUrl(decodedPath),
             },
             extraJsonLd: [
-                {
-                    "@context": "https://schema.org",
-                    "@type": "BreadcrumbList",
-                    itemListElement: [
-                        {
-                            "@type": "ListItem",
-                            position: 1,
-                            name: "ホーム",
-                            item: `${SITE_URL}/`,
-                        },
-                        {
-                            "@type": "ListItem",
-                            position: 2,
-                            name: book.section,
-                            item: toAbsoluteUrl(genrePath),
-                        },
-                        {
-                            "@type": "ListItem",
-                            position: 3,
-                            name: book.title,
-                            item: toAbsoluteUrl(decodedPath),
-                        },
-                    ],
-                },
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: book.section, url: toAbsoluteUrl(genrePath) },
+                    { name: book.title, url: toAbsoluteUrl(decodedPath) },
+                ]),
             ],
             pagePath: decodedPath,
             robots: "index,follow",
@@ -916,16 +958,31 @@ module.exports = async (req, res) => {
 
         if (rawPosts && rawPosts.length > 0) {
             hasReliableData = true;
-            recentPosts = rawPosts.map((p) => ({
-                id: p.id,
-                username: p.profiles?.username || "匿名ユーザー",
-                book_title: p.book_id || "書籍ID未設定",
-                rating: p.rating,
-                comment: p.comment,
-                date: p.created_at
-                    ? new Date(p.created_at).toLocaleDateString("ja-JP")
-                    : "",
-            }));
+            const isbnCache = new Map();
+            recentPosts = await Promise.all(
+                rawPosts.map(async (p) => {
+                    const rawBookId = p.book_id || "書籍ID未設定";
+                    let resolved = isbnCache.get(rawBookId);
+                    if (resolved === undefined) {
+                        resolved = await resolveBookByIsbn(
+                            rawBookId,
+                            diagnostics,
+                        );
+                        isbnCache.set(rawBookId, resolved || null);
+                    }
+
+                    return {
+                        id: p.id,
+                        username: p.profiles?.username || "匿名ユーザー",
+                        book_title: resolved?.title || rawBookId,
+                        rating: p.rating,
+                        comment: p.comment,
+                        date: p.created_at
+                            ? new Date(p.created_at).toLocaleDateString("ja-JP")
+                            : "",
+                    };
+                }),
+            );
         }
     } catch (err) {
         diagnostics.supabaseIndexError =
@@ -967,6 +1024,16 @@ module.exports = async (req, res) => {
                 <p>おすすめの本、洋書、人気作品を中心に紹介しています。</p>
             </div>
         `;
+    const primaryLinksHtml = `
+            <h2>主要ページ</h2>
+            <ul>
+                <li><a href="${SITE_URL}/genre/recommended">おすすめの本一覧</a></li>
+                <li><a href="${SITE_URL}/genre/western">洋書一覧</a></li>
+                <li><a href="${SITE_URL}/genre/popular">人気作品一覧</a></li>
+                <li><a href="${SITE_URL}/book/konbini-ningen">コンビニ人間の紹介</a></li>
+                <li><a href="${SITE_URL}/book/midnight-library">The Midnight Library の紹介</a></li>
+            </ul>
+        `;
 
     const html = renderPage({
         title: "本の一覧・検索・タイムライン",
@@ -989,6 +1056,7 @@ module.exports = async (req, res) => {
       <h2>タイムライン (最新レビュー)</h2>
       <div>${timelineHtml.length > 0 ? timelineHtml : "<p>現在、表示できる投稿がありません。</p>"}</div>
 
+            ${primaryLinksHtml}
       ${faqHtml}
     `,
         jsonLd: {
@@ -999,6 +1067,11 @@ module.exports = async (req, res) => {
             description:
                 "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
             url: `${SITE_URL}/`,
+            potentialAction: {
+                "@type": "SearchAction",
+                target: `${SITE_URL}/?seo_preview=1&path={search_term_string}`,
+                "query-input": "required name=search_term_string",
+            },
         },
         extraJsonLd: [faqStructuredData()],
         pagePath: decodedPath || "/",

@@ -40,6 +40,20 @@
             name="twitter:description"
             content="本の検索・レビュー投稿・読了管理ができる読書アプリ。"
         />
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                "name": "BookCase",
+                "alternateName": "Book Case",
+                "url": "https://book-case-u9uq.vercel.app/",
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": "https://book-case-u9uq.vercel.app/?seo_preview=1&path={search_term_string}",
+                    "query-input": "required name=search_term_string"
+                }
+            }
+        </script>
 
         <!-- iOS meta tags & icons -->
         <meta name="mobile-web-app-capable" content="yes" />
