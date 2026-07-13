@@ -138,7 +138,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       controller: _tabController,
                       children: [
                         _buildPostsTab(),
-                        _buildGridTab(_collections, 'コレクションはありません。'),
+                        _buildGridTab(
+                          _collections,
+                          'コレクションはありません。',
+                          showDescription: true,
+                        ),
                         _buildGridTab(_favorites, 'お気に入りの本はありません。'),
                       ],
                     ),
@@ -347,7 +351,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  Widget _buildGridTab(List<Book> booksList, String emptyMessage) {
+  Widget _buildGridTab(
+    List<Book> booksList,
+    String emptyMessage, {
+    bool showDescription = false,
+  }) {
     if (booksList.isEmpty) {
       return _buildEmptyState(emptyMessage);
     }
@@ -363,7 +371,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       itemCount: booksList.length,
       itemBuilder: (context, index) {
         final book = booksList[index];
-        return BookCard(book: book, width: double.infinity, height: 140);
+        return BookCard(
+          book: book,
+          width: double.infinity,
+          height: 140,
+          coverHeightRatio: showDescription ? 0.82 : 0.7,
+          showDescription: showDescription,
+          descriptionMaxLines: 3,
+        );
       },
     );
   }

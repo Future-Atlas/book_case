@@ -6,6 +6,9 @@ class BookCard extends StatefulWidget {
   final VoidCallback? onTap;
   final double? width;
   final double height;
+  final double coverHeightRatio;
+  final bool showDescription;
+  final int descriptionMaxLines;
 
   const BookCard({
     super.key,
@@ -13,6 +16,9 @@ class BookCard extends StatefulWidget {
     this.onTap,
     this.width,
     this.height = 190,
+    this.coverHeightRatio = 0.7,
+    this.showDescription = false,
+    this.descriptionMaxLines = 2,
   });
 
   @override
@@ -21,6 +27,14 @@ class BookCard extends StatefulWidget {
 
 class _BookCardState extends State<BookCard> {
   bool _isHovered = false;
+
+  String get _displayDescription {
+    final text = widget.book.description.trim();
+    if (text.isEmpty) {
+      return 'あらすじ情報はありません。';
+    }
+    return text;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,10 +64,12 @@ class _BookCardState extends State<BookCard> {
             children: [
               // Book Cover Image
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
                 child: SizedBox(
                   width: widget.width ?? 130,
-                  height: widget.height * 0.7,
+                  height: widget.height * widget.coverHeightRatio,
                   child: Hero(
                     tag: 'book-cover-${widget.book.id}',
                     child: Image.network(
@@ -63,7 +79,11 @@ class _BookCardState extends State<BookCard> {
                         return Container(
                           color: Colors.grey[300],
                           alignment: Alignment.center,
-                          child: const Icon(Icons.book, size: 40, color: Colors.grey),
+                          child: const Icon(
+                            Icons.book,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
                         );
                       },
                       loadingBuilder: (context, child, loadingProgress) {
@@ -107,11 +127,22 @@ class _BookCardState extends State<BookCard> {
                         widget.book.author,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
+                      if (widget.showDescription) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _displayDescription,
+                          maxLines: widget.descriptionMaxLines,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[700],
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
                       // Rating
                       Row(
                         children: [
