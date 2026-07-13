@@ -15,6 +15,67 @@ class RakutenApi {
   static const String _appId = String.fromEnvironment('RAKUTEN_APP_ID');
   static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
 
+  static Future<Book?> fetchBookById(String bookId) async {
+    if (_appId.isEmpty || _accessKey.isEmpty || bookId.trim().isEmpty) {
+      return null;
+    }
+
+    final trimmed = bookId.trim();
+    final isbnLike = RegExp(r'^[0-9Xx-]{10,17}$').hasMatch(trimmed);
+
+    final queryParam = isbnLike
+        ? 'isbn=${Uri.encodeComponent(trimmed.replaceAll('-', ''))}'
+        : 'keyword=${Uri.encodeComponent(trimmed)}';
+
+    final urlString =
+        '$_bookBaseUrl?format=json&hits=1&applicationId=$_appId&accessKey=$_accessKey&$queryParam';
+
+    try {
+      final response = await http.get(Uri.parse(urlString));
+      if (response.statusCode != 200) return null;
+
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      final items = json['Items'] as List<dynamic>? ?? [];
+      if (items.isEmpty) return null;
+
+      final item = items.first;
+      final bookData = item['Item'];
+      if (bookData is! Map<String, dynamic>) return null;
+
+      final title = bookData['title'] as String? ?? '不明な書籍';
+      final author = bookData['author'] as String? ?? '不明な著者';
+      final publisher = bookData['publisherName'] as String? ?? '不明な出版社';
+      final pubDate = bookData['salesDate'] as String? ?? '';
+      final isbn = bookData['isbn'] as String? ?? '';
+
+      String coverUrl = bookData['largeImageUrl'] as String? ?? '';
+      if (coverUrl.isNotEmpty) {
+        coverUrl =
+            'https://images.weserv.nl/?url=${Uri.encodeComponent(coverUrl)}';
+      }
+
+      final description = bookData['itemCaption'] as String? ?? '';
+      final rawReviewAverage = bookData['reviewAverage'];
+      final parsedReviewAverage = rawReviewAverage is num
+          ? rawReviewAverage.toDouble()
+          : double.tryParse(rawReviewAverage?.toString() ?? '') ?? 0.0;
+
+      return Book(
+        id: isbn.isNotEmpty ? isbn : trimmed,
+        title: title,
+        author: author,
+        publisher: publisher,
+        pubDate: pubDate,
+        isbn: isbn,
+        coverUrl: coverUrl,
+        ratingAvg: parsedReviewAverage,
+        description: description,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<List<Book>> searchBySelectedGenre({
     required String selectedGenre,
     int page = 1,

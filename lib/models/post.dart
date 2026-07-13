@@ -5,7 +5,7 @@ class Post {
   final double rating;
   final String comment;
   final DateTime createdAt;
-  
+
   // Joined fields
   final String username;
   final String userAvatarUrl;
@@ -38,8 +38,8 @@ class Post {
       bookId: json['book_id'] ?? '',
       rating: (json['rating'] ?? 0.0).toDouble(),
       comment: json['comment'] ?? '',
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
       username: profile?['username'] ?? '匿名ユーザー',
       userAvatarUrl: profile?['avatar_url'] ?? '',
@@ -58,5 +58,33 @@ class Post {
       'comment': comment,
       'created_at': createdAt.toIso8601String(),
     };
+  }
+
+  Post copyWith({
+    String? id,
+    String? profileId,
+    String? bookId,
+    double? rating,
+    String? comment,
+    DateTime? createdAt,
+    String? username,
+    String? userAvatarUrl,
+    String? bookTitle,
+    String? bookAuthor,
+    String? bookCoverUrl,
+  }) {
+    return Post(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      bookId: bookId ?? this.bookId,
+      rating: rating ?? this.rating,
+      comment: comment ?? this.comment,
+      createdAt: createdAt ?? this.createdAt,
+      username: username ?? this.username,
+      userAvatarUrl: userAvatarUrl ?? this.userAvatarUrl,
+      bookTitle: bookTitle ?? this.bookTitle,
+      bookAuthor: bookAuthor ?? this.bookAuthor,
+      bookCoverUrl: bookCoverUrl ?? this.bookCoverUrl,
+    );
   }
 }

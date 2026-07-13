@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../api/rakuten_api.dart';
 import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
@@ -218,7 +219,10 @@ class SupabaseService extends ChangeNotifier {
             .from('posts')
             .select('*, profiles(username, avatar_url)')
             .order('created_at', ascending: false);
-        return (response as List).map((json) => Post.fromJson(json)).toList();
+        final posts = (response as List)
+            .map((json) => Post.fromJson(json))
+            .toList();
+        return _enrichPostsWithBookMetadata(posts);
       } catch (e) {
         debugPrint('Error fetching timeline posts in Supabase: $e');
       }
@@ -306,11 +310,43 @@ class SupabaseService extends ChangeNotifier {
 
       // 2. 返ってきた生データを、正しくPostモデルの形に変換する
       final List<dynamic> data = response as List<dynamic>;
-      return data.map((json) => Post.fromJson(json)).toList();
+      final posts = data.map((json) => Post.fromJson(json)).toList();
+      return _enrichPostsWithBookMetadata(posts);
     } catch (e) {
       debugPrint('fetchUserPostsでエラーが発生しました: $e');
       return [];
     }
+  }
+
+  Future<List<Post>> _enrichPostsWithBookMetadata(List<Post> posts) async {
+    if (posts.isEmpty) return posts;
+
+    final cache = <String, Book?>{};
+
+    Future<Book?> getBook(String bookId) async {
+      if (cache.containsKey(bookId)) return cache[bookId];
+      final found = await RakutenApi.fetchBookById(bookId);
+      cache[bookId] = found;
+      return found;
+    }
+
+    final enriched = <Post>[];
+    for (final post in posts) {
+      final resolved = await getBook(post.bookId);
+      if (resolved == null) {
+        enriched.add(post);
+        continue;
+      }
+
+      enriched.add(
+        post.copyWith(
+          bookTitle: resolved.title,
+          bookAuthor: resolved.author,
+          bookCoverUrl: resolved.coverUrl,
+        ),
+      );
+    }
+    return enriched;
   }
 
   // ----- ACTIONS -----------------------------------------------------------

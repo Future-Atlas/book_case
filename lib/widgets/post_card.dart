@@ -5,14 +5,15 @@ class PostCard extends StatelessWidget {
   final Post post;
   final bool showUserInfo;
 
-  const PostCard({
-    super.key,
-    required this.post,
-    this.showUserInfo = true,
-  });
+  const PostCard({super.key, required this.post, this.showUserInfo = true});
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primaryTextColor = colorScheme.onSurface;
+    final secondaryTextColor = colorScheme.onSurface.withOpacity(0.72);
+    final tertiaryTextColor = colorScheme.onSurface.withOpacity(0.58);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -50,15 +51,16 @@ class PostCard extends StatelessWidget {
                     children: [
                       Text(
                         post.username,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          color: primaryTextColor,
                         ),
                       ),
                       Text(
                         _formatDate(post.createdAt),
                         style: TextStyle(
-                          color: Colors.grey[500],
+                          color: tertiaryTextColor,
                           fontSize: 11,
                         ),
                       ),
@@ -90,7 +92,7 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Review Details
                 Expanded(
                   child: Column(
@@ -99,16 +101,17 @@ class PostCard extends StatelessWidget {
                       // Book Title / Author
                       Text(
                         post.bookTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
+                          color: primaryTextColor,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         post.bookAuthor,
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: secondaryTextColor,
                           fontSize: 12,
                         ),
                       ),
@@ -135,12 +138,12 @@ class PostCard extends StatelessWidget {
                       Text(
                         post.comment,
                         style: TextStyle(
-                          color: Colors.grey[800],
+                          color: primaryTextColor,
                           fontSize: 13,
                           height: 1.5,
                         ),
                       ),
-                      
+
                       // Date if not showing user info (like in user profile tab)
                       if (!showUserInfo) ...[
                         const SizedBox(height: 8),
@@ -149,7 +152,7 @@ class PostCard extends StatelessWidget {
                           child: Text(
                             _formatDate(post.createdAt),
                             style: TextStyle(
-                              color: Colors.grey[400],
+                              color: tertiaryTextColor,
                               fontSize: 10,
                             ),
                           ),
