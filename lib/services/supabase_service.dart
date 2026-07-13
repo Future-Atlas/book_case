@@ -421,6 +421,40 @@ class SupabaseService extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> isBookReadByCurrentUser({required String bookId}) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty || !_isInitialized || _client == null) {
+      return false;
+    }
+
+    try {
+      final collectionRes = await _client!
+          .from('collections')
+          .select('book_id')
+          .eq('profile_id', profileId)
+          .eq('book_id', bookId)
+          .eq('status', 'read')
+          .limit(1);
+
+      if ((collectionRes as List<dynamic>).isNotEmpty) {
+        return true;
+      }
+
+      // Fallback for legacy data where read books may exist only as posts.
+      final postRes = await _client!
+          .from('posts')
+          .select('book_id')
+          .eq('profile_id', profileId)
+          .eq('book_id', bookId)
+          .limit(1);
+
+      return (postRes as List<dynamic>).isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking read status in Supabase: $e');
+      return false;
+    }
+  }
+
   Future<bool> createPost({
     required String bookId,
     required double rating,

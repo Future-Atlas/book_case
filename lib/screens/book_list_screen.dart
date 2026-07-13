@@ -236,6 +236,8 @@ class _BookListScreenState extends State<BookListScreen> {
       context: context,
       builder: (context) {
         final hasCover = book.coverUrl.trim().isNotEmpty;
+        final service = Provider.of<SupabaseService>(context, listen: false);
+        final isReadFuture = service.isBookReadByCurrentUser(bookId: book.id);
 
         return Dialog(
           backgroundColor: const Color(0xFFE6E6E6),
@@ -304,38 +306,49 @@ class _BookListScreenState extends State<BookListScreen> {
                         final detailBlock = Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Align(
-                              alignment: Alignment.topCenter,
-                              child: SizedBox(
-                                width: 190,
-                                height: 64,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    final service =
-                                        Provider.of<SupabaseService>(
-                                          context,
-                                          listen: false,
+                            FutureBuilder<bool>(
+                              future: isReadFuture,
+                              builder: (context, snapshot) {
+                                final isRead = snapshot.data ?? false;
+                                if (isRead) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Align(
+                                  alignment: Alignment.topCenter,
+                                  child: SizedBox(
+                                    width: 190,
+                                    height: 64,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        await service.markBookAsRead(
+                                          bookId: book.id,
                                         );
-                                    service.markBookAsRead(bookId: book.id);
-                                    Navigator.of(context).pop();
-                                    _showPostComposerDialog(book);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.black,
-                                    foregroundColor: const Color(0xFFFF1F1F),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18),
+                                        if (!context.mounted) return;
+                                        Navigator.of(context).pop();
+                                        _showPostComposerDialog(book);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.black,
+                                        foregroundColor: const Color(
+                                          0xFFFF1F1F,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            18,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        '読了',
+                                        style: TextStyle(
+                                          fontSize: 52 / 2,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  child: const Text(
-                                    '読了',
-                                    style: TextStyle(
-                                      fontSize: 52 / 2,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 14),
                             Row(
