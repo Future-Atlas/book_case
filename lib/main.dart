@@ -186,9 +186,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     return Consumer<SupabaseService>(
       builder: (context, service, _) {
-        final menuIconColor = Theme.of(context).brightness == Brightness.dark
-            ? Colors.white
-            : Colors.black;
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final menuIconColor = isDarkMode ? Colors.white : Colors.black;
+        final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
 
         // If auth is lost while on profile, force navigation back to list.
         if (!service.isAuthenticated && _currentScreenIndex == 1) {
@@ -221,33 +221,45 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         position: PopupMenuPosition.under,
                         color: Colors.white,
                         onSelected: _onMenuAction,
-                        itemBuilder: (context) => const [
+                        itemBuilder: (context) => [
                           PopupMenuItem(
                             value: _HeaderMenuAction.myPage,
                             child: Text(
                               'マイページ',
-                              style: TextStyle(fontSize: 28 / 2),
+                              style: TextStyle(
+                                fontSize: 28 / 2,
+                                color: popupMenuTextColor,
+                              ),
                             ),
                           ),
                           PopupMenuItem(
                             value: _HeaderMenuAction.settings,
                             child: Text(
                               '設定',
-                              style: TextStyle(fontSize: 28 / 2),
+                              style: TextStyle(
+                                fontSize: 28 / 2,
+                                color: popupMenuTextColor,
+                              ),
                             ),
                           ),
                           PopupMenuItem(
                             value: _HeaderMenuAction.help,
                             child: Text(
                               'ヘルプ',
-                              style: TextStyle(fontSize: 28 / 2),
+                              style: TextStyle(
+                                fontSize: 28 / 2,
+                                color: popupMenuTextColor,
+                              ),
                             ),
                           ),
                           PopupMenuItem(
                             value: _HeaderMenuAction.logout,
                             child: Text(
                               'ログアウト',
-                              style: TextStyle(fontSize: 28 / 2),
+                              style: TextStyle(
+                                fontSize: 28 / 2,
+                                color: popupMenuTextColor,
+                              ),
                             ),
                           ),
                         ],
