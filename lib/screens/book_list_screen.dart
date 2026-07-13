@@ -254,7 +254,7 @@ class _BookListScreenState extends State<BookListScreen> {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(maxWidth: 920),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: DefaultTextStyle.merge(
@@ -267,13 +267,13 @@ class _BookListScreenState extends State<BookListScreen> {
                         final isNarrow = constraints.maxWidth < 560;
 
                         final coverBlock = SizedBox(
-                          width: isNarrow ? double.infinity : 160,
+                          width: isNarrow ? double.infinity : 220,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Container(
-                                width: isNarrow ? double.infinity : 140,
-                                height: 210,
+                                width: isNarrow ? double.infinity : 200,
+                                height: isNarrow ? 240 : 300,
                                 color: Colors.grey[400],
                                 child: hasCover
                                     ? Image.network(
@@ -396,7 +396,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                           : 'あらすじ情報はまだ登録されていません。',
                                       style: const TextStyle(
                                         color: Color(0xFF1E1E1E),
-                                        fontSize: 20 / 2,
+                                        fontSize: 26 / 2,
                                         height: 1.5,
                                       ),
                                     ),
@@ -419,7 +419,7 @@ class _BookListScreenState extends State<BookListScreen> {
                         }
 
                         return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             coverBlock,
                             const SizedBox(width: 20),
