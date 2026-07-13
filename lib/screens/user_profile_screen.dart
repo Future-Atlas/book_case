@@ -119,33 +119,31 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             )
           : _profile == null
           ? const Center(child: Text('プロフィールの読み込みに失敗しました。')) // ⭕ データ未取得時の安全ガード
-          : Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 800),
-                color: Theme.of(context).scaffoldBackgroundColor,
-                child: Column(
-                  children: [
-                    // Profile Header Card
-                    _buildProfileHeader(),
+          : Container(
+              width: double.infinity,
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: Column(
+                children: [
+                  // Profile Header Card
+                  _buildProfileHeader(),
 
-                    const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                    // Custom Tab Bar with premium design
-                    _buildTabBar(),
+                  // Custom Tab Bar with premium design
+                  _buildTabBar(),
 
-                    // Tab View Contents
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildPostsTab(),
-                          _buildGridTab(_collections, 'コレクションはありません。'),
-                          _buildGridTab(_favorites, 'お気に入りの本はありません。'),
-                        ],
-                      ),
+                  // Tab View Contents
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildPostsTab(),
+                        _buildGridTab(_collections, 'コレクションはありません。'),
+                        _buildGridTab(_favorites, 'お気に入りの本はありません。'),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
     );
