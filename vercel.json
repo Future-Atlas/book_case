@@ -29,6 +29,17 @@
             "dest": "/api/seo?path=/"
         },
         {
+            "src": "/(genre/.*|book/.*|user/.*|profile/.*)",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
+                }
+            ],
+            "dest": "/api/seo?path=/$1"
+        },
+        {
             "handle": "filesystem"
         },
         {

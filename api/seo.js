@@ -21,6 +21,8 @@ const RAKUTEN_FOREIGN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
 const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
 const SITE_URL = "https://book-case-u9uq.vercel.app";
+const SITE_NAME = "BookCase";
+const SITE_ALT_NAME = "Book Case";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -533,7 +535,7 @@ module.exports = async (req, res) => {
       <meta name="description" content="${description}">
       <meta name="robots" content="${robots || "index,follow"}">
       <link rel="canonical" href="${absoluteUrl}">
-      <meta property="og:title" content="${title} | BookCase">
+    <meta property="og:title" content="${title} | ${SITE_NAME} (${SITE_ALT_NAME})">
       <meta property="og:description" content="${description}">
       <meta property="og:type" content="website">
       <meta property="og:url" content="${absoluteUrl}">
@@ -564,8 +566,8 @@ module.exports = async (req, res) => {
       </style>
     </head>
     <body>
-      <header>
-        <h1>BookCase</h1>
+            <header>
+                <h1>${SITE_NAME} (${SITE_ALT_NAME})</h1>
         <p>本のレビューと読書記録を管理できるアプリ</p>
       </header>
       <main>
@@ -992,7 +994,8 @@ module.exports = async (req, res) => {
         jsonLd: {
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "BookCase",
+            name: SITE_NAME,
+            alternateName: SITE_ALT_NAME,
             description:
                 "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
             url: `${SITE_URL}/`,
