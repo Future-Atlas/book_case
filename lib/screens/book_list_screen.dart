@@ -385,14 +385,22 @@ class _BookListScreenState extends State<BookListScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
                               color: const Color(0xFFD8D8D8),
-                              child: Text(
-                                book.description.trim().isNotEmpty
-                                    ? book.description
-                                    : 'あらすじ情報はまだ登録されていません。',
-                                style: const TextStyle(
-                                  color: Color(0xFF1E1E1E),
-                                  fontSize: 20 / 2,
-                                  height: 1.5,
+                              child: SizedBox(
+                                height: isNarrow ? 170 : 230,
+                                child: Scrollbar(
+                                  thumbVisibility: true,
+                                  child: SingleChildScrollView(
+                                    child: Text(
+                                      book.description.trim().isNotEmpty
+                                          ? book.description
+                                          : 'あらすじ情報はまだ登録されていません。',
+                                      style: const TextStyle(
+                                        color: Color(0xFF1E1E1E),
+                                        fontSize: 20 / 2,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
