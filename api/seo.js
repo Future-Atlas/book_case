@@ -23,6 +23,11 @@ const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
 const SITE_URL = "https://book-case-u9uq.vercel.app";
 const SITE_NAME = "BookCase";
 const SITE_ALT_NAME = "Book Case";
+const SITE_TITLE = "BookCase | 読書記録・本管理アプリ";
+const TOP_DESCRIPTION =
+    "BookCaseは、読んだ本や読みたい本を登録し、読書履歴・感想・蔵書をまとめて管理できる読書記録Webアプリです。";
+const OG_IMAGE_URL = `${SITE_URL}/icons/Icon-512.png`;
+const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -525,6 +530,21 @@ function itemListStructuredData(sectionTitle, books, pagePath) {
     };
 }
 
+function webApplicationStructuredData() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: SITE_NAME,
+        alternateName: SITE_ALT_NAME,
+        url: `${SITE_URL}/`,
+        applicationCategory: "LifestyleApplication",
+        operatingSystem: "Web",
+        inLanguage: "ja",
+        description:
+            "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
+    };
+}
+
 function sectionByGenrePath(pathname) {
     const map = {
         "/genre/recommended": "おすすめの本",
@@ -556,6 +576,10 @@ module.exports = async (req, res) => {
         supabaseProfileError: "none",
     };
 
+    if (!IS_PRODUCTION) {
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+
     console.log(`SEO Crawler requested path: ${decodedPath}`);
 
     const renderPage = ({
@@ -568,6 +592,9 @@ module.exports = async (req, res) => {
         extraJsonLd = [],
     }) => {
         const absoluteUrl = toAbsoluteUrl(pagePath);
+        const fullTitle = title.includes("BookCase")
+            ? title
+            : `${title} | BookCase`;
         const jsonLdList = [
             organizationStructuredData(),
             jsonLd,
@@ -579,17 +606,21 @@ module.exports = async (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title} | BookCase</title>
+            <title>${fullTitle}</title>
       <meta name="description" content="${description}">
-      <meta name="robots" content="${robots || "index,follow"}">
+            <meta name="robots" content="${IS_PRODUCTION ? robots || "index,follow" : "noindex,nofollow"}">
       <link rel="canonical" href="${absoluteUrl}">
-    <meta property="og:title" content="${title} | ${SITE_NAME} (${SITE_ALT_NAME})">
+        <meta property="og:title" content="${fullTitle}">
       <meta property="og:description" content="${description}">
+            <meta property="og:site_name" content="${SITE_NAME}">
       <meta property="og:type" content="website">
+            <meta property="og:locale" content="ja_JP">
       <meta property="og:url" content="${absoluteUrl}">
+            <meta property="og:image" content="${OG_IMAGE_URL}">
       <meta name="twitter:card" content="summary_large_image">
-      <meta name="twitter:title" content="${title}">
+            <meta name="twitter:title" content="${fullTitle}">
       <meta name="twitter:description" content="${description}">
+            <meta name="twitter:image" content="${OG_IMAGE_URL}">
       ${jsonLdList
           .map(
               (item) =>
@@ -773,7 +804,86 @@ module.exports = async (req, res) => {
                 name: escapeHtml(username),
                 description: escapeHtml(bio),
             },
-            robots: hasReliableData ? "index,follow" : "noindex,nofollow",
+            robots: "noindex,nofollow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/privacy") {
+        const html = renderPage({
+            title: "プライバシーポリシー",
+            description:
+                "BookCaseのプライバシーポリシーです。読書記録アプリにおける個人情報の取り扱い方針を説明しています。",
+            content: `
+        <section>
+          <h2>プライバシーポリシー</h2>
+          <p>BookCaseは、読書記録アプリの提供に必要な範囲で情報を取り扱います。</p>
+          <h3>収集する情報</h3>
+          <p>ログイン情報、読書記録、感想、アプリ利用時に必要な技術情報を収集する場合があります。</p>
+          <h3>利用目的</h3>
+          <p>本管理アプリ機能の提供、読書履歴表示、サービス改善、不正利用防止のために利用します。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "プライバシーポリシー | BookCase",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "BookCaseのプライバシーポリシーです。個人情報の取り扱い方針を説明しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    {
+                        name: "プライバシーポリシー",
+                        url: toAbsoluteUrl(decodedPath),
+                    },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/terms") {
+        const html = renderPage({
+            title: "利用規約",
+            description:
+                "BookCaseの利用規約です。読書記録・本管理アプリの利用条件を掲載しています。",
+            content: `
+        <section>
+          <h2>利用規約</h2>
+          <p>BookCaseをご利用いただく際の条件を定めたものです。</p>
+          <h3>サービス内容</h3>
+          <p>BookCaseは、読んだ本の記録、読みたい本の管理、読書履歴の保存などを提供します。</p>
+          <h3>禁止事項</h3>
+          <p>不正アクセス、第三者への迷惑行為、法令違反につながる行為は禁止します。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "利用規約 | BookCase",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "BookCaseの利用規約です。読書記録・本管理アプリの利用条件を掲載しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: "利用規約", url: toAbsoluteUrl(decodedPath) },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
         });
 
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -1030,18 +1140,31 @@ module.exports = async (req, res) => {
                 <li><a href="${SITE_URL}/genre/recommended">おすすめの本一覧</a></li>
                 <li><a href="${SITE_URL}/genre/western">洋書一覧</a></li>
                 <li><a href="${SITE_URL}/genre/popular">人気作品一覧</a></li>
+                                <li><a href="${SITE_URL}/privacy">プライバシーポリシー</a></li>
+                                <li><a href="${SITE_URL}/terms">利用規約</a></li>
                 <li><a href="${SITE_URL}/book/konbini-ningen">コンビニ人間の紹介</a></li>
                 <li><a href="${SITE_URL}/book/midnight-library">The Midnight Library の紹介</a></li>
             </ul>
         `;
 
     const html = renderPage({
-        title: "本の一覧・検索・タイムライン",
-        description:
-            "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
+        title: SITE_TITLE,
+        description: TOP_DESCRIPTION,
         content: `
-      <h2>BookCaseについて</h2>
-      <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
+            <section>
+            <h2>BookCaseでできること</h2>
+            <p>BookCaseは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録・本管理アプリです。読書履歴、感想、蔵書管理を一つのWeb本棚で行えます。</p>
+            <h3>主な機能</h3>
+            <ul>
+                <li>読んだ本の登録と読書履歴の保存</li>
+                <li>読みたい本の管理</li>
+                <li>レビュー・読書メモの記録</li>
+                <li>自分の本棚の一覧表示</li>
+                <li>書籍情報の検索とお気に入り管理</li>
+            </ul>
+            <p>読んだ本を忘れずに記録したい方、所有している本を整理したい方、読書習慣を振り返りたい方に向けたサービスです。</p>
+            <p><a href="${SITE_URL}/login">ログインする</a> / <a href="${SITE_URL}/">BookCaseを始める</a></p>
+            </section>
             ${sampleNoticeHtml}
 
       <h2>おすすめの本</h2>
@@ -1064,8 +1187,7 @@ module.exports = async (req, res) => {
             "@type": "WebSite",
             name: SITE_NAME,
             alternateName: SITE_ALT_NAME,
-            description:
-                "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
+            description: TOP_DESCRIPTION,
             url: `${SITE_URL}/`,
             potentialAction: {
                 "@type": "SearchAction",
@@ -1073,7 +1195,7 @@ module.exports = async (req, res) => {
                 "query-input": "required name=search_term_string",
             },
         },
-        extraJsonLd: [faqStructuredData()],
+        extraJsonLd: [faqStructuredData(), webApplicationStructuredData()],
         pagePath: decodedPath || "/",
         robots:
             hasReliableData || usingSampleBooks

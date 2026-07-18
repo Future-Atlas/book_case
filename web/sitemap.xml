@@ -6,6 +6,16 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://book-case-u9uq.vercel.app/privacy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://book-case-u9uq.vercel.app/terms</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://book-case-u9uq.vercel.app/genre/recommended</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="ja">
     <head>
         <!--
     If you are serving your web app in a path other than the root, change the
@@ -20,33 +20,47 @@
         <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
         <meta
             name="description"
-            content="BookCase (Book Case) は本の検索・レビュー投稿・読了管理ができる読書アプリ。おすすめ本、洋書、人気作品を掲載。"
+            content="BookCaseは、読んだ本や読みたい本を登録し、読書履歴・感想・蔵書をまとめて管理できる読書記録Webアプリです。"
         />
         <meta name="robots" content="index,follow" />
         <link rel="canonical" href="https://book-case-u9uq.vercel.app/" />
-        <meta
-            property="og:title"
-            content="BookCase (Book Case) | 本の検索・レビュー・読了管理"
-        />
+        <meta property="og:title" content="BookCase | 読書記録・本管理アプリ" />
         <meta
             property="og:description"
-            content="BookCase (Book Case) は本の検索・レビュー投稿・読了管理ができる読書アプリ。"
+            content="BookCaseは、読書履歴や蔵書、読みたい本をまとめて管理できる読書記録Webアプリです。"
         />
+        <meta property="og:site_name" content="BookCase" />
         <meta property="og:type" content="website" />
+        <meta property="og:locale" content="ja_JP" />
         <meta property="og:url" content="https://book-case-u9uq.vercel.app/" />
+        <meta
+            property="og:image"
+            content="https://book-case-u9uq.vercel.app/icons/Icon-512.png"
+        />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="BookCase (Book Case)" />
+        <meta
+            name="twitter:title"
+            content="BookCase | 読書記録・本管理アプリ"
+        />
         <meta
             name="twitter:description"
-            content="本の検索・レビュー投稿・読了管理ができる読書アプリ。"
+            content="読んだ本、読みたい本、読書履歴をまとめて管理できる読書記録Webアプリです。"
+        />
+        <meta
+            name="twitter:image"
+            content="https://book-case-u9uq.vercel.app/icons/Icon-512.png"
         />
         <script type="application/ld+json">
             {
                 "@context": "https://schema.org",
-                "@type": "WebSite",
+                "@type": "WebApplication",
                 "name": "BookCase",
                 "alternateName": "Book Case",
                 "url": "https://book-case-u9uq.vercel.app/",
+                "applicationCategory": "LifestyleApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "ja",
+                "description": "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
                 "potentialAction": {
                     "@type": "SearchAction",
                     "target": "https://book-case-u9uq.vercel.app/?seo_preview=1&path={search_term_string}",
@@ -64,10 +78,37 @@
         <!-- Favicon -->
         <link rel="icon" type="image/png" href="favicon.png" />
 
-        <title>BookCase (Book Case) | 本の検索・レビュー・読了管理</title>
+        <title>BookCase | 読書記録・本管理アプリ</title>
         <link rel="manifest" href="manifest.json" />
     </head>
     <body>
+        <noscript>
+            <main>
+                <header>
+                    <h1>BookCase - 読書記録・本管理アプリ</h1>
+                    <p>
+                        BookCaseは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録Webアプリです。読書履歴や感想を残して、自分だけのWeb本棚を作成できます。
+                    </p>
+                </header>
+                <section>
+                    <h2>BookCaseでできること</h2>
+                    <h3>読んだ本を記録</h3>
+                    <p>読み終えた本を登録し、読書履歴や感想を残せます。</p>
+                    <h3>読みたい本を管理</h3>
+                    <p>気になる本を保存し、次に読む本を整理できます。</p>
+                    <h3>自分だけのWeb本棚</h3>
+                    <p>
+                        登録した本を一覧表示し、蔵書管理や読書ログの振り返りができます。
+                    </p>
+                </section>
+                <section>
+                    <h2>こんな方におすすめ</h2>
+                    <p>
+                        読んだ本の記録を続けたい方、本管理アプリで蔵書管理したい方、読書習慣を見直したい方に向けたサービスです。
+                    </p>
+                </section>
+            </main>
+        </noscript>
         <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

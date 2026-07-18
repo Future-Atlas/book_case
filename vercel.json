@@ -29,7 +29,7 @@
             "dest": "/api/seo?path=/"
         },
         {
-            "src": "/(genre/.*|book/.*|user/.*|profile/.*)",
+            "src": "/(genre/.*|book/.*|user/.*|profile/.*|privacy|terms)",
             "has": [
                 {
                     "type": "header",

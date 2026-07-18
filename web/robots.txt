@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /user/
+Disallow: /profile/
+Disallow: /mypage/
 
 Sitemap: https://book-case-u9uq.vercel.app/sitemap.xml
