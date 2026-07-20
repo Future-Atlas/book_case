@@ -545,6 +545,39 @@ function webApplicationStructuredData() {
     };
 }
 
+function siteNavigationStructuredData() {
+    const navItems = [
+        { name: "ホーム", url: `${SITE_URL}/` },
+        { name: "おすすめの本", url: `${SITE_URL}/genre/recommended` },
+        { name: "洋書", url: `${SITE_URL}/genre/western` },
+        { name: "人気作品", url: `${SITE_URL}/genre/popular` },
+        { name: "プライバシーポリシー", url: `${SITE_URL}/privacy` },
+        { name: "利用規約", url: `${SITE_URL}/terms` },
+        { name: "コンビニ人間", url: `${SITE_URL}/book/konbini-ningen` },
+        { name: "舟を編む", url: `${SITE_URL}/book/fune-wo-amu` },
+        {
+            name: "The Midnight Library",
+            url: `${SITE_URL}/book/midnight-library`,
+        },
+        { name: "Atomic Habits", url: `${SITE_URL}/book/atomic-habits` },
+        {
+            name: "そして、バトンは渡された",
+            url: `${SITE_URL}/book/baton-wa-watasareta`,
+        },
+        {
+            name: "汝、星のごとく",
+            url: `${SITE_URL}/book/nanji-hoshi-no-gotoku`,
+        },
+    ];
+
+    return navItems.map((item) => ({
+        "@context": "https://schema.org",
+        "@type": "SiteNavigationElement",
+        name: item.name,
+        url: item.url,
+    }));
+}
+
 function sectionByGenrePath(pathname) {
     const map = {
         "/genre/recommended": "おすすめの本",
@@ -1143,7 +1176,11 @@ module.exports = async (req, res) => {
                                 <li><a href="${SITE_URL}/privacy">プライバシーポリシー</a></li>
                                 <li><a href="${SITE_URL}/terms">利用規約</a></li>
                 <li><a href="${SITE_URL}/book/konbini-ningen">コンビニ人間の紹介</a></li>
+                <li><a href="${SITE_URL}/book/fune-wo-amu">舟を編むの紹介</a></li>
                 <li><a href="${SITE_URL}/book/midnight-library">The Midnight Library の紹介</a></li>
+                <li><a href="${SITE_URL}/book/atomic-habits">Atomic Habits の紹介</a></li>
+                <li><a href="${SITE_URL}/book/baton-wa-watasareta">そして、バトンは渡されたの紹介</a></li>
+                <li><a href="${SITE_URL}/book/nanji-hoshi-no-gotoku">汝、星のごとくの紹介</a></li>
             </ul>
         `;
 
@@ -1195,7 +1232,11 @@ module.exports = async (req, res) => {
                 "query-input": "required name=search_term_string",
             },
         },
-        extraJsonLd: [faqStructuredData(), webApplicationStructuredData()],
+        extraJsonLd: [
+            faqStructuredData(),
+            webApplicationStructuredData(),
+            ...siteNavigationStructuredData(),
+        ],
         pagePath: decodedPath || "/",
         robots:
             hasReliableData || usingSampleBooks
