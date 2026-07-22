@@ -1,7 +1,10 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/supabase_service.dart';
+import 'terms_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -40,11 +43,158 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  /// 利用規約・プライバシーポリシーへの同意ダイアログを表示する。
+  /// 両方にチェックして「同意して続ける」を押した場合のみ true を返す。
+  Future<bool> _showTermsDialog() async {
+    bool agreedTerms = false;
+    bool agreedPrivacy = false;
+
+    final agreed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: const Text(
+                '利用規約・プライバシーポリシー',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '続けるには以下の両方に同意してください。',
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 16),
+                  // 利用規約
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: agreedTerms,
+                        activeColor: const Color(0xFFFF1F1F),
+                        onChanged: (v) =>
+                            setDialogState(() => agreedTerms = v ?? false),
+                      ),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: '利用規約',
+                                style: const TextStyle(
+                                  color: Color(0xFFFF1F1F),
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.of(dialogContext).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const TermsScreen(),
+                                      ),
+                                    );
+                                  },
+                              ),
+                              const TextSpan(text: ' に同意する'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // プライバシーポリシー
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: agreedPrivacy,
+                        activeColor: const Color(0xFFFF1F1F),
+                        onChanged: (v) =>
+                            setDialogState(() => agreedPrivacy = v ?? false),
+                      ),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: 'プライバシーポリシー',
+                                style: const TextStyle(
+                                  color: Color(0xFFFF1F1F),
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.of(dialogContext).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const PrivacyPolicyScreen(),
+                                      ),
+                                    );
+                                  },
+                              ),
+                              const TextSpan(text: ' に同意する'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('キャンセル'),
+                ),
+                ElevatedButton(
+                  onPressed: (agreedTerms && agreedPrivacy)
+                      ? () => Navigator.of(dialogContext).pop(true)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF1F1F),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey[300],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: const Text('同意して続ける'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return agreed == true;
+  }
+
   Future<void> _showEmailPrompt(String providerLabel) async {
+    // まず利用規約・プライバシーポリシーへの同意を確認する
+    final agreed = await _showTermsDialog();
+    if (!agreed) return;
+    if (!mounted) return;
+
     final emailController = TextEditingController();
 
     final email = await showDialog<String>(
       context: context,
+
       builder: (context) {
         return AlertDialog(
           title: Text('$providerLabel でログイン'),
