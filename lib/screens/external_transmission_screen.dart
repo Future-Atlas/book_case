@@ -6,7 +6,11 @@ class ExternalTransmissionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         title: const Text('外部送信に関する公表事項'),
         leading: IconButton(
           icon: const Icon(Icons.close),
@@ -48,13 +52,13 @@ class _ExternalTransmissionContent extends StatelessWidget {
     fontSize: 13,
     fontWeight: FontWeight.w600,
     height: 1.7,
-    color: Colors.black87,
+    color: Colors.white,
   );
 
   static const _bodyStyle = TextStyle(
     fontSize: 13,
     height: 1.9,
-    color: Colors.black87,
+    color: Colors.white,
   );
 
   static const String _disclosureText = r'''# Sharemarium 外部送信に関する公表事項
@@ -372,7 +376,10 @@ Sharemarium
           if (block.spacingBefore > 0) SizedBox(height: block.spacingBefore),
           Padding(
             padding: EdgeInsets.only(left: block.leftPadding),
-            child: Text(block.text, style: block.style),
+            child: Text(
+              block.text,
+              style: block.style.copyWith(color: Colors.white),
+            ),
           ),
         ],
         const SizedBox(height: 40),
