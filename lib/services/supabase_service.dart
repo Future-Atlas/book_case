@@ -108,6 +108,28 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<String?> signInWithX() async {
+    if (!_isInitialized || _client == null) {
+      return 'Supabaseが初期化されていません。';
+    }
+
+    try {
+      final started = await _client!.auth.signInWithOAuth(
+        OAuthProvider.x,
+        redirectTo: kIsWeb ? null : _redirectUrl,
+      );
+
+      if (!started) {
+        return 'Xログインを開始できませんでした。';
+      }
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Xログインに失敗しました: $e';
+    }
+  }
+
   Future<String?> signInWithEmail({
     required String email,
     required String password,

@@ -16,33 +16,6 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isSubmitting = false;
 
-  Future<void> _sendMagicLink(String email, String providerLabel) async {
-    setState(() => _isSubmitting = true);
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    final error = await service.sendMagicLink(email: email);
-
-    if (!mounted) return;
-
-    setState(() => _isSubmitting = false);
-
-    if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$providerLabel 経由としてマジックリンクを送信しました。メールを確認してください。'),
-      ),
-    );
-
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop(true);
-    }
-  }
-
   /// 利用規約・プライバシーポリシーへの同意ダイアログを表示する。
   /// 両方にチェックして「同意して続ける」を押した場合のみ true を返す。
   Future<bool> _showTermsDialog() async {
@@ -197,66 +170,15 @@ class _AuthScreenState extends State<AuthScreen> {
     return agreed == true;
   }
 
-  Future<void> _showEmailPrompt(String providerLabel) async {
-    // まず利用規約・プライバシーポリシーへの同意を確認する
-    final agreed = await _showTermsDialog();
-    if (!agreed) return;
-    if (!mounted) return;
-
-    final emailController = TextEditingController();
-
-    final email = await showDialog<String>(
-      context: context,
-
-      builder: (context) {
-        return AlertDialog(
-          title: Text('$providerLabel でログイン'),
-          content: TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'メールアドレス',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('キャンセル'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final value = emailController.text.trim();
-                Navigator.of(context).pop(value);
-              },
-              child: const Text('送信'),
-            ),
-          ],
-        );
-      },
-    );
-
-    final normalized = (email ?? '').trim();
-    if (normalized.isEmpty) return;
-    if (!normalized.contains('@')) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('メールアドレス形式が不正です。')));
-      return;
-    }
-
-    await _sendMagicLink(normalized, providerLabel);
-  }
-
-  Future<void> _signInWithGoogle() async {
+  Future<void> _signInWithOAuth(
+    Future<String?> Function(SupabaseService service) signIn,
+  ) async {
     final agreed = await _showTermsDialog();
     if (!agreed || !mounted) return;
 
     setState(() => _isSubmitting = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final error = await service.signInWithGoogle();
+    final error = await signIn(service);
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -268,19 +190,23 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() =>
+      _signInWithOAuth((service) => service.signInWithGoogle());
+
+  Future<void> _signInWithX() =>
+      _signInWithOAuth((service) => service.signInWithX());
+
   Widget _buildLoginButton({
     required String label,
     required Color background,
+    required VoidCallback onPressed,
     Color foreground = Colors.white,
-    VoidCallback? onPressed,
   }) {
     return SizedBox(
       width: 200,
       height: 36,
       child: ElevatedButton(
-        onPressed: _isSubmitting
-            ? null
-            : onPressed ?? () => _showEmailPrompt(label),
+        onPressed: _isSubmitting ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: background,
           foregroundColor: foreground,
@@ -352,20 +278,14 @@ class _AuthScreenState extends State<AuthScreen> {
                     onPressed: _signInWithGoogle,
                   ),
                   const SizedBox(height: 10),
-                  _buildLoginButton(label: 'X', background: Colors.black),
-                  const SizedBox(height: 10),
                   _buildLoginButton(
-                    label: 'Instagram',
-                    background: const Color(0xFFC80E5A),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildLoginButton(
-                    label: 'LINE',
-                    background: const Color(0xFF10C93A),
+                    label: 'X',
+                    background: Colors.black,
+                    onPressed: _signInWithX,
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'GoogleはOAuth認証を使用します。\nその他のボタンは現在メールリンク認証です。',
+                    'GoogleまたはXの公式ログイン画面に移動して認証します。',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
