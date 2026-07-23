@@ -216,46 +216,52 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   ),
                   child: Row(
                     children: [
-                      PopupMenuButton<_HeaderMenuAction>(
-                        tooltip: 'メニュー',
-                        icon: const Icon(
-                          Icons.menu,
-                          size: 38,
-                          color: Colors.black,
+                      SizedBox(
+                        width: 104,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: PopupMenuButton<_HeaderMenuAction>(
+                            tooltip: 'メニュー',
+                            icon: const Icon(
+                              Icons.menu,
+                              size: 38,
+                              color: Colors.black,
+                            ),
+                            position: PopupMenuPosition.under,
+                            color: Colors.white,
+                            onSelected: _onMenuAction,
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: _HeaderMenuAction.myPage,
+                                child: Text(
+                                  'マイページ',
+                                  style: TextStyle(fontSize: 28 / 2),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: _HeaderMenuAction.settings,
+                                child: Text(
+                                  '設定',
+                                  style: TextStyle(fontSize: 28 / 2),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: _HeaderMenuAction.help,
+                                child: Text(
+                                  'ヘルプ',
+                                  style: TextStyle(fontSize: 28 / 2),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: _HeaderMenuAction.logout,
+                                child: Text(
+                                  'ログアウト',
+                                  style: TextStyle(fontSize: 28 / 2),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        position: PopupMenuPosition.under,
-                        color: Colors.white,
-                        onSelected: _onMenuAction,
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
-                            value: _HeaderMenuAction.myPage,
-                            child: Text(
-                              'マイページ',
-                              style: TextStyle(fontSize: 28 / 2),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _HeaderMenuAction.settings,
-                            child: Text(
-                              '設定',
-                              style: TextStyle(fontSize: 28 / 2),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _HeaderMenuAction.help,
-                            child: Text(
-                              'ヘルプ',
-                              style: TextStyle(fontSize: 28 / 2),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _HeaderMenuAction.logout,
-                            child: Text(
-                              'ログアウト',
-                              style: TextStyle(fontSize: 28 / 2),
-                            ),
-                          ),
-                        ],
                       ),
                       Expanded(
                         child: Center(
@@ -269,7 +275,36 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      SizedBox(
+                        width: 104,
+                        height: 36,
+                        child: ElevatedButton.icon(
+                          onPressed: _goToProfile,
+                          icon: Icon(
+                            service.isAuthenticated
+                                ? Icons.person_outline
+                                : Icons.login,
+                            size: 16,
+                          ),
+                          label: Text(
+                            service.isAuthenticated ? 'プロフィール' : 'ログイン',
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF3B30),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            elevation: 0,
+                            shape: const StadiumBorder(),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -277,10 +312,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: _currentScreenIndex == 0
-                        ? BookListScreen(
-                            key: const ValueKey('BookListScreen'),
-                            onNavigateToProfile: _goToProfile,
-                          )
+                        ? const BookListScreen(key: ValueKey('BookListScreen'))
                         : _currentScreenIndex == 1
                         ? UserProfileScreen(
                             key: const ValueKey('UserProfileScreen'),

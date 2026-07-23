@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/supabase_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/ad_banner.dart';
 import '../widgets/post_card.dart';
 import '../controllers/book_list_controller.dart';
 import '../models/book.dart';
+import '../widgets/post_composer_dialog.dart';
 
 class BookListScreen extends StatefulWidget {
-  final VoidCallback onNavigateToProfile;
-
-  const BookListScreen({super.key, required this.onNavigateToProfile});
+  const BookListScreen({super.key});
 
   @override
   State<BookListScreen> createState() => _BookListScreenState();
@@ -33,186 +30,10 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Future<void> _showPostComposerDialog(Book book) async {
-    double rating = 5.0;
-    bool isSpoiler = false;
-    final commentController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFFE9E9E9),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 92,
-                        height: 132,
-                        color: Colors.grey[350],
-                        child: book.coverUrl.trim().isNotEmpty
-                            ? Image.network(
-                                book.coverUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildMissingCoverFallback(book),
-                              )
-                            : _buildMissingCoverFallback(book),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      setDialogState(() => isSpoiler = false);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      foregroundColor: isSpoiler
-                                          ? Colors.white70
-                                          : const Color(0xFFFF1F1F),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Text('ネタバレなし投稿'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      setDialogState(() => isSpoiler = true);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      foregroundColor: isSpoiler
-                                          ? const Color(0xFFFF1F1F)
-                                          : Colors.white70,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Text('ネタバレあり投稿'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                ...List.generate(5, (index) {
-                                  final starVal = index + 1.0;
-                                  return IconButton(
-                                    icon: Icon(
-                                      rating >= starVal
-                                          ? Icons.star
-                                          : Icons.star_border,
-                                      color: const Color(0xFFE0B400),
-                                      size: 42,
-                                    ),
-                                    onPressed: () {
-                                      setDialogState(() => rating = starVal);
-                                    },
-                                  );
-                                }),
-                                Text(
-                                  rating.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    fontSize: 52 / 2,
-                                    color: Color(0xFFE0B400),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    color: const Color(0xFFD2D2D2),
-                    padding: const EdgeInsets.all(10),
-                    child: TextField(
-                      controller: commentController,
-                      maxLines: 5,
-                      decoration: const InputDecoration(
-                        hintText: '感想を書いてください',
-                        border: InputBorder.none,
-                        isCollapsed: true,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  child: Text(
-                    'キャンセル',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF3B30),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    '投稿する',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  onPressed: () async {
-                    if (commentController.text.trim().isEmpty) return;
-
-                    final service = Provider.of<SupabaseService>(
-                      context,
-                      listen: false,
-                    );
-                    final comment = isSpoiler
-                        ? '[ネタバレあり]\n${commentController.text.trim()}'
-                        : '[ネタバレなし]\n${commentController.text.trim()}';
-
-                    final success = await service.createPost(
-                      bookId: book.id,
-                      rating: rating,
-                      comment: comment,
-                    );
-
-                    if (success && mounted) {
-                      commentController.clear();
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('レビューを投稿しました')),
-                      );
-                      _controller.loadData(context);
-                    }
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    commentController.dispose();
+    final posted = await showPostComposerDialog(context: context, book: book);
+    if (posted && mounted) {
+      _controller.loadData(context);
+    }
   }
 
   void _showBookDetailDialog(Book book) {
@@ -428,40 +249,46 @@ class _BookListScreenState extends State<BookListScreen> {
                   )
                 : SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildTopHeroImage(),
-                        _buildHeader(),
-                        _buildSearchBar(),
-                        if (_controller.searchQuery.isNotEmpty)
-                          _buildSearchResults()
-                        else ...[
-                          _buildGenreSection(
-                            title: 'おすすめの本',
-                            sectionCode: 'Section 3',
-                            bookList: _controller.recommendedBooks,
-                            onLoadMore: _controller.loadMoreRecommended,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSearchBar(),
+                              if (_controller.searchQuery.isNotEmpty)
+                                _buildSearchResults()
+                              else ...[
+                                _buildGenreSection(
+                                  title: 'おすすめの本',
+                                  sectionCode: 'Section 3',
+                                  bookList: _controller.recommendedBooks,
+                                  onLoadMore: _controller.loadMoreRecommended,
+                                ),
+                                const AdBanner(sectionLabel: 'Section 2'),
+                                _buildGenreSection(
+                                  title: '洋書',
+                                  sectionCode: 'Section 4',
+                                  bookList: _controller.westernBooks,
+                                  onLoadMore: _controller.loadMoreWestern,
+                                ),
+                                _buildGenreSection(
+                                  title: '人気作品',
+                                  sectionCode: 'Section 6',
+                                  bookList: _controller.popularBooks,
+                                  onLoadMore: _controller.loadMorePopular,
+                                ),
+                                const AdBanner(sectionLabel: 'Section 5'),
+                                _buildSectionHeader('タイムライン', 'Section 5'),
+                                _buildTimeline(),
+                              ],
+                              _buildFooter(),
+                            ],
                           ),
-                          const AdBanner(sectionLabel: 'Section 2'),
-                          _buildGenreSection(
-                            title: '洋書',
-                            sectionCode: 'Section 4',
-                            bookList: _controller.westernBooks,
-                            onLoadMore: _controller.loadMoreWestern,
-                          ),
-                          _buildGenreSection(
-                            title: '人気作品',
-                            sectionCode: 'Section 6',
-                            bookList: _controller.popularBooks,
-                            onLoadMore: _controller.loadMorePopular,
-                          ),
-                          const AdBanner(sectionLabel: 'Section 5'),
-                          _buildSectionHeader('タイムライン', 'Section 5'),
-                          _buildTimeline(),
-                        ],
-                        _buildFooter(),
+                        ),
                       ],
                     ),
                   ),
@@ -472,105 +299,39 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildTopHeroImage() {
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: ClipRect(
-        child: Transform.translate(
-          offset: const Offset(-16, 0),
-          child: SizedBox(
-            width: screenWidth,
-            height: 170,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const ColoredBox(color: Color(0xFF090909)),
-                ClipPath(
-                  clipper: _DiagonalRedClipper(),
-                  child: const ColoredBox(color: Color(0xFFFF1F1F)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Image.asset(
-                    'assets/images/Sharemarium.png',
-                    fit: BoxFit.fitWidth,
-                    alignment: Alignment.center,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Text(
-                          'Sharemarium',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 42,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1.0,
-                          ),
-                        ),
-                      );
-                    },
+      child: SizedBox(
+        width: double.infinity,
+        height: 140.5,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF090909)),
+            ClipPath(
+              clipper: _DiagonalRedClipper(),
+              child: const ColoredBox(color: Color.fromARGB(255, 208, 3, 3)),
+            ),
+            Image.asset(
+              'assets/images/Sharemarium.png',
+              fit: BoxFit.fill,
+              alignment: Alignment.centerLeft,
+              errorBuilder: (context, error, stackTrace) {
+                return const Center(
+                  child: Text(
+                    'Sharemarium',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.0,
+                    ),
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF3B30),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'BookCase',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-          ElevatedButton.icon(
-            onPressed: widget.onNavigateToProfile,
-            icon: const Icon(
-              Icons.person_outline,
-              size: 18,
-              color: Colors.white,
-            ),
-            label: const Text(
-              'プロフィール',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF3B30),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 2,
-            ),
-          ),
-        ],
       ),
     );
   }

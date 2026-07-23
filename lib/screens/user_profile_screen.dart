@@ -6,6 +6,7 @@ import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
+import 'profile_book_search_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -77,6 +78,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
   }
 
+  Future<void> _openBookSearch() async {
+    final posted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const ProfileBookSearchScreen()),
+    );
+    if (posted == true && mounted) {
+      await _loadProfileData();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,6 +123,19 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               centerTitle: true,
             )
           : null,
+      floatingActionButton: _profile == null
+          ? null
+          : FloatingActionButton(
+              heroTag: 'addReadBookFromProfile',
+              onPressed: _openBookSearch,
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              shape: const CircleBorder(
+                side: BorderSide(color: Colors.white24),
+              ),
+              tooltip: '読了した本を投稿',
+              child: const Icon(Icons.add, size: 32),
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
