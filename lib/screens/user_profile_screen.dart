@@ -139,7 +139,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                         controller: _tabController,
                         children: [
                           _buildPostsTab(),
-                          _buildGridTab(_collections, 'コレクションはありません。'),
+                          _buildGridTab(_collections, '本棚はありません。'),
                           _buildGridTab(_favorites, 'お気に入りの本はありません。'),
                         ],
                       ),
@@ -163,7 +163,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -327,7 +327,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         ),
         tabs: const [
           Tab(text: '投稿'),
-          Tab(text: 'コレクション'),
+          Tab(text: '本棚'),
           Tab(text: 'お気に入り'),
         ],
       ),
