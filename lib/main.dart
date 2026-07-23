@@ -5,6 +5,11 @@ import 'services/supabase_service.dart';
 import 'screens/book_list_screen.dart'; // 👈 これを追加
 import 'screens/user_profile_screen.dart';
 import 'screens/auth_screen.dart';
+import 'screens/terms_screen.dart';
+import 'screens/privacy_policy_screen.dart';
+import 'screens/community_guidelines_screen.dart';
+import 'screens/infringement_policy_screen.dart';
+import 'screens/external_transmission_screen.dart';
 
 enum _HeaderMenuAction { myPage, settings, help, logout }
 
@@ -178,7 +183,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       case 3:
         return 'ヘルプ';
       default:
-        return 'ヘッダー';
+        return 'ホーム';
     }
   }
 
@@ -288,11 +293,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             title: '設定',
                             message: '設定画面はこれから実装します。',
                           )
-                        : const _SimplePlaceholderScreen(
-                            key: ValueKey('HelpScreen'),
-                            title: 'ヘルプ',
-                            message: 'ヘルプ画面はこれから実装します。',
-                          ),
+                        : const _HelpScreen(key: ValueKey('HelpScreen')),
                   ),
                 ),
               ],
@@ -340,4 +341,76 @@ class _SimplePlaceholderScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HelpScreen extends StatelessWidget {
+  const _HelpScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <_HelpItem>[
+      _HelpItem(title: '利用規約', screenBuilder: (_) => const TermsScreen()),
+      _HelpItem(
+        title: 'プライバシーポリシー',
+        screenBuilder: (_) => const PrivacyPolicyScreen(),
+      ),
+      _HelpItem(
+        title: 'コミュニティガイドライン',
+        screenBuilder: (_) => const CommunityGuidelinesScreen(),
+      ),
+      _HelpItem(
+        title: '権利侵害・通報ポリシー',
+        screenBuilder: (_) => const InfringementPolicyScreen(),
+      ),
+      _HelpItem(
+        title: '外部送信に関する公表事項',
+        screenBuilder: (_) => const ExternalTransmissionScreen(),
+      ),
+    ];
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: items.length + 1,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '規約・ポリシー',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+              );
+            }
+
+            final item = items[index - 1];
+            return Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                title: Text(item.title),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: item.screenBuilder));
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _HelpItem {
+  const _HelpItem({required this.title, required this.screenBuilder});
+
+  final String title;
+  final WidgetBuilder screenBuilder;
 }
