@@ -56,12 +56,19 @@ class _AuthScreenState extends State<AuthScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              backgroundColor: Colors.black,
+              surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Colors.white24),
                 borderRadius: BorderRadius.circular(12),
               ),
               title: const Text(
                 '利用規約・プライバシーポリシー',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -69,7 +76,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 children: [
                   const Text(
                     '続けるには以下の両方に同意してください。',
-                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                    style: TextStyle(fontSize: 13, color: Colors.white70),
                   ),
                   const SizedBox(height: 16),
                   // 利用規約
@@ -79,6 +86,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       Checkbox(
                         value: agreedTerms,
                         activeColor: const Color(0xFFFF1F1F),
+                        checkColor: Colors.white,
+                        side: const BorderSide(color: Colors.white70),
                         onChanged: (v) =>
                             setDialogState(() => agreedTerms = v ?? false),
                       ),
@@ -87,7 +96,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           text: TextSpan(
                             style: const TextStyle(
                               fontSize: 13,
-                              color: Colors.black87,
+                              color: Colors.white,
                             ),
                             children: [
                               TextSpan(
@@ -119,6 +128,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       Checkbox(
                         value: agreedPrivacy,
                         activeColor: const Color(0xFFFF1F1F),
+                        checkColor: Colors.white,
+                        side: const BorderSide(color: Colors.white70),
                         onChanged: (v) =>
                             setDialogState(() => agreedPrivacy = v ?? false),
                       ),
@@ -127,7 +138,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           text: TextSpan(
                             style: const TextStyle(
                               fontSize: 13,
-                              color: Colors.black87,
+                              color: Colors.white,
                             ),
                             children: [
                               TextSpan(
@@ -158,6 +169,7 @@ class _AuthScreenState extends State<AuthScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(false),
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
                   child: const Text('キャンセル'),
                 ),
                 ElevatedButton(
@@ -167,7 +179,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF1F1F),
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey[300],
+                    disabledBackgroundColor: Colors.grey[800],
+                    disabledForegroundColor: Colors.white54,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -237,16 +250,37 @@ class _AuthScreenState extends State<AuthScreen> {
     await _sendMagicLink(normalized, providerLabel);
   }
 
+  Future<void> _signInWithGoogle() async {
+    final agreed = await _showTermsDialog();
+    if (!agreed || !mounted) return;
+
+    setState(() => _isSubmitting = true);
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final error = await service.signInWithGoogle();
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
   Widget _buildLoginButton({
     required String label,
     required Color background,
     Color foreground = Colors.white,
+    VoidCallback? onPressed,
   }) {
     return SizedBox(
       width: 200,
       height: 36,
       child: ElevatedButton(
-        onPressed: _isSubmitting ? null : () => _showEmailPrompt(label),
+        onPressed: _isSubmitting
+            ? null
+            : onPressed ?? () => _showEmailPrompt(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: background,
           foregroundColor: foreground,
@@ -315,6 +349,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     label: 'Google',
                     background: const Color(0xFFF5CF00),
                     foreground: Colors.black,
+                    onPressed: _signInWithGoogle,
                   ),
                   const SizedBox(height: 10),
                   _buildLoginButton(label: 'X', background: Colors.black),
@@ -330,7 +365,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    '現在はマジックリンク認証のみ有効です。\nどのボタンからでもメールリンクを送信します。',
+                    'GoogleはOAuth認証を使用します。\nその他のボタンは現在メールリンク認証です。',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),

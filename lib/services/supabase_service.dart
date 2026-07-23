@@ -85,6 +85,29 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<String?> signInWithGoogle() async {
+    if (!_isInitialized || _client == null) {
+      return 'Supabaseが初期化されていません。';
+    }
+
+    try {
+      final started = await _client!.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? null : _redirectUrl,
+        queryParams: const {'prompt': 'select_account'},
+      );
+
+      if (!started) {
+        return 'Googleログインを開始できませんでした。';
+      }
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Googleログインに失敗しました: $e';
+    }
+  }
+
   Future<String?> signInWithEmail({
     required String email,
     required String password,
