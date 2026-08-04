@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
-import 'screens/book_list_screen.dart'; // 👈 これを追加
+import 'screens/book_list_screen.dart';
 import 'screens/user_profile_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/terms_screen.dart';
@@ -10,6 +10,9 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/community_guidelines_screen.dart';
 import 'screens/infringement_policy_screen.dart';
 import 'screens/external_transmission_screen.dart';
+import 'screens/legal_consent_screen.dart';
+import 'screens/account_settings_screen.dart';
+import 'screens/contact_screen.dart';
 
 enum _HeaderMenuAction { myPage, settings, help, logout }
 
@@ -63,7 +66,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.light,
           primary: const Color(0xFFFF3B30),
           secondary: const Color(0xFF264653), // Slate blue
-          background: const Color(0xFFF8F9FA),
+          surface: const Color(0xFFF8F9FA),
         ),
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme)
             .copyWith(
@@ -94,7 +97,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark,
           primary: const Color(0xFFFF3B30),
           secondary: const Color(0xFF4EA8DE),
-          background: const Color(0xFF0B0F19),
+          surface: const Color(0xFF0B0F19),
         ),
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
             .copyWith(
@@ -113,7 +116,7 @@ class MyApp extends StatelessWidget {
       themeMode: ThemeMode.system, // Dynamically follow device preference
       routes: {'/login': (context) => const AuthScreen()},
 
-      home: const MainNavigationShell(),
+      home: const LegalConsentGate(child: MainNavigationShell()),
     );
   }
 }
@@ -320,10 +323,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             showAppBar: false,
                           )
                         : _currentScreenIndex == 2
-                        ? const _SimplePlaceholderScreen(
-                            key: ValueKey('SettingsScreen'),
-                            title: '設定',
-                            message: '設定画面はこれから実装します。',
+                        ? AccountSettingsScreen(
+                            key: const ValueKey('SettingsScreen'),
+                            onAccountDeleted: _goToBookList,
                           )
                         : const _HelpScreen(key: ValueKey('HelpScreen')),
                   ),
@@ -333,44 +335,6 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
         );
       },
-    );
-  }
-}
-
-class _SimplePlaceholderScreen extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _SimplePlaceholderScreen({
-    super.key,
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 720),
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E5E5)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Text(message, style: TextStyle(color: Colors.grey[700])),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -398,6 +362,7 @@ class _HelpScreen extends StatelessWidget {
         title: '外部送信に関する公表事項',
         screenBuilder: (_) => const ExternalTransmissionScreen(),
       ),
+      _HelpItem(title: 'お問い合わせ', screenBuilder: (_) => const ContactScreen()),
     ];
 
     return Align(

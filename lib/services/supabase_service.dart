@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
+import 'legal_document_versions.dart';
 
 class SupabaseService extends ChangeNotifier {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -17,6 +18,8 @@ class SupabaseService extends ChangeNotifier {
   SupabaseClient? _client;
   StreamSubscription<AuthState>? _authStateSubscription;
   String? _redirectUrl;
+  bool? _hasCurrentLegalConsentCache;
+  String? _cachedConsentUserId;
 
   // ----- Initialization ----------------------------------------------------
   Future<void> initialize({
@@ -40,8 +43,12 @@ class SupabaseService extends ChangeNotifier {
         _authStateSubscription?.cancel();
         _authStateSubscription = _client!.auth.onAuthStateChange.listen((evt) {
           final user = evt.session?.user;
+          if (_cachedConsentUserId != user?.id) {
+            _cachedConsentUserId = user?.id;
+            _hasCurrentLegalConsentCache = null;
+          }
           if (user != null) {
-            _upsertProfile(userId: user.id, email: user.email);
+            _ensureProfile(userId: user.id);
           }
           notifyListeners();
         });
@@ -145,11 +152,7 @@ class SupabaseService extends ChangeNotifier {
       );
       final user = response.user;
       if (user != null) {
-        await _upsertProfile(
-          userId: user.id,
-          email: user.email,
-          preferredUsername: null,
-        );
+        await _ensureProfile(userId: user.id, preferredUsername: null);
       }
       notifyListeners();
       return null;
@@ -176,11 +179,7 @@ class SupabaseService extends ChangeNotifier {
       );
       final user = response.user;
       if (user != null) {
-        await _upsertProfile(
-          userId: user.id,
-          email: email,
-          preferredUsername: username,
-        );
+        await _ensureProfile(userId: user.id, preferredUsername: username);
       }
       notifyListeners();
       return null;
@@ -204,37 +203,152 @@ class SupabaseService extends ChangeNotifier {
   Future<void> ensureCurrentUserProfile() async {
     final user = currentUser;
     if (user == null) return;
-    await _upsertProfile(userId: user.id, email: user.email);
+    await _ensureProfile(userId: user.id);
   }
 
-  Future<void> _upsertProfile({
+  Future<void> _ensureProfile({
     required String userId,
-    String? email,
     String? preferredUsername,
   }) async {
     if (!_isInitialized || _client == null) return;
 
     final generatedUsername = preferredUsername?.trim().isNotEmpty == true
         ? preferredUsername!.trim()
-        : _usernameFromEmail(email);
+        : _anonymousUsername(userId);
 
     try {
-      await _client!.from('profiles').upsert({
+      final existing = await _client!
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+      if (existing != null) return;
+
+      await _client!.from('profiles').insert({
         'id': userId,
         'username': generatedUsername,
         'avatar_url': '',
         'bio': '',
-      }, onConflict: 'id');
+      });
     } catch (e) {
-      debugPrint('Error upserting profile: $e');
+      debugPrint('Error ensuring profile: $e');
     }
   }
 
-  String _usernameFromEmail(String? email) {
-    final source = (email ?? 'bookcase_user').split('@').first;
-    final sanitized = source.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-    if (sanitized.isEmpty) return 'bookcase_user';
-    return sanitized;
+  String _anonymousUsername(String userId) {
+    final compactId = userId.replaceAll('-', '');
+    final suffix = compactId.length >= 10
+        ? compactId.substring(0, 10)
+        : compactId;
+    return 'reader_$suffix';
+  }
+
+  Future<bool> hasCurrentLegalConsent({bool forceRefresh = false}) async {
+    final userId = activeProfileId;
+    if (!_isInitialized || _client == null || userId.isEmpty) return false;
+    if (!forceRefresh &&
+        _cachedConsentUserId == userId &&
+        _hasCurrentLegalConsentCache != null) {
+      return _hasCurrentLegalConsentCache!;
+    }
+
+    try {
+      final consent = await _client!
+          .from('legal_consents')
+          .select('id')
+          .eq('profile_id', userId)
+          .eq('bundle_version', LegalDocumentVersions.bundle)
+          .maybeSingle();
+      _cachedConsentUserId = userId;
+      _hasCurrentLegalConsentCache = consent != null;
+      return consent != null;
+    } catch (e) {
+      debugPrint('Error checking legal consent: $e');
+      return false;
+    }
+  }
+
+  Future<String?> acceptCurrentLegalDocuments() async {
+    final user = currentUser;
+    if (!_isInitialized || _client == null || user == null) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+
+    try {
+      await _ensureProfile(userId: user.id);
+      final provider = user.appMetadata['provider']?.toString();
+      await _client!.from('legal_consents').insert({
+        'profile_id': user.id,
+        'bundle_version': LegalDocumentVersions.bundle,
+        'terms_version': LegalDocumentVersions.terms,
+        'privacy_version': LegalDocumentVersions.privacy,
+        'community_guidelines_version':
+            LegalDocumentVersions.communityGuidelines,
+        'infringement_policy_version': LegalDocumentVersions.infringementPolicy,
+        'external_transmission_version':
+            LegalDocumentVersions.externalTransmission,
+        'auth_provider': provider,
+      });
+      _cachedConsentUserId = user.id;
+      _hasCurrentLegalConsentCache = true;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('Error saving legal consent: $e');
+      return '同意内容を保存できませんでした。データベース更新後にもう一度お試しください。';
+    }
+  }
+
+  Future<String?> submitContactRequest({
+    required String email,
+    required String category,
+    required String subject,
+    required String message,
+  }) async {
+    if (!_isInitialized || _client == null) {
+      return 'お問い合わせ機能を初期化できませんでした。';
+    }
+
+    try {
+      final profileId = activeProfileId;
+      await _client!.from('contact_requests').insert({
+        'profile_id': profileId.isEmpty ? null : profileId,
+        'email': email.trim(),
+        'category': category,
+        'subject': subject.trim(),
+        'message': message.trim(),
+      });
+      return null;
+    } catch (e) {
+      debugPrint('Error submitting contact request: $e');
+      return 'お問い合わせを送信できませんでした。データベース更新後にもう一度お試しください。';
+    }
+  }
+
+  Future<String?> deleteCurrentAccount() async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+
+    try {
+      final response = await _client!.functions.invoke(
+        'delete-account',
+        body: const {'confirmation': true},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        return '退会処理に失敗しました。お問い合わせフォームからご連絡ください。';
+      }
+      await signOut();
+      _cachedConsentUserId = null;
+      _hasCurrentLegalConsentCache = null;
+      return null;
+    } on FunctionException catch (e) {
+      debugPrint('Delete account function error: $e');
+      return '退会処理に失敗しました。Edge Functionの配備状況を確認してください。';
+    } catch (e) {
+      debugPrint('Error deleting account: $e');
+      return '退会処理に失敗しました。もう一度お試しください。';
+    }
   }
 
   // ----- BOOK QUERIES -----------------------------------------------------
