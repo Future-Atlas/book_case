@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
 const RAKUTEN_REFERER =
-    process.env.RAKUTEN_REFERER || "https://book-case-u9uq.vercel.app/";
+    process.env.RAKUTEN_REFERER || "https://sharemarium.com/";
 const ENABLE_NDL_FALLBACK =
     String(process.env.SEO_ENABLE_NDL_FALLBACK || "false").toLowerCase() ===
     "true";
@@ -20,7 +20,7 @@ const RAKUTEN_BOOK_API =
 const RAKUTEN_FOREIGN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
 const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
-const SITE_URL = "https://book-case-u9uq.vercel.app";
+const SITE_URL = "https://sharemarium.com";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -86,7 +86,7 @@ function rakutenRequestHeaders() {
     return {
         Referer: RAKUTEN_REFERER,
         "User-Agent":
-            "BookCase-SEO-Bot/1.0 (+https://book-case-u9uq.vercel.app)",
+            "Sharemarium-SEO-Bot/1.0 (+https://sharemarium.com)",
     };
 }
 
