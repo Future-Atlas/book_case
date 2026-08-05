@@ -1,8 +1,20 @@
 import '../models/book.dart';
 import '../api/ndl_api.dart';
 import '../api/rakuten_api.dart';
+import '../services/content_safety_service.dart';
 
 class BookRepository {
+  BookRepository({this.allowAdultContent = false});
+
+  final bool allowAdultContent;
+
+  List<Book> _filterForViewer(List<Book> books) {
+    return ContentSafetyService.filterBooks(
+      books,
+      allowAdultContent: allowAdultContent,
+    );
+  }
+
   /// 📌 1. トップ画面の各セクション（おすすめ・洋書・人気）の追加読み込み用
   /// ここでは最初から表紙画像が確実に手に入る楽天APIをページ指定で動かします。
   Future<List<Book>> fetchBooksByGenre(String genre, {int page = 1}) async {
@@ -20,7 +32,7 @@ class BookRepository {
         page: page,
         count: 10,
       );
-      return rakutenBooks;
+      return _filterForViewer(rakutenBooks);
     } catch (e) {
       print('❌ [Repository] 楽天ジャンル本の取得でエラーが発生しました: $e');
       return [];
@@ -37,7 +49,7 @@ class BookRepository {
         page: 1,
         count: 10,
       );
-      return ndlBooks;
+      return _filterForViewer(ndlBooks);
     } catch (e) {
       print('❌ [Repository] 国会図書館全件取得でエラーが発生しました: $e');
       return [];
@@ -48,6 +60,9 @@ class BookRepository {
   /// すべての図書が見えるように、国会図書館APIを直接使用します！
   Future<List<Book>> searchBooks(String query, {int page = 1}) async {
     if (query.isEmpty) return fetchAllBooks();
+    if (!allowAdultContent && ContentSafetyService.isAdultSearchQuery(query)) {
+      return [];
+    }
 
     try {
       print('📦 [Repository] 国会図書館APIからキーワード検索を行います: $query (Page: $page)');
@@ -58,7 +73,7 @@ class BookRepository {
         page: page,
         count: 10,
       );
-      return ndlBooks;
+      return _filterForViewer(ndlBooks);
     } catch (e) {
       print('❌ [Repository] 国会図書館検索でエラーが発生しました: $e');
       return [];

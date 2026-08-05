@@ -27,6 +27,10 @@ class BookListController extends ChangeNotifier {
 
   // タイムライン用
   List<Post> timelinePosts = [];
+  bool _allowAdultContent = false;
+
+  BookRepository get _repository =>
+      BookRepository(allowAdultContent: _allowAdultContent);
 
   // 初期化
   void initialize(BuildContext context) {
@@ -50,7 +54,8 @@ class BookListController extends ChangeNotifier {
     isLoading = true;
     notifyListeners();
 
-    final repository = BookRepository();
+    _allowAdultContent = await SupabaseService().canViewAdultContent();
+    final repository = _repository;
 
     recommendedPage = 1;
     westernPage = 1;
@@ -112,7 +117,7 @@ class BookListController extends ChangeNotifier {
       final nextPage = recommendedPage + 1;
       print('📡 おすすめ本の次のページを取得中... (Page: $nextPage)');
 
-      final newBooks = await BookRepository().fetchBooksByGenre(
+      final newBooks = await _repository.fetchBooksByGenre(
         '話題の本',
         page: nextPage,
       );
@@ -140,7 +145,7 @@ class BookListController extends ChangeNotifier {
       final nextPage = westernPage + 1;
       print('📡 洋書の次のページを取得中... (Page: $nextPage)');
 
-      final newBooks = await BookRepository().fetchBooksByGenre(
+      final newBooks = await _repository.fetchBooksByGenre(
         'English',
         page: nextPage,
       );
@@ -168,7 +173,7 @@ class BookListController extends ChangeNotifier {
       final nextPage = popularPage + 1;
       print('📡 人気作品の次のページを取得中... (Page: $nextPage)');
 
-      final newBooks = await BookRepository().fetchBooksByGenre(
+      final newBooks = await _repository.fetchBooksByGenre(
         'ベストセラー',
         page: nextPage,
       );

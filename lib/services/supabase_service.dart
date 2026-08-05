@@ -10,6 +10,7 @@ import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
 import '../models/moderation_models.dart';
+import 'content_safety_service.dart';
 import 'legal_document_versions.dart';
 
 class SupabaseService extends ChangeNotifier {
@@ -467,6 +468,18 @@ class SupabaseService extends ChangeNotifier {
       debugPrint('Error fetching account details: $e');
       return null;
     }
+  }
+
+  /// Users without a verified registration birth date are treated as minors.
+  /// This fail-closed behavior also applies to signed-out visitors.
+  Future<bool> canViewAdultContent() async {
+    if (!isAuthenticated) return false;
+    final details = await fetchCurrentAccountDetails();
+    final birthDate = DateTime.tryParse(
+      details?['birth_date']?.toString() ?? '',
+    );
+    if (birthDate == null) return false;
+    return ContentSafetyService.isAtLeast18(birthDate);
   }
 
   Future<Map<String, dynamic>?> fetchCurrentSettingsData() async {
@@ -1105,7 +1118,8 @@ class SupabaseService extends ChangeNotifier {
         final posts = (response as List)
             .map((json) => Post.fromJson(json))
             .toList();
-        return _enrichPostsWithBookMetadata(posts);
+        final enriched = await _enrichPostsWithBookMetadata(posts);
+        return _filterPostsForCurrentViewer(enriched);
       } catch (e) {
         debugPrint('Error fetching timeline posts in Supabase: $e');
       }
@@ -1231,7 +1245,8 @@ class SupabaseService extends ChangeNotifier {
       // 2. 返ってきた生データを、正しくPostモデルの形に変換する
       final List<dynamic> data = response as List<dynamic>;
       final posts = data.map((json) => Post.fromJson(json)).toList();
-      return _enrichPostsWithBookMetadata(posts);
+      final enriched = await _enrichPostsWithBookMetadata(posts);
+      return _filterPostsForCurrentViewer(enriched);
     } catch (e) {
       debugPrint('fetchUserPostsでエラーが発生しました: $e');
       return [];
@@ -1260,13 +1275,31 @@ class SupabaseService extends ChangeNotifier {
 
       enriched.add(
         post.copyWith(
-          bookTitle: resolved.title,
-          bookAuthor: resolved.author,
+          bookTitle: post.bookTitle.trim().isNotEmpty
+              ? post.bookTitle
+              : resolved.title,
+          bookAuthor: post.bookAuthor.trim().isNotEmpty
+              ? post.bookAuthor
+              : resolved.author,
           bookCoverUrl: resolved.coverUrl,
         ),
       );
     }
     return _attachReactionState(enriched);
+  }
+
+  Future<List<Post>> _filterPostsForCurrentViewer(List<Post> posts) async {
+    if (await canViewAdultContent()) return posts;
+    return posts
+        .where((post) {
+          return !post.isAgeRestricted &&
+              !ContentSafetyService.containsAdultContentTerms([
+                post.bookTitle,
+                post.bookAuthor,
+                post.comment,
+              ]);
+        })
+        .toList(growable: false);
   }
 
   Future<List<Post>> _attachReactionState(List<Post> posts) async {
@@ -1608,7 +1641,7 @@ class SupabaseService extends ChangeNotifier {
   }
 
   Future<bool> createPost({
-    required String bookId,
+    required Book book,
     required double rating,
     required String comment,
   }) async {
@@ -1617,17 +1650,29 @@ class SupabaseService extends ChangeNotifier {
       debugPrint('Cannot create post: no authenticated user.');
       return false;
     }
+    final isAgeRestricted =
+        ContentSafetyService.isAdultBook(book) ||
+        ContentSafetyService.containsAdultContentTerms([comment]);
+    if (isAgeRestricted && !await canViewAdultContent()) {
+      debugPrint('Cannot create an age-restricted post for a minor.');
+      return false;
+    }
     if (_isInitialized && _client != null) {
       try {
         await _client!.from('posts').insert({
           'profile_id': profileId,
-          'book_id': bookId,
+          'book_id': book.id,
+          'book_title': book.title,
+          'book_author': book.author,
+          'book_publisher': book.publisher,
+          'book_description': book.description,
+          'is_age_restricted': isAgeRestricted,
           'rating': rating,
           'comment': comment,
         });
 
         // Any completed post is also tracked in collections as 'read'.
-        await _upsertReadCollection(profileId: profileId, bookId: bookId);
+        await _upsertReadCollection(profileId: profileId, bookId: book.id);
 
         await _client!.rpc(
           'increment_read_count',

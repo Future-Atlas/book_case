@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/book.dart';
 import '../repositories/book_repository.dart';
+import '../services/supabase_service.dart';
 import '../widgets/post_composer_dialog.dart';
 
 class ProfileBookSearchScreen extends StatefulWidget {
@@ -16,7 +18,6 @@ class ProfileBookSearchScreen extends StatefulWidget {
 
 class _ProfileBookSearchScreenState extends State<ProfileBookSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final BookRepository _repository = BookRepository();
   Timer? _debounce;
   List<Book> _results = [];
   bool _isSearching = false;
@@ -62,7 +63,11 @@ class _ProfileBookSearchScreenState extends State<ProfileBookSearchScreen> {
       _hasSearched = true;
     });
 
-    final books = await _repository.searchBooks(query);
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final allowAdultContent = await service.canViewAdultContent();
+    final books = await BookRepository(
+      allowAdultContent: allowAdultContent,
+    ).searchBooks(query);
     if (!mounted || generation != _searchGeneration) return;
     setState(() {
       _results = books;

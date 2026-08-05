@@ -14,6 +14,7 @@ class Post {
   final String bookTitle;
   final String bookAuthor;
   final String bookCoverUrl;
+  final bool isAgeRestricted;
   final Map<PostReactionType, int> reactionCounts;
   final PostReactionType? currentUserReaction;
 
@@ -32,6 +33,7 @@ class Post {
     required this.bookTitle,
     required this.bookAuthor,
     required this.bookCoverUrl,
+    this.isAgeRestricted = false,
     this.reactionCounts = const {},
     this.currentUserReaction,
   });
@@ -52,9 +54,10 @@ class Post {
           : DateTime.now(),
       username: profile?['username'] ?? '匿名ユーザー',
       userAvatarUrl: profile?['avatar_url'] ?? '',
-      bookTitle: book?['title'] ?? '不明な書籍',
-      bookAuthor: book?['author'] ?? '不明な著者',
+      bookTitle: json['book_title'] ?? book?['title'] ?? '',
+      bookAuthor: json['book_author'] ?? book?['author'] ?? '',
       bookCoverUrl: book?['cover_url'] ?? '',
+      isAgeRestricted: json['is_age_restricted'] == true,
       reactionCounts: const {},
     );
   }
@@ -66,6 +69,9 @@ class Post {
       'book_id': bookId,
       'rating': rating,
       'comment': comment,
+      'book_title': bookTitle,
+      'book_author': bookAuthor,
+      'is_age_restricted': isAgeRestricted,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -82,6 +88,7 @@ class Post {
     String? bookTitle,
     String? bookAuthor,
     String? bookCoverUrl,
+    bool? isAgeRestricted,
     Map<PostReactionType, int>? reactionCounts,
     PostReactionType? currentUserReaction,
   }) {
@@ -97,6 +104,7 @@ class Post {
       bookTitle: bookTitle ?? this.bookTitle,
       bookAuthor: bookAuthor ?? this.bookAuthor,
       bookCoverUrl: bookCoverUrl ?? this.bookCoverUrl,
+      isAgeRestricted: isAgeRestricted ?? this.isAgeRestricted,
       reactionCounts: reactionCounts ?? this.reactionCounts,
       currentUserReaction: currentUserReaction ?? this.currentUserReaction,
     );

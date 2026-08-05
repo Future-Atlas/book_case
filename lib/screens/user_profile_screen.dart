@@ -31,7 +31,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _footerSearchController = TextEditingController();
-  final BookRepository _bookRepository = BookRepository();
   UserProfile? _profile;
   List<Post> _userPosts = [];
   List<Book> _collections = [];
@@ -98,15 +97,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     });
 
     try {
+      final service = Provider.of<SupabaseService>(context, listen: false);
+      final allowAdultContent = await service.canViewAdultContent();
+      final bookRepository = BookRepository(
+        allowAdultContent: allowAdultContent,
+      );
       final List<Book> merged = [];
-      final primaryBooks = await _bookRepository.searchBooks(keyword);
+      final primaryBooks = await bookRepository.searchBooks(keyword);
       merged.addAll(primaryBooks);
 
       // Fuzzy fallback: search by each token and merge results.
       final tokens = _tokenizeQuery(keyword);
       if (tokens.length > 1) {
         for (final token in tokens.take(3)) {
-          final tokenBooks = await _bookRepository.searchBooks(token);
+          final tokenBooks = await bookRepository.searchBooks(token);
           merged.addAll(tokenBooks);
         }
       }

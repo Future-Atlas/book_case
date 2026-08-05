@@ -2,12 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/book.dart';
+import '../services/content_safety_service.dart';
 import '../services/supabase_service.dart';
 
 Future<bool> showPostComposerDialog({
   required BuildContext context,
   required Book book,
 }) async {
+  final service = Provider.of<SupabaseService>(context, listen: false);
+  if (ContentSafetyService.isAdultBook(book) &&
+      !await service.canViewAdultContent()) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('この書籍は18歳未満の利用者には表示・投稿できません。')),
+      );
+    }
+    return false;
+  }
+  if (!context.mounted) return false;
+
   double rating = 5.0;
   bool isSpoiler = false;
   bool isSubmitting = false;
@@ -182,15 +195,11 @@ Future<bool> showPostComposerDialog({
                         }
 
                         setDialogState(() => isSubmitting = true);
-                        final service = Provider.of<SupabaseService>(
-                          context,
-                          listen: false,
-                        );
                         final comment = isSpoiler
                             ? '[ネタバレあり]\n$review'
                             : '[ネタバレなし]\n$review';
                         final success = await service.createPost(
-                          bookId: book.id,
+                          book: book,
                           rating: rating,
                           comment: comment,
                         );
