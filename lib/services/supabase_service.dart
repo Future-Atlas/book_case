@@ -399,6 +399,42 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool?> fetchCurrentProfilePrivacy() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return null;
+
+    try {
+      final profile = await _client!
+          .from('profiles')
+          .select('is_private')
+          .eq('id', profileId)
+          .maybeSingle();
+      return profile?['is_private'] as bool? ?? false;
+    } catch (e) {
+      debugPrint('Error fetching profile privacy: $e');
+      return null;
+    }
+  }
+
+  Future<String?> updateCurrentProfilePrivacy({required bool isPrivate}) async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+
+    try {
+      await _client!
+          .from('profiles')
+          .update({'is_private': isPrivate})
+          .eq('id', profileId);
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('Error updating profile privacy: $e');
+      return '鍵アカウント設定を保存できませんでした。データベース更新後にもう一度お試しください。';
+    }
+  }
+
   Future<bool> hasCurrentLegalConsent({bool forceRefresh = false}) async {
     final userId = activeProfileId;
     if (!_isInitialized || _client == null || userId.isEmpty) return false;
@@ -574,6 +610,7 @@ class SupabaseService extends ChangeNotifier {
       followersCount: 0,
       followingCount: 0,
       readCount: 0,
+      isPrivate: false,
     );
   }
 
@@ -605,19 +642,22 @@ class SupabaseService extends ChangeNotifier {
 
         if (bookIds.isEmpty) return [];
 
-        // Backfill missing collection rows so future loads can rely on collections.
-        final upsertRows = bookIds
-            .map(
-              (bookId) => {
-                'profile_id': profileId,
-                'book_id': bookId,
-                'status': 'read',
-              },
-            )
-            .toList();
-        await _client!
-            .from('collections')
-            .upsert(upsertRows, onConflict: 'profile_id,book_id');
+        // Only the owner may backfill collection rows. Public profile viewers
+        // must remain read-only, and private-profile RLS may return no rows.
+        if (profileId == activeProfileId) {
+          final upsertRows = bookIds
+              .map(
+                (bookId) => {
+                  'profile_id': profileId,
+                  'book_id': bookId,
+                  'status': 'read',
+                },
+              )
+              .toList();
+          await _client!
+              .from('collections')
+              .upsert(upsertRows, onConflict: 'profile_id,book_id');
+        }
 
         return _resolveBooksByIds(bookIds.toList());
       } catch (e) {

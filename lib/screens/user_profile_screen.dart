@@ -364,12 +364,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Username
-                      Text(
-                        _profile!.username,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _profile!.username,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (_profile!.isPrivate) ...[
+                            const SizedBox(width: 6),
+                            const Icon(Icons.lock, size: 16),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       // ⭕ 文字数が足りない場合の RangeError 回避

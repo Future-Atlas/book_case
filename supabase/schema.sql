@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     followers_count INTEGER DEFAULT 0,
     following_count INTEGER DEFAULT 0,
     read_count INTEGER DEFAULT 0,
+    is_private BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -126,20 +127,44 @@ CREATE POLICY "Users can update their own account details" ON public.account_det
     USING (auth.uid() = profile_id)
     WITH CHECK (auth.uid() = profile_id);
 
-CREATE POLICY "Allow public read access for posts" ON public.posts
-    FOR SELECT USING (true);
+CREATE POLICY "Allow visible profile posts to be read" ON public.posts
+    FOR SELECT USING (
+        auth.uid() = profile_id
+        OR EXISTS (
+            SELECT 1
+            FROM public.profiles AS profile
+            WHERE profile.id = posts.profile_id
+              AND profile.is_private = false
+        )
+    );
 
 CREATE POLICY "Allow authenticated users to insert posts" ON public.posts
     FOR INSERT WITH CHECK (auth.uid() = profile_id);
 
-CREATE POLICY "Allow public read access for favorites" ON public.favorites
-    FOR SELECT USING (true);
+CREATE POLICY "Allow visible profile favorites to be read" ON public.favorites
+    FOR SELECT USING (
+        auth.uid() = profile_id
+        OR EXISTS (
+            SELECT 1
+            FROM public.profiles AS profile
+            WHERE profile.id = favorites.profile_id
+              AND profile.is_private = false
+        )
+    );
 
 CREATE POLICY "Allow authenticated users to insert/delete favorites" ON public.favorites
     FOR ALL USING (auth.uid() = profile_id);
 
-CREATE POLICY "Allow public read access for collections" ON public.collections
-    FOR SELECT USING (true);
+CREATE POLICY "Allow visible profile collections to be read" ON public.collections
+    FOR SELECT USING (
+        auth.uid() = profile_id
+        OR EXISTS (
+            SELECT 1
+            FROM public.profiles AS profile
+            WHERE profile.id = collections.profile_id
+              AND profile.is_private = false
+        )
+    );
 
 CREATE POLICY "Allow authenticated users to insert/delete collections" ON public.collections
     FOR ALL USING (auth.uid() = profile_id);

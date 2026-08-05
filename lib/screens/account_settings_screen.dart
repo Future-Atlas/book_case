@@ -14,6 +14,10 @@ class AccountSettingsScreen extends StatefulWidget {
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   bool _isDeleting = false;
+  bool _isLoadingPrivacy = true;
+  bool _isSavingPrivacy = false;
+  bool _isPrivate = false;
+  bool _privacyLoadStarted = false;
   Future<Map<String, dynamic>?>? _accountDetailsFuture;
 
   @override
@@ -23,6 +27,43 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       context,
       listen: false,
     ).fetchCurrentAccountDetails();
+    if (!_privacyLoadStarted) {
+      _privacyLoadStarted = true;
+      _loadPrivacySetting();
+    }
+  }
+
+  Future<void> _loadPrivacySetting() async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final value = await service.fetchCurrentProfilePrivacy();
+    if (!mounted) return;
+    setState(() {
+      _isPrivate = value ?? false;
+      _isLoadingPrivacy = false;
+    });
+  }
+
+  Future<void> _updatePrivacySetting(bool value) async {
+    final previousValue = _isPrivate;
+    setState(() {
+      _isPrivate = value;
+      _isSavingPrivacy = true;
+    });
+
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final error = await service.updateCurrentProfilePrivacy(isPrivate: value);
+    if (!mounted) return;
+
+    setState(() {
+      _isSavingPrivacy = false;
+      if (error != null) _isPrivate = previousValue;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error ?? (value ? '鍵アカウントに設定しました。' : 'アカウントを公開しました。')),
+      ),
+    );
   }
 
   Future<void> _deleteAccount() async {
@@ -112,6 +153,28 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                Card(
+                  child: SwitchListTile(
+                    secondary: Icon(
+                      _isPrivate ? Icons.lock_outline : Icons.public,
+                    ),
+                    title: const Text('鍵アカウント'),
+                    subtitle: Text(
+                      _isPrivate
+                          ? '投稿・本棚・お気に入りは、本人以外には表示されません。'
+                          : '投稿・本棚・お気に入りは公開されます。',
+                    ),
+                    value: _isPrivate,
+                    onChanged: _isLoadingPrivacy || _isSavingPrivacy
+                        ? null
+                        : _updatePrivacySetting,
+                  ),
+                ),
+                if (_isLoadingPrivacy || _isSavingPrivacy) ...[
+                  const SizedBox(height: 6),
+                  const LinearProgressIndicator(minHeight: 2),
+                ],
                 const SizedBox(height: 16),
                 FutureBuilder<Map<String, dynamic>?>(
                   future: _accountDetailsFuture,

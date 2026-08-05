@@ -7,6 +7,7 @@ class UserProfile {
   final int followersCount;
   final int followingCount;
   final int readCount;
+  final bool isPrivate;
 
   UserProfile({
     required this.id,
@@ -17,6 +18,7 @@ class UserProfile {
     required this.followersCount,
     required this.followingCount,
     required this.readCount,
+    required this.isPrivate,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class UserProfile {
       followersCount: json['followers_count'] ?? 0,
       followingCount: json['following_count'] ?? 0,
       readCount: json['read_count'] ?? 0,
+      isPrivate: json['is_private'] ?? false,
     );
   }
 
@@ -42,6 +45,7 @@ class UserProfile {
       'followers_count': followersCount,
       'following_count': followingCount,
       'read_count': readCount,
+      'is_private': isPrivate,
     };
   }
 }
