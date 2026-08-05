@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
 
-class PostCard extends StatelessWidget {
+class PostCard extends StatefulWidget {
   final Post post;
   final bool showUserInfo;
   final VoidCallback? onUserTap;
   final Future<void> Function(PostReactionType reaction)? onReaction;
   final VoidCallback? onReport;
+  final bool concealSpoiler;
 
   const PostCard({
     super.key,
@@ -16,7 +17,31 @@ class PostCard extends StatelessWidget {
     this.onUserTap,
     this.onReaction,
     this.onReport,
+    this.concealSpoiler = true,
   });
+
+  @override
+  State<PostCard> createState() => _PostCardState();
+}
+
+class _PostCardState extends State<PostCard> {
+  bool _spoilerRevealed = false;
+
+  Post get post => widget.post;
+  bool get showUserInfo => widget.showUserInfo;
+  VoidCallback? get onUserTap => widget.onUserTap;
+  Future<void> Function(PostReactionType reaction)? get onReaction =>
+      widget.onReaction;
+  VoidCallback? get onReport => widget.onReport;
+
+  @override
+  void didUpdateWidget(covariant PostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post.id != widget.post.id ||
+        oldWidget.concealSpoiler != widget.concealSpoiler) {
+      _spoilerRevealed = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,14 +178,49 @@ class PostCard extends StatelessWidget {
                       const SizedBox(height: 10),
 
                       // Review text (there is no reply/comment feature)
-                      Text(
-                        post.comment,
-                        style: TextStyle(
-                          color: primaryTextColor,
-                          fontSize: 13,
-                          height: 1.5,
+                      if (post.hasSpoiler) ...[
+                        const Text(
+                          'ネタバレあり',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                      ],
+                      if (post.hasSpoiler &&
+                          widget.concealSpoiler &&
+                          !_spoilerRevealed)
+                        TextButton(
+                          onPressed: () {
+                            setState(() => _spoilerRevealed = true);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: primaryTextColor,
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            alignment: Alignment.centerLeft,
+                          ),
+                          child: const Text(
+                            '＜投稿を見る＞',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          post.reviewText,
+                          style: TextStyle(
+                            color: primaryTextColor,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
 
                       // Date if not showing user info (like in user profile tab)
                       if (!showUserInfo) ...[

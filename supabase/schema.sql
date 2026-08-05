@@ -1839,3 +1839,14 @@ COMMENT ON TABLE public.adult_content_terms IS
     'Server-side terms used to identify age-restricted books and posts. Only administrators can access this table.';
 COMMENT ON COLUMN public.posts.is_age_restricted IS
     'Set automatically when book metadata or the review matches an active adult-content term.';
+
+-- Store spoiler state independently from the review text.
+ALTER TABLE public.posts
+    ADD COLUMN IF NOT EXISTS is_spoiler BOOLEAN NOT NULL DEFAULT false;
+
+UPDATE public.posts
+SET is_spoiler = true
+WHERE ltrim(comment) LIKE '[ネタバレあり]%';
+
+COMMENT ON COLUMN public.posts.is_spoiler IS
+    'When true, clients conceal the review body from other users until they explicitly reveal it.';

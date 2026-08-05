@@ -686,7 +686,9 @@ class _BookListScreenState extends State<BookListScreen> {
           listen: false,
         ).activeProfileId;
         return PostCard(
+          key: ValueKey(post.id),
           post: post,
+          concealSpoiler: post.profileId != currentProfileId,
           onUserTap: () => _openUserProfile(post.profileId),
           onReaction: post.profileId == currentProfileId
               ? null

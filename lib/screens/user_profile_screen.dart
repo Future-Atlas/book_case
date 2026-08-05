@@ -736,8 +736,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         // Hide user info header since profile context is clear
         final post = _userPosts[index];
         return PostCard(
+          key: ValueKey(post.id),
           post: post,
           showUserInfo: false,
+          concealSpoiler: !_isOwnProfile,
           onReaction: _isOwnProfile
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),

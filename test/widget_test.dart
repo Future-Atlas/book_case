@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_application_1/screens/profile_onboarding_screen.dart';
 import 'package:flutter_application_1/models/book.dart';
+import 'package:flutter_application_1/models/post.dart';
 import 'package:flutter_application_1/services/content_safety_service.dart';
 
 void main() {
@@ -65,6 +66,43 @@ void main() {
         adultBook,
       ], allowAdultContent: false);
       expect(filtered, [normalBook]);
+    });
+  });
+
+  group('ネタバレ投稿', () {
+    Post createPost(String comment, {bool isSpoiler = false}) {
+      return Post(
+        id: 'post',
+        profileId: 'profile',
+        bookId: 'book',
+        rating: 5,
+        comment: comment,
+        createdAt: DateTime(2026, 8, 6),
+        username: 'user',
+        userAvatarUrl: '',
+        bookTitle: 'title',
+        bookAuthor: 'author',
+        bookCoverUrl: '',
+        isSpoiler: isSpoiler,
+      );
+    }
+
+    test('専用フラグでネタバレ投稿を判定する', () {
+      final post = createPost('感想本文', isSpoiler: true);
+      expect(post.hasSpoiler, isTrue);
+      expect(post.reviewText, '感想本文');
+    });
+
+    test('従来の本文プレフィックスにも対応する', () {
+      final post = createPost('[ネタバレあり]\n感想本文');
+      expect(post.hasSpoiler, isTrue);
+      expect(post.reviewText, '感想本文');
+    });
+
+    test('ネタバレなしの従来プレフィックスは表示時に取り除く', () {
+      final post = createPost('[ネタバレなし]\n感想本文');
+      expect(post.hasSpoiler, isFalse);
+      expect(post.reviewText, '感想本文');
     });
   });
 }

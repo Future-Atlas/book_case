@@ -15,11 +15,23 @@ class Post {
   final String bookAuthor;
   final String bookCoverUrl;
   final bool isAgeRestricted;
+  final bool isSpoiler;
   final Map<PostReactionType, int> reactionCounts;
   final PostReactionType? currentUserReaction;
 
   int get reactionsCount => reactionCounts.values.fold(0, (a, b) => a + b);
   bool get reactedByCurrentUser => currentUserReaction != null;
+  bool get hasSpoiler => isSpoiler || comment.trimLeft().startsWith('[ネタバレあり]');
+
+  String get reviewText {
+    final trimmed = comment.trimLeft();
+    for (final prefix in const ['[ネタバレあり]', '[ネタバレなし]']) {
+      if (trimmed.startsWith(prefix)) {
+        return trimmed.substring(prefix.length).trimLeft();
+      }
+    }
+    return comment;
+  }
 
   Post({
     required this.id,
@@ -34,6 +46,7 @@ class Post {
     required this.bookAuthor,
     required this.bookCoverUrl,
     this.isAgeRestricted = false,
+    this.isSpoiler = false,
     this.reactionCounts = const {},
     this.currentUserReaction,
   });
@@ -43,12 +56,13 @@ class Post {
     final profile = json['profiles'] as Map<String, dynamic>?;
     final book = json['books'] as Map<String, dynamic>?;
 
+    final comment = json['comment']?.toString() ?? '';
     return Post(
       id: json['id'] ?? '',
       profileId: json['profile_id'] ?? '',
       bookId: json['book_id'] ?? '',
       rating: (json['rating'] ?? 0.0).toDouble(),
-      comment: json['comment'] ?? '',
+      comment: comment,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
@@ -58,6 +72,9 @@ class Post {
       bookAuthor: json['book_author'] ?? book?['author'] ?? '',
       bookCoverUrl: book?['cover_url'] ?? '',
       isAgeRestricted: json['is_age_restricted'] == true,
+      isSpoiler:
+          json['is_spoiler'] == true ||
+          comment.trimLeft().startsWith('[ネタバレあり]'),
       reactionCounts: const {},
     );
   }
@@ -72,6 +89,7 @@ class Post {
       'book_title': bookTitle,
       'book_author': bookAuthor,
       'is_age_restricted': isAgeRestricted,
+      'is_spoiler': isSpoiler,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -89,6 +107,7 @@ class Post {
     String? bookAuthor,
     String? bookCoverUrl,
     bool? isAgeRestricted,
+    bool? isSpoiler,
     Map<PostReactionType, int>? reactionCounts,
     PostReactionType? currentUserReaction,
   }) {
@@ -105,6 +124,7 @@ class Post {
       bookAuthor: bookAuthor ?? this.bookAuthor,
       bookCoverUrl: bookCoverUrl ?? this.bookCoverUrl,
       isAgeRestricted: isAgeRestricted ?? this.isAgeRestricted,
+      isSpoiler: isSpoiler ?? this.isSpoiler,
       reactionCounts: reactionCounts ?? this.reactionCounts,
       currentUserReaction: currentUserReaction ?? this.currentUserReaction,
     );

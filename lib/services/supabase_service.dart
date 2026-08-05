@@ -1644,6 +1644,7 @@ class SupabaseService extends ChangeNotifier {
     required Book book,
     required double rating,
     required String comment,
+    required bool isSpoiler,
   }) async {
     final profileId = activeProfileId;
     if (profileId.isEmpty) {
@@ -1669,6 +1670,7 @@ class SupabaseService extends ChangeNotifier {
           'is_age_restricted': isAgeRestricted,
           'rating': rating,
           'comment': comment,
+          'is_spoiler': isSpoiler,
         });
 
         // Any completed post is also tracked in collections as 'read'.

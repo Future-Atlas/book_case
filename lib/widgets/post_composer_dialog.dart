@@ -195,13 +195,11 @@ Future<bool> showPostComposerDialog({
                         }
 
                         setDialogState(() => isSubmitting = true);
-                        final comment = isSpoiler
-                            ? '[ネタバレあり]\n$review'
-                            : '[ネタバレなし]\n$review';
                         final success = await service.createPost(
                           book: book,
                           rating: rating,
-                          comment: comment,
+                          comment: review,
+                          isSpoiler: isSpoiler,
                         );
 
                         if (!dialogContext.mounted) return;
