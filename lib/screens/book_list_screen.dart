@@ -7,6 +7,7 @@ import '../controllers/book_list_controller.dart';
 import '../models/book.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_composer_dialog.dart';
+import 'user_profile_screen.dart';
 
 class BookListScreen extends StatefulWidget {
   const BookListScreen({super.key});
@@ -35,6 +36,35 @@ class _BookListScreenState extends State<BookListScreen> {
     final posted = await showPostComposerDialog(context: context, book: book);
     if (posted && mounted) {
       _controller.loadData(context);
+    }
+  }
+
+  Future<bool> _ensureAuthenticated() async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (service.isAuthenticated) return true;
+    final result = await Navigator.of(context).pushNamed('/login');
+    return mounted && (result == true || service.isAuthenticated);
+  }
+
+  Future<void> _openUserProfile(String profileId) async {
+    if (!await _ensureAuthenticated() || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UserProfileScreen(
+          profileId: profileId,
+          onBack: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+    if (mounted) await _controller.loadData(context);
+  }
+
+  Future<void> _toggleReaction(String postId) async {
+    if (!await _ensureAuthenticated() || !mounted) return;
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final success = await service.togglePostReaction(postId);
+    if (success && mounted) {
+      await _controller.loadData(context);
     }
   }
 
@@ -380,7 +410,7 @@ class _BookListScreenState extends State<BookListScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -453,7 +483,7 @@ class _BookListScreenState extends State<BookListScreen> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -473,7 +503,7 @@ class _BookListScreenState extends State<BookListScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF3B30).withOpacity(0.12),
+                      color: const Color(0xFFFF3B30).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -504,9 +534,11 @@ class _BookListScreenState extends State<BookListScreen> {
         height: 205,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor.withOpacity(0.8),
+          color: Theme.of(context).cardColor.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFFF3B30).withOpacity(0.25)),
+          border: Border.all(
+            color: const Color(0xFFFF3B30).withValues(alpha: 0.25),
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -641,7 +673,18 @@ class _BookListScreenState extends State<BookListScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _controller.timelinePosts.length,
       itemBuilder: (context, index) {
-        return PostCard(post: _controller.timelinePosts[index]);
+        final post = _controller.timelinePosts[index];
+        final currentProfileId = Provider.of<SupabaseService>(
+          context,
+          listen: false,
+        ).activeProfileId;
+        return PostCard(
+          post: post,
+          onUserTap: () => _openUserProfile(post.profileId),
+          onReaction: post.profileId == currentProfileId
+              ? null
+              : () => _toggleReaction(post.id),
+        );
       },
     );
   }

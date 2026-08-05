@@ -12,6 +12,8 @@ class Post {
   final String bookTitle;
   final String bookAuthor;
   final String bookCoverUrl;
+  final int reactionsCount;
+  final bool reactedByCurrentUser;
 
   Post({
     required this.id,
@@ -25,6 +27,8 @@ class Post {
     required this.bookTitle,
     required this.bookAuthor,
     required this.bookCoverUrl,
+    this.reactionsCount = 0,
+    this.reactedByCurrentUser = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,8 @@ class Post {
       bookTitle: book?['title'] ?? '不明な書籍',
       bookAuthor: book?['author'] ?? '不明な著者',
       bookCoverUrl: book?['cover_url'] ?? '',
+      reactionsCount: json['reactions_count'] ?? 0,
+      reactedByCurrentUser: json['reacted_by_current_user'] ?? false,
     );
   }
 
@@ -72,6 +78,8 @@ class Post {
     String? bookTitle,
     String? bookAuthor,
     String? bookCoverUrl,
+    int? reactionsCount,
+    bool? reactedByCurrentUser,
   }) {
     return Post(
       id: id ?? this.id,
@@ -85,6 +93,8 @@ class Post {
       bookTitle: bookTitle ?? this.bookTitle,
       bookAuthor: bookAuthor ?? this.bookAuthor,
       bookCoverUrl: bookCoverUrl ?? this.bookCoverUrl,
+      reactionsCount: reactionsCount ?? this.reactionsCount,
+      reactedByCurrentUser: reactedByCurrentUser ?? this.reactedByCurrentUser,
     );
   }
 }

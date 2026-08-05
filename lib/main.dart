@@ -14,6 +14,7 @@ import 'screens/legal_consent_screen.dart';
 import 'screens/account_settings_screen.dart';
 import 'screens/contact_screen.dart';
 import 'screens/profile_onboarding_screen.dart';
+import 'screens/notifications_screen.dart';
 
 enum _HeaderMenuAction { myPage, settings, help, logout }
 
@@ -287,13 +288,23 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       ),
                       Expanded(
                         child: Center(
-                          child: Text(
-                            _currentHeaderTitle(),
-                            style: const TextStyle(
-                              color: Color(0xFFF1D600),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _currentHeaderTitle(),
+                                style: const TextStyle(
+                                  color: Color(0xFFF1D600),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (_currentScreenIndex == 1 &&
+                                  service.isAuthenticated) ...[
+                                const SizedBox(width: 2),
+                                const NotificationBellButton(),
+                              ],
+                            ],
                           ),
                         ),
                       ),

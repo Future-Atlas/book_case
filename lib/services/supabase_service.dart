@@ -8,6 +8,7 @@ import '../api/rakuten_api.dart';
 import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
+import '../models/social_models.dart';
 import 'legal_document_versions.dart';
 
 class SupabaseService extends ChangeNotifier {
@@ -435,6 +436,256 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<ProfileRelationship> fetchProfileRelationship(
+    String targetProfileId,
+  ) async {
+    final viewerId = activeProfileId;
+    if (!_isInitialized || _client == null || viewerId.isEmpty) {
+      return const ProfileRelationship(
+        isOwnProfile: false,
+        followStatus: FollowRelationshipStatus.none,
+        blockedByMe: false,
+        blockedEitherDirection: false,
+      );
+    }
+    if (viewerId == targetProfileId) {
+      return const ProfileRelationship(
+        isOwnProfile: true,
+        followStatus: FollowRelationshipStatus.none,
+        blockedByMe: false,
+        blockedEitherDirection: false,
+      );
+    }
+
+    try {
+      final follow = await _client!
+          .from('follows')
+          .select('status')
+          .eq('follower_id', viewerId)
+          .eq('following_id', targetProfileId)
+          .maybeSingle();
+      final ownBlock = await _client!
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', viewerId)
+          .eq('blocked_id', targetProfileId)
+          .maybeSingle();
+      final blockedBetween = await _client!.rpc(
+        'is_blocked_between',
+        params: {'first_profile': viewerId, 'second_profile': targetProfileId},
+      );
+
+      final rawStatus = follow?['status']?.toString();
+      final followStatus = rawStatus == 'accepted'
+          ? FollowRelationshipStatus.accepted
+          : rawStatus == 'pending'
+          ? FollowRelationshipStatus.pending
+          : FollowRelationshipStatus.none;
+      return ProfileRelationship(
+        isOwnProfile: false,
+        followStatus: followStatus,
+        blockedByMe: ownBlock != null,
+        blockedEitherDirection: blockedBetween == true,
+      );
+    } catch (e) {
+      debugPrint('Error fetching profile relationship: $e');
+      return const ProfileRelationship(
+        isOwnProfile: false,
+        followStatus: FollowRelationshipStatus.none,
+        blockedByMe: false,
+        blockedEitherDirection: false,
+      );
+    }
+  }
+
+  Future<FollowRelationshipStatus?> followProfile(
+    String targetProfileId,
+  ) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return null;
+    try {
+      final result = await _client!.rpc(
+        'request_follow',
+        params: {'target_profile': targetProfileId},
+      );
+      notifyListeners();
+      return result?.toString() == 'accepted'
+          ? FollowRelationshipStatus.accepted
+          : FollowRelationshipStatus.pending;
+    } catch (e) {
+      debugPrint('Error following profile: $e');
+      return null;
+    }
+  }
+
+  Future<bool> unfollowProfile(String targetProfileId) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      await _client!.rpc(
+        'unfollow_profile',
+        params: {'target_profile': targetProfileId},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error unfollowing profile: $e');
+      return false;
+    }
+  }
+
+  Future<bool> respondToFollowRequest({
+    required String requesterProfileId,
+    required bool approve,
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      await _client!.rpc(
+        'respond_follow_request',
+        params: {'requester_profile': requesterProfileId, 'approve': approve},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error responding to follow request: $e');
+      return false;
+    }
+  }
+
+  Future<bool> blockProfile(String targetProfileId) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      await _client!.rpc(
+        'block_profile',
+        params: {'target_profile': targetProfileId},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error blocking profile: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unblockProfile(String targetProfileId) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      await _client!.rpc(
+        'unblock_profile',
+        params: {'target_profile': targetProfileId},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error unblocking profile: $e');
+      return false;
+    }
+  }
+
+  Future<List<SocialNotification>> fetchNotifications() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return [];
+
+    try {
+      final response = await _client!
+          .from('notifications')
+          .select(
+            'id, type, actor_id, post_id, read_at, created_at, '
+            'actor:profiles!notifications_actor_id_fkey(username, avatar_url), '
+            'post:posts!notifications_post_id_fkey(book_id)',
+          )
+          .eq('recipient_id', profileId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      final pendingResponse = await _client!
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', profileId)
+          .eq('status', 'pending');
+      final pendingActorIds = (pendingResponse as List<dynamic>)
+          .map((row) => row['follower_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      final notifications = <SocialNotification>[];
+      final bookCache = <String, String>{};
+      for (final raw in response as List<dynamic>) {
+        final row = raw as Map<String, dynamic>;
+        final actor = row['actor'] as Map<String, dynamic>?;
+        final post = row['post'] as Map<String, dynamic>?;
+        final rawType = row['type']?.toString();
+        final type = rawType == 'reaction'
+            ? SocialNotificationType.reaction
+            : rawType == 'follow_request'
+            ? SocialNotificationType.followRequest
+            : SocialNotificationType.follow;
+        final actorId = row['actor_id']?.toString() ?? '';
+        final bookId = post?['book_id']?.toString();
+        String? bookTitle;
+        if (bookId != null && bookId.isNotEmpty) {
+          bookTitle = bookCache[bookId];
+          if (bookTitle == null) {
+            final book = await RakutenApi.fetchBookById(bookId);
+            bookTitle = book?.title ?? bookId;
+            bookCache[bookId] = bookTitle;
+          }
+        }
+        notifications.add(
+          SocialNotification(
+            id: (row['id'] as num).toInt(),
+            type: type,
+            actorId: actorId,
+            actorUsername: actor?['username']?.toString() ?? 'ユーザー',
+            actorAvatarUrl: actor?['avatar_url']?.toString() ?? '',
+            postId: row['post_id']?.toString(),
+            bookId: bookId,
+            bookTitle: bookTitle,
+            isRead: row['read_at'] != null,
+            followRequestPending:
+                type == SocialNotificationType.followRequest &&
+                pendingActorIds.contains(actorId),
+            createdAt:
+                DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+                DateTime.now(),
+          ),
+        );
+      }
+      return notifications;
+    } catch (e) {
+      debugPrint('Error fetching notifications: $e');
+      return [];
+    }
+  }
+
+  Future<int> fetchUnreadNotificationCount() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return 0;
+    try {
+      final response = await _client!
+          .from('notifications')
+          .select('id')
+          .eq('recipient_id', profileId)
+          .isFilter('read_at', null);
+      return (response as List<dynamic>).length;
+    } catch (e) {
+      debugPrint('Error fetching unread notification count: $e');
+      return 0;
+    }
+  }
+
+  Future<void> markNotificationsRead() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return;
+    try {
+      await _client!
+          .from('notifications')
+          .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('recipient_id', profileId)
+          .isFilter('read_at', null);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error marking notifications read: $e');
+    }
+  }
+
   Future<bool> hasCurrentLegalConsent({bool forceRefresh = false}) async {
     final userId = activeProfileId;
     if (!_isInitialized || _client == null || userId.isEmpty) return false;
@@ -735,7 +986,42 @@ class SupabaseService extends ChangeNotifier {
         ),
       );
     }
-    return enriched;
+    return _attachReactionState(enriched);
+  }
+
+  Future<List<Post>> _attachReactionState(List<Post> posts) async {
+    if (posts.isEmpty || !_isInitialized || _client == null) return posts;
+
+    try {
+      final postIds = posts.map((post) => post.id).toList();
+      final response = await _client!
+          .from('post_reactions')
+          .select('post_id, profile_id')
+          .inFilter('post_id', postIds);
+      final counts = <String, int>{};
+      final reactedPostIds = <String>{};
+      final currentProfileId = activeProfileId;
+      for (final raw in response as List<dynamic>) {
+        final row = raw as Map<String, dynamic>;
+        final postId = row['post_id']?.toString() ?? '';
+        if (postId.isEmpty) continue;
+        counts[postId] = (counts[postId] ?? 0) + 1;
+        if (row['profile_id']?.toString() == currentProfileId) {
+          reactedPostIds.add(postId);
+        }
+      }
+      return posts
+          .map(
+            (post) => post.copyWith(
+              reactionsCount: counts[post.id] ?? 0,
+              reactedByCurrentUser: reactedPostIds.contains(post.id),
+            ),
+          )
+          .toList();
+    } catch (e) {
+      debugPrint('Error attaching reaction state: $e');
+      return posts;
+    }
   }
 
   Future<List<Book>> _resolveBooksByIds(List<String> bookIds) async {
@@ -785,6 +1071,37 @@ class SupabaseService extends ChangeNotifier {
   }
 
   // ----- ACTIONS -----------------------------------------------------------
+  Future<bool> togglePostReaction(String postId) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty || !_isInitialized || _client == null) return false;
+
+    try {
+      final existing = await _client!
+          .from('post_reactions')
+          .select('post_id')
+          .eq('post_id', postId)
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      if (existing == null) {
+        await _client!.from('post_reactions').insert({
+          'post_id': postId,
+          'profile_id': profileId,
+        });
+      } else {
+        await _client!
+            .from('post_reactions')
+            .delete()
+            .eq('post_id', postId)
+            .eq('profile_id', profileId);
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling post reaction: $e');
+      return false;
+    }
+  }
+
   Future<bool> markBookAsRead({required String bookId}) async {
     final profileId = activeProfileId;
     if (profileId.isEmpty) {

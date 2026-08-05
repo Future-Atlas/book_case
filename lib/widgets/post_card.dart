@@ -4,15 +4,23 @@ import '../models/post.dart';
 class PostCard extends StatelessWidget {
   final Post post;
   final bool showUserInfo;
+  final VoidCallback? onUserTap;
+  final Future<void> Function()? onReaction;
 
-  const PostCard({super.key, required this.post, this.showUserInfo = true});
+  const PostCard({
+    super.key,
+    required this.post,
+    this.showUserInfo = true,
+    this.onUserTap,
+    this.onReaction,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final primaryTextColor = colorScheme.onSurface;
-    final secondaryTextColor = colorScheme.onSurface.withOpacity(0.72);
-    final tertiaryTextColor = colorScheme.onSurface.withOpacity(0.58);
+    final secondaryTextColor = colorScheme.onSurface.withValues(alpha: 0.72);
+    final tertiaryTextColor = colorScheme.onSurface.withValues(alpha: 0.58);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -21,7 +29,7 @@ class PostCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -34,39 +42,46 @@ class PostCard extends StatelessWidget {
           children: [
             // User Header (for Home Timeline)
             if (showUserInfo) ...[
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundImage: post.userAvatarUrl.isNotEmpty
-                        ? NetworkImage(post.userAvatarUrl)
-                        : null,
-                    radius: 18,
-                    child: post.userAvatarUrl.isEmpty
-                        ? const Icon(Icons.person, size: 18)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              InkWell(
+                onTap: onUserTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
                     children: [
-                      Text(
-                        post.username,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: primaryTextColor,
-                        ),
+                      CircleAvatar(
+                        backgroundImage: post.userAvatarUrl.isNotEmpty
+                            ? NetworkImage(post.userAvatarUrl)
+                            : null,
+                        radius: 18,
+                        child: post.userAvatarUrl.isEmpty
+                            ? const Icon(Icons.person, size: 18)
+                            : null,
                       ),
-                      Text(
-                        _formatDate(post.createdAt),
-                        style: TextStyle(
-                          color: tertiaryTextColor,
-                          fontSize: 11,
-                        ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post.username,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: primaryTextColor,
+                            ),
+                          ),
+                          Text(
+                            _formatDate(post.createdAt),
+                            style: TextStyle(
+                              color: tertiaryTextColor,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
               const Divider(height: 24, thickness: 0.8),
             ],
@@ -141,6 +156,34 @@ class PostCard extends StatelessWidget {
                           color: primaryTextColor,
                           fontSize: 13,
                           height: 1.5,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: onReaction == null
+                              ? null
+                              : () async => onReaction!(),
+                          icon: Icon(
+                            post.reactedByCurrentUser
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            size: 18,
+                            color: post.reactedByCurrentUser
+                                ? Colors.red
+                                : tertiaryTextColor,
+                          ),
+                          label: Text(
+                            'リアクション ${post.reactionsCount}',
+                            style: TextStyle(
+                              color: post.reactedByCurrentUser
+                                  ? Colors.red
+                                  : tertiaryTextColor,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
 

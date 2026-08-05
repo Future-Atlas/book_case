@@ -4,6 +4,7 @@ import '../services/supabase_service.dart';
 import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
+import '../models/social_models.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
 import 'profile_book_search_screen.dart';
@@ -12,11 +13,13 @@ import '../repositories/book_repository.dart';
 class UserProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
   final bool showAppBar;
+  final String? profileId;
 
   const UserProfileScreen({
     super.key,
     required this.onBack,
     this.showAppBar = true,
+    this.profileId,
   });
 
   @override
@@ -37,6 +40,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   bool _isSearchPanelOpen = false;
   bool _isSearchingBooks = false;
   String? _searchError;
+  ProfileRelationship? _relationship;
+  bool _isSocialActionInProgress = false;
+
+  bool get _isOwnProfile => _relationship?.isOwnProfile ?? false;
+
+  bool get _canViewProfileContent {
+    final profile = _profile;
+    final relationship = _relationship;
+    if (profile == null || relationship == null) return false;
+    if (relationship.isOwnProfile) return true;
+    if (relationship.blockedEitherDirection) return false;
+    return !profile.isPrivate ||
+        relationship.followStatus == FollowRelationshipStatus.accepted;
+  }
 
   @override
   void initState() {
@@ -193,7 +210,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final uid = service.activeProfileId;
+    final uid = widget.profileId ?? service.activeProfileId;
 
     if (uid.isEmpty) {
       if (mounted) {
@@ -209,19 +226,104 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     final profile = await service.fetchUserProfile(uid);
-    final posts = await service.fetchUserPosts(uid);
-    final colls = await service.fetchUserCollections(uid);
-    final favs = await service.fetchUserFavorites(uid);
+    final relationship = await service.fetchProfileRelationship(uid);
+    final canLoadContent =
+        relationship.isOwnProfile ||
+        (!relationship.blockedEitherDirection &&
+            (!profile.isPrivate ||
+                relationship.followStatus ==
+                    FollowRelationshipStatus.accepted));
+    final posts = canLoadContent ? await service.fetchUserPosts(uid) : <Post>[];
+    final colls = canLoadContent
+        ? await service.fetchUserCollections(uid)
+        : <Book>[];
+    final favs = canLoadContent
+        ? await service.fetchUserFavorites(uid)
+        : <Book>[];
 
     if (mounted) {
       setState(() {
         _profile = profile;
+        _relationship = relationship;
         _userPosts = posts;
         _collections = colls;
         _favorites = favs;
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _toggleFollow() async {
+    final profile = _profile;
+    final relationship = _relationship;
+    if (profile == null || relationship == null || relationship.isOwnProfile) {
+      return;
+    }
+
+    setState(() => _isSocialActionInProgress = true);
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final success = relationship.followStatus == FollowRelationshipStatus.none
+        ? await service.followProfile(profile.id) != null
+        : await service.unfollowProfile(profile.id);
+    if (!mounted) return;
+    setState(() => _isSocialActionInProgress = false);
+    if (!success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('フォロー設定を変更できませんでした。')));
+      return;
+    }
+    await _loadProfileData();
+  }
+
+  Future<void> _toggleBlock() async {
+    final profile = _profile;
+    final relationship = _relationship;
+    if (profile == null || relationship == null || relationship.isOwnProfile) {
+      return;
+    }
+
+    if (!relationship.blockedByMe) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('このユーザーをブロックしますか？'),
+          content: const Text('互いのフォローは解除され、投稿の表示、フォロー、リアクションが制限されます。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('ブロック'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    setState(() => _isSocialActionInProgress = true);
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final success = relationship.blockedByMe
+        ? await service.unblockProfile(profile.id)
+        : await service.blockProfile(profile.id);
+    if (!mounted) return;
+    setState(() => _isSocialActionInProgress = false);
+    if (!success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ブロック設定を変更できませんでした。')));
+      return;
+    }
+    await _loadProfileData();
+  }
+
+  Future<void> _toggleReaction(String postId) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final success = await service.togglePostReaction(postId);
+    if (success && mounted) await _loadProfileData();
   }
 
   Future<void> _openBookSearch() async {
@@ -244,20 +346,22 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 icon: const Icon(Icons.arrow_back, color: Colors.black87),
                 onPressed: widget.onBack,
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.black87),
-                  onPressed: () async {
-                    final service = Provider.of<SupabaseService>(
-                      context,
-                      listen: false,
-                    );
-                    await service.signOut();
-                    if (!mounted) return;
-                    widget.onBack();
-                  },
-                ),
-              ],
+              actions: _isOwnProfile
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.black87),
+                        onPressed: () async {
+                          final service = Provider.of<SupabaseService>(
+                            context,
+                            listen: false,
+                          );
+                          await service.signOut();
+                          if (!mounted) return;
+                          widget.onBack();
+                        },
+                      ),
+                    ]
+                  : null,
               title: const Text(
                 'マイプロフィール',
                 style: TextStyle(
@@ -269,7 +373,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               centerTitle: true,
             )
           : null,
-      floatingActionButton: _profile == null
+      floatingActionButton: _profile == null || !_isOwnProfile
           ? null
           : FloatingActionButton(
               heroTag: 'addReadBookFromProfile',
@@ -298,24 +402,27 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
                   const SizedBox(height: 16),
 
-                  // Custom Tab Bar with premium design
-                  _buildTabBar(),
+                  if (_canViewProfileContent) ...[
+                    // Custom Tab Bar with premium design
+                    _buildTabBar(),
 
-                  // Tab View Contents
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildPostsTab(),
-                        _buildGridTab(
-                          _collections,
-                          '本棚はありません。',
-                          showDescription: true,
-                        ),
-                        _buildGridTab(_favorites, 'お気に入りの本はありません。'),
-                      ],
+                    // Tab View Contents
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildPostsTab(),
+                          _buildGridTab(
+                            _collections,
+                            '本棚はありません。',
+                            showDescription: true,
+                          ),
+                          _buildGridTab(_favorites, 'お気に入りの本はありません。'),
+                        ],
+                      ),
                     ),
-                  ),
+                  ] else
+                    Expanded(child: _buildPrivateOrBlockedState()),
                 ],
               ),
             ),
@@ -429,6 +536,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ],
             ),
 
+            if (!_isOwnProfile) ...[
+              const SizedBox(height: 14),
+              _buildSocialActions(),
+            ],
+
             const SizedBox(height: 16),
 
             // Bio comment box
@@ -488,6 +600,91 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
+  Widget _buildSocialActions() {
+    final relationship = _relationship;
+    if (relationship == null) return const SizedBox.shrink();
+
+    if (relationship.blockedByThem) {
+      return const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.block, size: 18),
+          SizedBox(width: 6),
+          Text('このアカウントは利用できません。'),
+        ],
+      );
+    }
+
+    if (relationship.blockedByMe) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _isSocialActionInProgress ? null : _toggleBlock,
+          icon: const Icon(Icons.lock_open),
+          label: const Text('ブロックを解除'),
+        ),
+      );
+    }
+
+    final followLabel = switch (relationship.followStatus) {
+      FollowRelationshipStatus.none => 'フォロー',
+      FollowRelationshipStatus.pending => 'リクエスト済み',
+      FollowRelationshipStatus.accepted => 'フォロー中',
+    };
+    final followIcon = switch (relationship.followStatus) {
+      FollowRelationshipStatus.none => Icons.person_add_alt_1,
+      FollowRelationshipStatus.pending => Icons.hourglass_top,
+      FollowRelationshipStatus.accepted => Icons.person_remove_outlined,
+    };
+
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: _isSocialActionInProgress ? null : _toggleFollow,
+            icon: Icon(followIcon),
+            label: Text(followLabel),
+          ),
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton.icon(
+          onPressed: _isSocialActionInProgress ? null : _toggleBlock,
+          icon: const Icon(Icons.block, size: 18),
+          label: const Text('ブロック'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrivateOrBlockedState() {
+    final relationship = _relationship;
+    final blocked = relationship?.blockedEitherDirection ?? false;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(blocked ? Icons.block : Icons.lock, size: 52),
+            const SizedBox(height: 14),
+            Text(
+              blocked ? 'このアカウントのコンテンツは表示できません。' : 'このアカウントは非公開です。',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (!blocked) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'フォローリクエストが承認されると、投稿・本棚・お気に入りを確認できます。',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTabBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -528,7 +725,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       itemCount: _userPosts.length,
       itemBuilder: (context, index) {
         // Hide user info header since profile context is clear
-        return PostCard(post: _userPosts[index], showUserInfo: false);
+        final post = _userPosts[index];
+        return PostCard(
+          post: post,
+          showUserInfo: false,
+          onReaction: _isOwnProfile ? null : () => _toggleReaction(post.id),
+        );
       },
     );
   }
