@@ -179,13 +179,13 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 10),
                     _loginButton(
                       label: 'Apple',
-                      background: Colors.red,
+                      background: const Color(0xFFB71C1C),
                       action: (service) => service.signInWithApple(),
                     ),
                     const SizedBox(height: 10),
                     _loginButton(
                       label: 'Discord',
-                      background: const Color(0xFF5865F2),
+                      background: const Color(0xFF4A148C),
                       action: (service) => service.signInWithDiscord(),
                     ),
                     const SizedBox(height: 18),
