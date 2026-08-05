@@ -5,8 +5,10 @@ import '../widgets/ad_banner.dart';
 import '../widgets/post_card.dart';
 import '../controllers/book_list_controller.dart';
 import '../models/book.dart';
+import '../models/social_models.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_composer_dialog.dart';
+import 'report_post_dialog.dart';
 import 'user_profile_screen.dart';
 
 class BookListScreen extends StatefulWidget {
@@ -59,13 +61,18 @@ class _BookListScreenState extends State<BookListScreen> {
     if (mounted) await _controller.loadData(context);
   }
 
-  Future<void> _toggleReaction(String postId) async {
+  Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
     if (!await _ensureAuthenticated() || !mounted) return;
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final success = await service.togglePostReaction(postId);
+    final success = await service.setPostReaction(postId, reaction);
     if (success && mounted) {
       await _controller.loadData(context);
     }
+  }
+
+  Future<void> _reportPost(String postId) async {
+    if (!await _ensureAuthenticated() || !mounted) return;
+    await showPostReportDialog(context: context, postId: postId);
   }
 
   void _showBookDetailDialog(Book book) {
@@ -683,7 +690,10 @@ class _BookListScreenState extends State<BookListScreen> {
           onUserTap: () => _openUserProfile(post.profileId),
           onReaction: post.profileId == currentProfileId
               ? null
-              : () => _toggleReaction(post.id),
+              : (reaction) => _toggleReaction(post.id, reaction),
+          onReport: post.profileId == currentProfileId
+              ? null
+              : () => _reportPost(post.id),
         );
       },
     );

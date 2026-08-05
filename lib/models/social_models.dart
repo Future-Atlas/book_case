@@ -1,5 +1,23 @@
 enum FollowRelationshipStatus { none, pending, accepted }
 
+enum PostReactionType {
+  like('like', '👍'),
+  love('love', '♥'),
+  sad('sad', '😢');
+
+  const PostReactionType(this.databaseValue, this.symbol);
+
+  final String databaseValue;
+  final String symbol;
+
+  static PostReactionType? fromDatabase(String? value) {
+    for (final type in values) {
+      if (type.databaseValue == value) return type;
+    }
+    return null;
+  }
+}
+
 class ProfileRelationship {
   const ProfileRelationship({
     required this.isOwnProfile,

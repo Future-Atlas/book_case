@@ -15,8 +15,10 @@ import 'screens/account_settings_screen.dart';
 import 'screens/contact_screen.dart';
 import 'screens/profile_onboarding_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/moderation_screen.dart';
+import 'screens/account_suspension_gate.dart';
 
-enum _HeaderMenuAction { myPage, settings, help, logout }
+enum _HeaderMenuAction { myPage, settings, help, moderation, logout }
 
 final supabaseService = SupabaseService();
 
@@ -118,8 +120,10 @@ class MyApp extends StatelessWidget {
       themeMode: ThemeMode.system, // Dynamically follow device preference
       routes: {'/login': (context) => const AuthScreen()},
 
-      home: const LegalConsentGate(
-        child: ProfileOnboardingGate(child: MainNavigationShell()),
+      home: const AccountSuspensionGate(
+        child: LegalConsentGate(
+          child: ProfileOnboardingGate(child: MainNavigationShell()),
+        ),
       ),
     );
   }
@@ -134,7 +138,18 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentScreenIndex =
-      0; // 0 = BookList, 1 = UserProfile, 2 = Settings, 3 = Help
+      0; // 0 = Home, 1 = Profile, 2 = Settings, 3 = Help, 4 = Moderation
+  String? _adminCheckedUserId;
+  bool _isAdmin = false;
+
+  Future<void> _checkAdministratorAccess(
+    SupabaseService service,
+    String userId,
+  ) async {
+    final isAdmin = await service.isCurrentUserAdmin();
+    if (!mounted || service.activeProfileId != userId) return;
+    setState(() => _isAdmin = isAdmin);
+  }
 
   Future<void> _goToProfile() async {
     final service = Provider.of<SupabaseService>(context, listen: false);
@@ -169,6 +184,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       case _HeaderMenuAction.help:
         setState(() => _currentScreenIndex = 3);
         break;
+      case _HeaderMenuAction.moderation:
+        if (_isAdmin) setState(() => _currentScreenIndex = 4);
+        break;
       case _HeaderMenuAction.logout:
         final service = Provider.of<SupabaseService>(context, listen: false);
         await service.signOut();
@@ -189,6 +207,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         return '設定';
       case 3:
         return 'ヘルプ';
+      case 4:
+        return '管理';
       default:
         return 'ホーム';
     }
@@ -198,12 +218,23 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     return Consumer<SupabaseService>(
       builder: (context, service, _) {
+        final currentUserId = service.activeProfileId;
+        if (_adminCheckedUserId != currentUserId) {
+          _adminCheckedUserId = currentUserId;
+          _isAdmin = false;
+          if (currentUserId.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _checkAdministratorAccess(service, currentUserId),
+            );
+          }
+        }
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
 
         // If auth is lost while on profile, force navigation back to list.
-        if (!service.isAuthenticated && _currentScreenIndex == 1) {
+        if (!service.isAuthenticated &&
+            (_currentScreenIndex == 1 || _currentScreenIndex == 4)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               _goToBookList();
@@ -272,6 +303,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                   ),
                                 ),
                               ),
+                              if (_isAdmin)
+                                PopupMenuItem(
+                                  value: _HeaderMenuAction.moderation,
+                                  child: Text(
+                                    '管理',
+                                    style: TextStyle(
+                                      fontSize: 28 / 2,
+                                      color: popupMenuTextColor,
+                                    ),
+                                  ),
+                                ),
                               PopupMenuItem(
                                 value: _HeaderMenuAction.logout,
                                 child: Text(
@@ -357,7 +399,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             key: const ValueKey('SettingsScreen'),
                             onAccountDeleted: _goToBookList,
                           )
-                        : const _HelpScreen(key: ValueKey('HelpScreen')),
+                        : _currentScreenIndex == 3
+                        ? const _HelpScreen(key: ValueKey('HelpScreen'))
+                        : const ModerationScreen(
+                            key: ValueKey('ModerationScreen'),
+                          ),
                   ),
                 ),
               ],

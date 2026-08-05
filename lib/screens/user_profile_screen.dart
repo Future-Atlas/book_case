@@ -8,6 +8,7 @@ import '../models/social_models.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
 import 'profile_book_search_screen.dart';
+import 'report_post_dialog.dart';
 import '../repositories/book_repository.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -320,10 +321,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     await _loadProfileData();
   }
 
-  Future<void> _toggleReaction(String postId) async {
+  Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final success = await service.togglePostReaction(postId);
+    final success = await service.setPostReaction(postId, reaction);
     if (success && mounted) await _loadProfileData();
+  }
+
+  Future<void> _reportPost(String postId) async {
+    await showPostReportDialog(context: context, postId: postId);
   }
 
   Future<void> _openBookSearch() async {
@@ -729,7 +734,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         return PostCard(
           post: post,
           showUserInfo: false,
-          onReaction: _isOwnProfile ? null : () => _toggleReaction(post.id),
+          onReaction: _isOwnProfile
+              ? null
+              : (reaction) => _toggleReaction(post.id, reaction),
+          onReport: _isOwnProfile ? null : () => _reportPost(post.id),
         );
       },
     );

@@ -9,6 +9,7 @@ import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
+import '../models/moderation_models.dart';
 import 'legal_document_versions.dart';
 
 class SupabaseService extends ChangeNotifier {
@@ -996,25 +997,29 @@ class SupabaseService extends ChangeNotifier {
       final postIds = posts.map((post) => post.id).toList();
       final response = await _client!
           .from('post_reactions')
-          .select('post_id, profile_id')
+          .select('post_id, profile_id, reaction_type')
           .inFilter('post_id', postIds);
-      final counts = <String, int>{};
-      final reactedPostIds = <String>{};
+      final counts = <String, Map<PostReactionType, int>>{};
+      final currentReactions = <String, PostReactionType>{};
       final currentProfileId = activeProfileId;
       for (final raw in response as List<dynamic>) {
         final row = raw as Map<String, dynamic>;
         final postId = row['post_id']?.toString() ?? '';
         if (postId.isEmpty) continue;
-        counts[postId] = (counts[postId] ?? 0) + 1;
+        final reaction =
+            PostReactionType.fromDatabase(row['reaction_type']?.toString()) ??
+            PostReactionType.like;
+        final postCounts = counts.putIfAbsent(postId, () => {});
+        postCounts[reaction] = (postCounts[reaction] ?? 0) + 1;
         if (row['profile_id']?.toString() == currentProfileId) {
-          reactedPostIds.add(postId);
+          currentReactions[postId] = reaction;
         }
       }
       return posts
           .map(
             (post) => post.copyWith(
-              reactionsCount: counts[post.id] ?? 0,
-              reactedByCurrentUser: reactedPostIds.contains(post.id),
+              reactionCounts: counts[post.id] ?? const {},
+              currentUserReaction: currentReactions[post.id],
             ),
           )
           .toList();
@@ -1071,33 +1076,201 @@ class SupabaseService extends ChangeNotifier {
   }
 
   // ----- ACTIONS -----------------------------------------------------------
-  Future<bool> togglePostReaction(String postId) async {
+  Future<bool> setPostReaction(String postId, PostReactionType reaction) async {
     final profileId = activeProfileId;
     if (profileId.isEmpty || !_isInitialized || _client == null) return false;
 
     try {
       final existing = await _client!
           .from('post_reactions')
-          .select('post_id')
+          .select('reaction_type')
           .eq('post_id', postId)
           .eq('profile_id', profileId)
           .maybeSingle();
-      if (existing == null) {
-        await _client!.from('post_reactions').insert({
-          'post_id': postId,
-          'profile_id': profileId,
-        });
-      } else {
+      if (existing?['reaction_type']?.toString() == reaction.databaseValue) {
         await _client!
             .from('post_reactions')
             .delete()
             .eq('post_id', postId)
             .eq('profile_id', profileId);
+      } else {
+        await _client!.from('post_reactions').upsert({
+          'post_id': postId,
+          'profile_id': profileId,
+          'reaction_type': reaction.databaseValue,
+        }, onConflict: 'post_id,profile_id');
       }
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('Error toggling post reaction: $e');
+      debugPrint('Error setting post reaction: $e');
+      return false;
+    }
+  }
+
+  Future<bool> submitPostReport({
+    required String postId,
+    required ReportCategory category,
+    String details = '',
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      await _client!.rpc(
+        'submit_post_report',
+        params: {
+          'target_post': postId,
+          'report_category': category.databaseValue,
+          'report_details': details.trim().isEmpty ? null : details.trim(),
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting post report: $e');
+      return false;
+    }
+  }
+
+  Future<bool> isCurrentUserAdmin() async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      return await _client!.rpc('is_current_user_admin') == true;
+    } catch (e) {
+      debugPrint('Error checking administrator access: $e');
+      return false;
+    }
+  }
+
+  Future<AccountSuspensionStatus> fetchCurrentAccountSuspension() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) {
+      return const AccountSuspensionStatus(
+        isSuspended: false,
+        reason: '',
+        suspendedAt: null,
+      );
+    }
+    try {
+      final profile = await _client!
+          .from('profiles')
+          .select('is_suspended')
+          .eq('id', profileId)
+          .single();
+      final suspension = await _client!
+          .from('account_suspensions')
+          .select('reason, suspended_at')
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      return AccountSuspensionStatus(
+        isSuspended: profile['is_suspended'] == true,
+        reason: suspension?['reason']?.toString() ?? '',
+        suspendedAt: DateTime.tryParse(
+          suspension?['suspended_at']?.toString() ?? '',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error fetching account suspension: $e');
+      return const AccountSuspensionStatus(
+        isSuspended: false,
+        reason: '',
+        suspendedAt: null,
+      );
+    }
+  }
+
+  Future<List<ModerationReport>> fetchModerationReports() async {
+    if (!await isCurrentUserAdmin() || _client == null) return [];
+    try {
+      final response = await _client!
+          .from('moderation_reports')
+          .select(
+            'id, post_id, category, details, status, resolution, created_at, '
+            'post_snapshot, '
+            'reporter:profiles!moderation_reports_reporter_id_fkey(username), '
+            'reported:profiles!moderation_reports_reported_profile_id_fkey('
+            'id, username, is_suspended)',
+          )
+          .order('created_at', ascending: false)
+          .limit(200);
+
+      return (response as List<dynamic>).map((raw) {
+        final row = raw as Map<String, dynamic>;
+        final reporter = row['reporter'] as Map<String, dynamic>?;
+        final reported = row['reported'] as Map<String, dynamic>?;
+        final snapshot = row['post_snapshot'] as Map<String, dynamic>? ?? {};
+        return ModerationReport(
+          id: (row['id'] as num).toInt(),
+          reporterUsername: reporter?['username']?.toString() ?? '退会済みユーザー',
+          reportedProfileId:
+              reported?['id']?.toString() ??
+              snapshot['profile_id']?.toString() ??
+              '',
+          reportedUsername: reported?['username']?.toString() ?? '退会済みユーザー',
+          reportedAccountSuspended: reported?['is_suspended'] == true,
+          postId: row['post_id']?.toString(),
+          bookId: snapshot['book_id']?.toString() ?? '',
+          review: snapshot['review']?.toString() ?? '',
+          category: ReportCategory.fromDatabase(row['category']?.toString()),
+          details: row['details']?.toString() ?? '',
+          status: row['status']?.toString() ?? 'open',
+          resolution: row['resolution']?.toString() ?? '',
+          createdAt:
+              DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+              DateTime.now(),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching moderation reports: $e');
+      return [];
+    }
+  }
+
+  Future<bool> adminResolveReport(int reportId) async {
+    if (!_isInitialized || _client == null) return false;
+    try {
+      await _client!.rpc(
+        'admin_resolve_report',
+        params: {'target_report': reportId, 'resolution_note': 'dismissed'},
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error resolving report: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteReportedPost(int reportId) async {
+    if (!_isInitialized || _client == null) return false;
+    try {
+      await _client!.rpc(
+        'admin_delete_reported_post',
+        params: {'target_report': reportId},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting reported post: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminSetAccountSuspension({
+    required String profileId,
+    required bool suspended,
+    String reason = '',
+  }) async {
+    if (!_isInitialized || _client == null || profileId.isEmpty) return false;
+    try {
+      await _client!.rpc(
+        'admin_set_account_suspension',
+        params: {
+          'target_profile': profileId,
+          'suspend': suspended,
+          'reason': reason.trim().isEmpty ? null : reason.trim(),
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error changing account suspension: $e');
       return false;
     }
   }

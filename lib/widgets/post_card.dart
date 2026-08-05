@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/post.dart';
+import '../models/social_models.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;
   final bool showUserInfo;
   final VoidCallback? onUserTap;
-  final Future<void> Function()? onReaction;
+  final Future<void> Function(PostReactionType reaction)? onReaction;
+  final VoidCallback? onReport;
 
   const PostCard({
     super.key,
@@ -13,6 +15,7 @@ class PostCard extends StatelessWidget {
     this.showUserInfo = true,
     this.onUserTap,
     this.onReaction,
+    this.onReport,
   });
 
   @override
@@ -86,7 +89,7 @@ class PostCard extends StatelessWidget {
               const Divider(height: 24, thickness: 0.8),
             ],
 
-            // Book & Comment Body
+            // Book and review body
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -149,41 +152,13 @@ class PostCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
 
-                      // User Comment
+                      // Review text (there is no reply/comment feature)
                       Text(
                         post.comment,
                         style: TextStyle(
                           color: primaryTextColor,
                           fontSize: 13,
                           height: 1.5,
-                        ),
-                      ),
-
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: onReaction == null
-                              ? null
-                              : () async => onReaction!(),
-                          icon: Icon(
-                            post.reactedByCurrentUser
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            size: 18,
-                            color: post.reactedByCurrentUser
-                                ? Colors.red
-                                : tertiaryTextColor,
-                          ),
-                          label: Text(
-                            'リアクション ${post.reactionsCount}',
-                            style: TextStyle(
-                              color: post.reactedByCurrentUser
-                                  ? Colors.red
-                                  : tertiaryTextColor,
-                              fontSize: 12,
-                            ),
-                          ),
                         ),
                       ),
 
@@ -201,11 +176,93 @@ class PostCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          for (final reaction in PostReactionType.values) ...[
+                            _buildReactionButton(
+                              context,
+                              reaction,
+                              tertiaryTextColor,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          const Spacer(),
+                          if (onReport != null)
+                            TextButton.icon(
+                              onPressed: onReport,
+                              icon: const Icon(Icons.flag_outlined, size: 16),
+                              label: const Text('報告'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: tertiaryTextColor,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                minimumSize: const Size(0, 34),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReactionButton(
+    BuildContext context,
+    PostReactionType reaction,
+    Color inactiveColor,
+  ) {
+    final selected = post.currentUserReaction == reaction;
+    final count = post.reactionCounts[reaction] ?? 0;
+    final selectedColor = reaction == PostReactionType.love
+        ? Colors.red
+        : Theme.of(context).colorScheme.primary;
+
+    return InkWell(
+      onTap: onReaction == null ? null : () async => onReaction!(reaction),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 42, minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected
+              ? selectedColor.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? selectedColor.withValues(alpha: 0.55)
+                : inactiveColor.withValues(alpha: 0.22),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              reaction.symbol,
+              style: TextStyle(
+                fontSize: 17,
+                color: reaction == PostReactionType.love ? Colors.red : null,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 3),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? selectedColor : inactiveColor,
+                ),
+              ),
+            ],
           ],
         ),
       ),
