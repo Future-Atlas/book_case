@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../api/rakuten_api.dart';
 import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
@@ -534,7 +535,10 @@ class SupabaseService extends ChangeNotifier {
             .from('posts')
             .select('*, profiles(username, avatar_url)')
             .order('created_at', ascending: false);
-        return (response as List).map((json) => Post.fromJson(json)).toList();
+        final posts = (response as List)
+            .map((json) => Post.fromJson(json))
+            .toList();
+        return _enrichPostsWithBookMetadata(posts);
       } catch (e) {
         debugPrint('Error fetching timeline posts in Supabase: $e');
       }
@@ -578,12 +582,44 @@ class SupabaseService extends ChangeNotifier {
   Future<List<Book>> fetchUserCollections(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        await _client!
+        final collectionRes = await _client!
             .from('collections')
             .select('book_id')
             .eq('profile_id', profileId);
-        // Currently returning empty list as Book objects are fetched elsewhere.
-        return [];
+
+        // Include books that were posted as read, even if legacy data has no collection row.
+        final postRes = await _client!
+            .from('posts')
+            .select('book_id')
+            .eq('profile_id', profileId);
+
+        final bookIds = <String>{};
+        for (final row in (collectionRes as List<dynamic>)) {
+          final id = (row['book_id'] ?? '').toString().trim();
+          if (id.isNotEmpty) bookIds.add(id);
+        }
+        for (final row in (postRes as List<dynamic>)) {
+          final id = (row['book_id'] ?? '').toString().trim();
+          if (id.isNotEmpty) bookIds.add(id);
+        }
+
+        if (bookIds.isEmpty) return [];
+
+        // Backfill missing collection rows so future loads can rely on collections.
+        final upsertRows = bookIds
+            .map(
+              (bookId) => {
+                'profile_id': profileId,
+                'book_id': bookId,
+                'status': 'read',
+              },
+            )
+            .toList();
+        await _client!
+            .from('collections')
+            .upsert(upsertRows, onConflict: 'profile_id,book_id');
+
+        return _resolveBooksByIds(bookIds.toList());
       } catch (e) {
         debugPrint('Error fetching user collection in Supabase: $e');
       }
@@ -623,14 +659,145 @@ class SupabaseService extends ChangeNotifier {
 
       // 2. 返ってきた生データを、正しくPostモデルの形に変換する
       final List<dynamic> data = response as List<dynamic>;
-      return data.map((json) => Post.fromJson(json)).toList();
+      final posts = data.map((json) => Post.fromJson(json)).toList();
+      return _enrichPostsWithBookMetadata(posts);
     } catch (e) {
       debugPrint('fetchUserPostsでエラーが発生しました: $e');
       return [];
     }
   }
 
+  Future<List<Post>> _enrichPostsWithBookMetadata(List<Post> posts) async {
+    if (posts.isEmpty) return posts;
+
+    final cache = <String, Book?>{};
+
+    Future<Book?> getBook(String bookId) async {
+      if (cache.containsKey(bookId)) return cache[bookId];
+      final found = await RakutenApi.fetchBookById(bookId);
+      cache[bookId] = found;
+      return found;
+    }
+
+    final enriched = <Post>[];
+    for (final post in posts) {
+      final resolved = await getBook(post.bookId);
+      if (resolved == null) {
+        enriched.add(post);
+        continue;
+      }
+
+      enriched.add(
+        post.copyWith(
+          bookTitle: resolved.title,
+          bookAuthor: resolved.author,
+          bookCoverUrl: resolved.coverUrl,
+        ),
+      );
+    }
+    return enriched;
+  }
+
+  Future<List<Book>> _resolveBooksByIds(List<String> bookIds) async {
+    if (bookIds.isEmpty) return [];
+
+    final results = await Future.wait(
+      bookIds.map((id) => RakutenApi.fetchBookById(id)),
+    );
+
+    final books = <Book>[];
+    for (var i = 0; i < bookIds.length; i++) {
+      final id = bookIds[i];
+      final resolved = results[i];
+      if (resolved != null) {
+        books.add(resolved);
+        continue;
+      }
+
+      // Keep unresolved items visible in collections instead of dropping them.
+      books.add(
+        Book(
+          id: id,
+          title: id,
+          author: '著者情報なし',
+          publisher: '',
+          pubDate: '',
+          isbn: id,
+          coverUrl: '',
+          ratingAvg: 0,
+          genre: '',
+          description: '書誌情報を取得できませんでした。',
+        ),
+      );
+    }
+    return books;
+  }
+
+  Future<void> _upsertReadCollection({
+    required String profileId,
+    required String bookId,
+  }) async {
+    await _client!.from('collections').upsert({
+      'profile_id': profileId,
+      'book_id': bookId,
+      'status': 'read',
+    }, onConflict: 'profile_id,book_id');
+  }
+
   // ----- ACTIONS -----------------------------------------------------------
+  Future<bool> markBookAsRead({required String bookId}) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty) {
+      debugPrint('Cannot mark book as read: no authenticated user.');
+      return false;
+    }
+    if (_isInitialized && _client != null) {
+      try {
+        await _upsertReadCollection(profileId: profileId, bookId: bookId);
+        notifyListeners();
+        return true;
+      } catch (e) {
+        debugPrint('Error marking book as read in Supabase: $e');
+      }
+    }
+    debugPrint('Supabase not initialized – collection not updated.');
+    return false;
+  }
+
+  Future<bool> isBookReadByCurrentUser({required String bookId}) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty || !_isInitialized || _client == null) {
+      return false;
+    }
+
+    try {
+      final collectionRes = await _client!
+          .from('collections')
+          .select('book_id')
+          .eq('profile_id', profileId)
+          .eq('book_id', bookId)
+          .eq('status', 'read')
+          .limit(1);
+
+      if ((collectionRes as List<dynamic>).isNotEmpty) {
+        return true;
+      }
+
+      // Fallback for legacy data where read books may exist only as posts.
+      final postRes = await _client!
+          .from('posts')
+          .select('book_id')
+          .eq('profile_id', profileId)
+          .eq('book_id', bookId)
+          .limit(1);
+
+      return (postRes as List<dynamic>).isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking read status in Supabase: $e');
+      return false;
+    }
+  }
+
   Future<bool> createPost({
     required String bookId,
     required double rating,
@@ -649,6 +816,10 @@ class SupabaseService extends ChangeNotifier {
           'rating': rating,
           'comment': comment,
         });
+
+        // Any completed post is also tracked in collections as 'read'.
+        await _upsertReadCollection(profileId: profileId, bookId: bookId);
+
         await _client!.rpc(
           'increment_read_count',
           params: {'user_id': profileId},

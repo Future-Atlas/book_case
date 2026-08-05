@@ -1,7 +1,7 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <!--
+<!doctype html>
+<html lang="ja">
+    <head>
+        <!--
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
 
@@ -14,26 +14,102 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="$FLUTTER_BASE_HREF">
+        <base href="$FLUTTER_BASE_HREF" />
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="BookCase - iOS, Android, and Web application to search books, view by genre, write reviews, and save collections of read books.">
+        <meta charset="UTF-8" />
+        <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
+        <meta
+            name="description"
+            content="Sharemariumは、読んだ本や読みたい本を登録し、読書履歴・感想・蔵書をまとめて管理できる読書記録Webアプリです。"
+        />
+        <meta name="robots" content="index,follow" />
+        <link rel="canonical" href="https://sharemarium.com/" />
+        <meta property="og:title" content="Sharemarium | 読書記録・本管理アプリ" />
+        <meta
+            property="og:description"
+            content="Sharemariumは、読書履歴や蔵書、読みたい本をまとめて管理できる読書記録Webアプリです。"
+        />
+        <meta property="og:site_name" content="Sharemarium" />
+        <meta property="og:type" content="website" />
+        <meta property="og:locale" content="ja_JP" />
+        <meta property="og:url" content="https://sharemarium.com/" />
+        <meta
+            property="og:image"
+            content="https://sharemarium.com/icons/Icon-512.png"
+        />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            content="Sharemarium | 読書記録・本管理アプリ"
+        />
+        <meta
+            name="twitter:description"
+            content="読んだ本、読みたい本、読書履歴をまとめて管理できる読書記録Webアプリです。"
+        />
+        <meta
+            name="twitter:image"
+            content="https://sharemarium.com/icons/Icon-512.png"
+        />
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "WebApplication",
+                "name": "Sharemarium",
+                "alternateName": "Sharemarium",
+                "url": "https://sharemarium.com/",
+                "applicationCategory": "LifestyleApplication",
+                "operatingSystem": "Web",
+                "inLanguage": "ja",
+                "description": "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": "https://sharemarium.com/?seo_preview=1&path={search_term_string}",
+                    "query-input": "required name=search_term_string"
+                }
+            }
+        </script>
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="BookCase">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+        <!-- iOS meta tags & icons -->
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+        <meta name="apple-mobile-web-app-title" content="Sharemarium" />
+        <link rel="apple-touch-icon" href="icons/Icon-192.png" />
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="favicon.png" />
 
-  <title>BookCase - 本の一覧・検索・タイムライン</title>
-  <link rel="manifest" href="manifest.json">
-</head>
-<body>
-  <!--
+        <title>Sharemarium | 読書記録・本管理アプリ</title>
+        <link rel="manifest" href="manifest.json" />
+    </head>
+    <body>
+        <noscript>
+            <main>
+                <header>
+                    <h1>Sharemarium - 読書記録・本管理アプリ</h1>
+                    <p>
+                        Sharemariumは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録Webアプリです。読書履歴や感想を残して、自分だけのWeb本棚を作成できます。
+                    </p>
+                </header>
+                <section>
+                    <h2>Sharemariumでできること</h2>
+                    <h3>読んだ本を記録</h3>
+                    <p>読み終えた本を登録し、読書履歴や感想を残せます。</p>
+                    <h3>読みたい本を管理</h3>
+                    <p>気になる本を保存し、次に読む本を整理できます。</p>
+                    <h3>自分だけのWeb本棚</h3>
+                    <p>
+                        登録した本を一覧表示し、蔵書管理や読書ログの振り返りができます。
+                    </p>
+                </section>
+                <section>
+                    <h2>こんな方におすすめ</h2>
+                    <p>
+                        読んだ本の記録を続けたい方、本管理アプリで蔵書管理したい方、読書習慣を見直したい方に向けたサービスです。
+                    </p>
+                </section>
+            </main>
+        </noscript>
+        <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
     or to give the user feedback during the initialization process.
@@ -41,6 +117,6 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
-</body>
+        <script src="flutter_bootstrap.js" async></script>
+    </body>
 </html>

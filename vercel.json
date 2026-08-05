@@ -4,7 +4,42 @@
     "framework": null,
     "buildCommand": null,
     "outputDirectory": "build/web",
+    "headers": [
+        {
+            "source": "/sitemap.xml",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/xml; charset=utf-8"
+                },
+                {
+                    "key": "X-Content-Type-Options",
+                    "value": "nosniff"
+                }
+            ]
+        },
+        {
+            "source": "/robots.txt",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "text/plain; charset=utf-8"
+                },
+                {
+                    "key": "X-Content-Type-Options",
+                    "value": "nosniff"
+                }
+            ]
+        }
+    ],
     "routes": [
+        {
+            "src": "/sitemap$",
+            "status": 308,
+            "headers": {
+                "Location": "/sitemap.xml"
+            }
+        },
         {
             "src": "/(.*)",
             "has": [
@@ -26,6 +61,17 @@
                 }
             ],
             "dest": "/api/seo?path=/"
+        },
+        {
+            "src": "/(genre/.*|book/.*|user/.*|profile/.*|privacy|terms)",
+            "has": [
+                {
+                    "type": "header",
+                    "key": "user-agent",
+                    "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
+                }
+            ],
+            "dest": "/api/seo?path=/$1"
         },
         {
             "handle": "filesystem"

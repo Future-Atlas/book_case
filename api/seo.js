@@ -1,4 +1,4 @@
-// Vercel serverless function to return crawler-friendly HTML for BookCase.
+// Vercel serverless function to return crawler-friendly HTML for Sharemarium.
 // Policy: no Google APIs. Data source order is Rakuten first, then NDL fallback.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
@@ -21,6 +21,13 @@ const RAKUTEN_FOREIGN_BOOK_API =
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404";
 const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
 const SITE_URL = "https://sharemarium.com";
+const SITE_NAME = "Sharemarium";
+const SITE_ALT_NAME = "Sharemarium";
+const SITE_TITLE = "Sharemarium | 読書レビューSNS";
+const TOP_DESCRIPTION =
+    "Sharemariumは、読んだ本や読みたい本を記録し、レビューや読書体験を共有できる読書レビューSNSです。";
+const OG_IMAGE_URL = `${SITE_URL}/icons/Icon-512.png`;
+const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -453,7 +460,7 @@ function faqStructuredData() {
         mainEntity: [
             {
                 "@type": "Question",
-                name: "BookCaseでは何ができますか？",
+                name: "Sharemariumでは何ができますか？",
                 acceptedAnswer: {
                     "@type": "Answer",
                     text: "本の検索、レビュー投稿、読書記録の管理、タイムライン閲覧ができます。",
@@ -469,7 +476,7 @@ function faqStructuredData() {
             },
             {
                 "@type": "Question",
-                name: "BookCaseの対象ジャンルは何ですか？",
+                name: "Sharemariumの対象ジャンルは何ですか？",
                 acceptedAnswer: {
                     "@type": "Answer",
                     text: "おすすめの本、洋書、人気作品を中心に紹介しています。",
@@ -477,6 +484,98 @@ function faqStructuredData() {
             },
         ],
     };
+}
+
+function organizationStructuredData() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: SITE_NAME,
+        alternateName: SITE_ALT_NAME,
+        url: `${SITE_URL}/`,
+        logo: `${SITE_URL}/icons/Icon-192.png`,
+    };
+}
+
+function breadcrumbStructuredData(items) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: items.map((item, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            name: item.name,
+            item: item.url,
+        })),
+    };
+}
+
+function itemListStructuredData(sectionTitle, books, pagePath) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: `${sectionTitle}一覧`,
+        url: toAbsoluteUrl(pagePath),
+        numberOfItems: books.length,
+        itemListElement: books.map((book, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            item: {
+                "@type": "Book",
+                name: book.title,
+                author: book.author,
+                description: book.description || "",
+            },
+        })),
+    };
+}
+
+function webApplicationStructuredData() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        name: SITE_NAME,
+        alternateName: SITE_ALT_NAME,
+        url: `${SITE_URL}/`,
+        applicationCategory: "LifestyleApplication",
+        operatingSystem: "Web",
+        inLanguage: "ja",
+        description:
+            "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
+    };
+}
+
+function siteNavigationStructuredData() {
+    const navItems = [
+        { name: "ホーム", url: `${SITE_URL}/` },
+        { name: "おすすめの本", url: `${SITE_URL}/genre/recommended` },
+        { name: "洋書", url: `${SITE_URL}/genre/western` },
+        { name: "人気作品", url: `${SITE_URL}/genre/popular` },
+        { name: "プライバシーポリシー", url: `${SITE_URL}/privacy` },
+        { name: "利用規約", url: `${SITE_URL}/terms` },
+        { name: "コンビニ人間", url: `${SITE_URL}/book/konbini-ningen` },
+        { name: "舟を編む", url: `${SITE_URL}/book/fune-wo-amu` },
+        {
+            name: "The Midnight Library",
+            url: `${SITE_URL}/book/midnight-library`,
+        },
+        { name: "Atomic Habits", url: `${SITE_URL}/book/atomic-habits` },
+        {
+            name: "そして、バトンは渡された",
+            url: `${SITE_URL}/book/baton-wa-watasareta`,
+        },
+        {
+            name: "汝、星のごとく",
+            url: `${SITE_URL}/book/nanji-hoshi-no-gotoku`,
+        },
+    ];
+
+    return navItems.map((item) => ({
+        "@context": "https://schema.org",
+        "@type": "SiteNavigationElement",
+        name: item.name,
+        url: item.url,
+    }));
 }
 
 function sectionByGenrePath(pathname) {
@@ -510,6 +609,10 @@ module.exports = async (req, res) => {
         supabaseProfileError: "none",
     };
 
+    if (!IS_PRODUCTION) {
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+
     console.log(`SEO Crawler requested path: ${decodedPath}`);
 
     const renderPage = ({
@@ -522,24 +625,35 @@ module.exports = async (req, res) => {
         extraJsonLd = [],
     }) => {
         const absoluteUrl = toAbsoluteUrl(pagePath);
-        const jsonLdList = [jsonLd, ...extraJsonLd].filter(Boolean);
+        const fullTitle = title.includes("Sharemarium")
+            ? title
+            : `${title} | Sharemarium`;
+        const jsonLdList = [
+            organizationStructuredData(),
+            jsonLd,
+            ...extraJsonLd,
+        ].filter(Boolean);
         return `
     <!DOCTYPE html>
     <html lang="ja">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${title} | BookCase</title>
+            <title>${fullTitle}</title>
       <meta name="description" content="${description}">
-      <meta name="robots" content="${robots || "index,follow"}">
+            <meta name="robots" content="${IS_PRODUCTION ? robots || "index,follow" : "noindex,nofollow"}">
       <link rel="canonical" href="${absoluteUrl}">
-      <meta property="og:title" content="${title} | BookCase">
+        <meta property="og:title" content="${fullTitle}">
       <meta property="og:description" content="${description}">
+            <meta property="og:site_name" content="${SITE_NAME}">
       <meta property="og:type" content="website">
+            <meta property="og:locale" content="ja_JP">
       <meta property="og:url" content="${absoluteUrl}">
+            <meta property="og:image" content="${OG_IMAGE_URL}">
       <meta name="twitter:card" content="summary_large_image">
-      <meta name="twitter:title" content="${title}">
+            <meta name="twitter:title" content="${fullTitle}">
       <meta name="twitter:description" content="${description}">
+            <meta name="twitter:image" content="${OG_IMAGE_URL}">
       ${jsonLdList
           .map(
               (item) =>
@@ -564,11 +678,17 @@ module.exports = async (req, res) => {
       </style>
     </head>
     <body>
-      <header>
-        <h1>BookCase</h1>
+            <header>
+                <h1>${SITE_NAME} (${SITE_ALT_NAME})</h1>
         <p>本のレビューと読書記録を管理できるアプリ</p>
       </header>
       <main>
+                <nav style="margin: 0 0 16px 0; font-size: 0.95em;">
+                    <a href="${SITE_URL}/">ホーム</a> |
+                    <a href="${SITE_URL}/genre/recommended">おすすめの本</a> |
+                    <a href="${SITE_URL}/genre/western">洋書</a> |
+                    <a href="${SITE_URL}/genre/popular">人気作品</a>
+                </nav>
         ${content}
       </main>
       <footer>
@@ -717,7 +837,86 @@ module.exports = async (req, res) => {
                 name: escapeHtml(username),
                 description: escapeHtml(bio),
             },
-            robots: hasReliableData ? "index,follow" : "noindex,nofollow",
+            robots: "noindex,nofollow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/privacy") {
+        const html = renderPage({
+            title: "プライバシーポリシー",
+            description:
+                "Sharemariumのプライバシーポリシーです。読書記録アプリにおける個人情報の取り扱い方針を説明しています。",
+            content: `
+        <section>
+          <h2>プライバシーポリシー</h2>
+          <p>Sharemariumは、読書記録アプリの提供に必要な範囲で情報を取り扱います。</p>
+          <h3>収集する情報</h3>
+          <p>ログイン情報、読書記録、感想、アプリ利用時に必要な技術情報を収集する場合があります。</p>
+          <h3>利用目的</h3>
+          <p>本管理アプリ機能の提供、読書履歴表示、サービス改善、不正利用防止のために利用します。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "プライバシーポリシー | Sharemarium",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "Sharemariumのプライバシーポリシーです。個人情報の取り扱い方針を説明しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    {
+                        name: "プライバシーポリシー",
+                        url: toAbsoluteUrl(decodedPath),
+                    },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/terms") {
+        const html = renderPage({
+            title: "利用規約",
+            description:
+                "Sharemariumの利用規約です。読書記録・本管理アプリの利用条件を掲載しています。",
+            content: `
+        <section>
+          <h2>利用規約</h2>
+          <p>Sharemariumをご利用いただく際の条件を定めたものです。</p>
+          <h3>サービス内容</h3>
+          <p>Sharemariumは、読んだ本の記録、読みたい本の管理、読書履歴の保存などを提供します。</p>
+          <h3>禁止事項</h3>
+          <p>不正アクセス、第三者への迷惑行為、法令違反につながる行為は禁止します。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "利用規約 | Sharemarium",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "Sharemariumの利用規約です。読書記録・本管理アプリの利用条件を掲載しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: "利用規約", url: toAbsoluteUrl(decodedPath) },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
         });
 
         res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -748,10 +947,10 @@ module.exports = async (req, res) => {
 
         const html = renderPage({
             title: `${genreSection}一覧`,
-            description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
+            description: `Sharemariumの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
             content: `
         <h2>${genreSection}について</h2>
-        <p>BookCaseが注目する${genreSection}を一覧で紹介します。</p>
+        <p>Sharemariumが注目する${genreSection}を一覧で紹介します。</p>
         <div>${renderBookList(books)}</div>
         <h2>${genreSection}の詳細ページ</h2>
         <ul>${detailLinks}</ul>
@@ -759,10 +958,17 @@ module.exports = async (req, res) => {
             jsonLd: {
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
-                name: `${genreSection}一覧 | BookCase`,
-                description: `BookCaseの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
+                name: `${genreSection}一覧 | Sharemarium`,
+                description: `Sharemariumの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
                 url: toAbsoluteUrl(decodedPath),
             },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: genreSection, url: toAbsoluteUrl(decodedPath) },
+                ]),
+                itemListStructuredData(genreSection, books, decodedPath),
+            ],
             pagePath: decodedPath,
             robots: "index,follow",
         });
@@ -819,30 +1025,11 @@ module.exports = async (req, res) => {
                 url: toAbsoluteUrl(decodedPath),
             },
             extraJsonLd: [
-                {
-                    "@context": "https://schema.org",
-                    "@type": "BreadcrumbList",
-                    itemListElement: [
-                        {
-                            "@type": "ListItem",
-                            position: 1,
-                            name: "ホーム",
-                            item: `${SITE_URL}/`,
-                        },
-                        {
-                            "@type": "ListItem",
-                            position: 2,
-                            name: book.section,
-                            item: toAbsoluteUrl(genrePath),
-                        },
-                        {
-                            "@type": "ListItem",
-                            position: 3,
-                            name: book.title,
-                            item: toAbsoluteUrl(decodedPath),
-                        },
-                    ],
-                },
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: book.section, url: toAbsoluteUrl(genrePath) },
+                    { name: book.title, url: toAbsoluteUrl(decodedPath) },
+                ]),
             ],
             pagePath: decodedPath,
             robots: "index,follow",
@@ -914,16 +1101,31 @@ module.exports = async (req, res) => {
 
         if (rawPosts && rawPosts.length > 0) {
             hasReliableData = true;
-            recentPosts = rawPosts.map((p) => ({
-                id: p.id,
-                username: p.profiles?.username || "匿名ユーザー",
-                book_title: p.book_id || "書籍ID未設定",
-                rating: p.rating,
-                comment: p.comment,
-                date: p.created_at
-                    ? new Date(p.created_at).toLocaleDateString("ja-JP")
-                    : "",
-            }));
+            const isbnCache = new Map();
+            recentPosts = await Promise.all(
+                rawPosts.map(async (p) => {
+                    const rawBookId = p.book_id || "書籍ID未設定";
+                    let resolved = isbnCache.get(rawBookId);
+                    if (resolved === undefined) {
+                        resolved = await resolveBookByIsbn(
+                            rawBookId,
+                            diagnostics,
+                        );
+                        isbnCache.set(rawBookId, resolved || null);
+                    }
+
+                    return {
+                        id: p.id,
+                        username: p.profiles?.username || "匿名ユーザー",
+                        book_title: resolved?.title || rawBookId,
+                        rating: p.rating,
+                        comment: p.comment,
+                        date: p.created_at
+                            ? new Date(p.created_at).toLocaleDateString("ja-JP")
+                            : "",
+                    };
+                }),
+            );
         }
     } catch (err) {
         diagnostics.supabaseIndexError =
@@ -953,7 +1155,7 @@ module.exports = async (req, res) => {
     const faqHtml = `
             <h2>よくある質問</h2>
             <div class="post-card">
-                <strong>BookCaseでは何ができますか？</strong>
+                <strong>Sharemariumでは何ができますか？</strong>
                 <p>本の検索、レビュー投稿、読書記録の管理、タイムライン閲覧ができます。</p>
             </div>
             <div class="post-card">
@@ -961,18 +1163,45 @@ module.exports = async (req, res) => {
                 <p>アプリ内アカウントでログインしたユーザーがレビュー投稿できます。</p>
             </div>
             <div class="post-card">
-                <strong>BookCaseの対象ジャンルは何ですか？</strong>
+                <strong>Sharemariumの対象ジャンルは何ですか？</strong>
                 <p>おすすめの本、洋書、人気作品を中心に紹介しています。</p>
             </div>
         `;
+    const primaryLinksHtml = `
+            <h2>主要ページ</h2>
+            <ul>
+                <li><a href="${SITE_URL}/genre/recommended">おすすめの本一覧</a></li>
+                <li><a href="${SITE_URL}/genre/western">洋書一覧</a></li>
+                <li><a href="${SITE_URL}/genre/popular">人気作品一覧</a></li>
+                                <li><a href="${SITE_URL}/privacy">プライバシーポリシー</a></li>
+                                <li><a href="${SITE_URL}/terms">利用規約</a></li>
+                <li><a href="${SITE_URL}/book/konbini-ningen">コンビニ人間の紹介</a></li>
+                <li><a href="${SITE_URL}/book/fune-wo-amu">舟を編むの紹介</a></li>
+                <li><a href="${SITE_URL}/book/midnight-library">The Midnight Library の紹介</a></li>
+                <li><a href="${SITE_URL}/book/atomic-habits">Atomic Habits の紹介</a></li>
+                <li><a href="${SITE_URL}/book/baton-wa-watasareta">そして、バトンは渡されたの紹介</a></li>
+                <li><a href="${SITE_URL}/book/nanji-hoshi-no-gotoku">汝、星のごとくの紹介</a></li>
+            </ul>
+        `;
 
     const html = renderPage({
-        title: "本の一覧・検索・タイムライン",
-        description:
-            "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
+        title: SITE_TITLE,
+        description: TOP_DESCRIPTION,
         content: `
-      <h2>BookCaseについて</h2>
-      <p>本の検索、レビュー投稿、プロフィール管理を行えるサービスです。</p>
+            <section>
+            <h2>Sharemariumでできること</h2>
+            <p>Sharemariumは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録・本管理アプリです。読書履歴、感想、蔵書管理を一つのWeb本棚で行えます。</p>
+            <h3>主な機能</h3>
+            <ul>
+                <li>読んだ本の登録と読書履歴の保存</li>
+                <li>読みたい本の管理</li>
+                <li>レビュー・読書メモの記録</li>
+                <li>自分の本棚の一覧表示</li>
+                <li>書籍情報の検索とお気に入り管理</li>
+            </ul>
+            <p>読んだ本を忘れずに記録したい方、所有している本を整理したい方、読書習慣を振り返りたい方に向けたサービスです。</p>
+            <p><a href="${SITE_URL}/login">ログインする</a> / <a href="${SITE_URL}/">Sharemariumを始める</a></p>
+            </section>
             ${sampleNoticeHtml}
 
       <h2>おすすめの本</h2>
@@ -987,17 +1216,27 @@ module.exports = async (req, res) => {
       <h2>タイムライン (最新レビュー)</h2>
       <div>${timelineHtml.length > 0 ? timelineHtml : "<p>現在、表示できる投稿がありません。</p>"}</div>
 
+            ${primaryLinksHtml}
       ${faqHtml}
     `,
         jsonLd: {
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "BookCase",
-            description:
-                "BookCaseは、おすすめの本・洋書・人気作品の紹介と、ユーザーのレビュータイムラインを提供する読書アプリです。",
+            name: SITE_NAME,
+            alternateName: SITE_ALT_NAME,
+            description: TOP_DESCRIPTION,
             url: `${SITE_URL}/`,
+            potentialAction: {
+                "@type": "SearchAction",
+                target: `${SITE_URL}/?seo_preview=1&path={search_term_string}`,
+                "query-input": "required name=search_term_string",
+            },
         },
-        extraJsonLd: [faqStructuredData()],
+        extraJsonLd: [
+            faqStructuredData(),
+            webApplicationStructuredData(),
+            ...siteNavigationStructuredData(),
+        ],
         pagePath: decodedPath || "/",
         robots:
             hasReliableData || usingSampleBooks

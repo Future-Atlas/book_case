@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://sharemarium.com/</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://sharemarium.com/sitemap-core.xml</loc>
+    <lastmod>2026-07-20</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sharemarium.com/sitemap-genres.xml</loc>
+    <lastmod>2026-07-20</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://sharemarium.com/sitemap-books.xml</loc>
+    <lastmod>2026-07-20</lastmod>
+  </sitemap>
+</sitemapindex>
