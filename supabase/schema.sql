@@ -3,6 +3,10 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
+    user_id TEXT NOT NULL CHECK (
+        user_id = lower(user_id)
+        AND user_id ~ '^[a-z0-9_]{3,20}$'
+    ),
     avatar_url TEXT,
     bio TEXT,
     followers_count INTEGER DEFAULT 0,
@@ -12,6 +16,25 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_user_id_lower_unique
+    ON public.profiles (lower(user_id));
+
+-- Legal name, date of birth and phone number must never be publicly readable.
+CREATE TABLE IF NOT EXISTS public.account_details (
+    profile_id UUID PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL CHECK (char_length(btrim(full_name)) BETWEEN 1 AND 100),
+    birth_date DATE NOT NULL CHECK (
+        birth_date >= DATE '1900-01-01'
+        AND birth_date <= CURRENT_DATE
+    ),
+    phone_number TEXT NOT NULL CHECK (phone_number ~ '^\+?[0-9]{7,15}$'),
+    phone_verified_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.account_details ENABLE ROW LEVEL SECURITY;
 
 -- NOTE: books table removed; external API provides book data.
 
@@ -92,6 +115,17 @@ CREATE POLICY "Allow users to update their own profile" ON public.profiles
 CREATE POLICY "Allow users to insert their own profile" ON public.profiles
     FOR INSERT WITH CHECK (auth.uid() = id);
 
+CREATE POLICY "Users can read their own account details" ON public.account_details
+    FOR SELECT TO authenticated USING (auth.uid() = profile_id);
+
+CREATE POLICY "Users can insert their own account details" ON public.account_details
+    FOR INSERT TO authenticated WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Users can update their own account details" ON public.account_details
+    FOR UPDATE TO authenticated
+    USING (auth.uid() = profile_id)
+    WITH CHECK (auth.uid() = profile_id);
+
 CREATE POLICY "Allow public read access for posts" ON public.posts
     FOR SELECT USING (true);
 
@@ -127,11 +161,80 @@ GRANT SELECT, INSERT ON public.legal_consents TO authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.legal_consents_id_seq TO authenticated;
 GRANT INSERT ON public.contact_requests TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.contact_requests_id_seq TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.account_details TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.complete_registration(
+    p_full_name TEXT,
+    p_birth_date DATE,
+    p_phone_number TEXT,
+    p_username TEXT,
+    p_user_id TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+    current_profile_id UUID := auth.uid();
+    normalized_user_id TEXT := lower(btrim(p_user_id));
+    normalized_phone TEXT := regexp_replace(p_phone_number, '[^0-9+]', '', 'g');
+BEGIN
+    IF current_profile_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+    END IF;
+
+    IF char_length(btrim(p_full_name)) NOT BETWEEN 1 AND 100
+        OR p_birth_date < DATE '1900-01-01'
+        OR p_birth_date > CURRENT_DATE
+        OR normalized_phone !~ '^\+?[0-9]{7,15}$'
+        OR char_length(btrim(p_username)) NOT BETWEEN 1 AND 30
+        OR normalized_user_id !~ '^[a-z0-9_]{3,20}$'
+    THEN
+        RAISE EXCEPTION 'Invalid registration data' USING ERRCODE = '23514';
+    END IF;
+
+    IF normalized_user_id IN (
+        'admin', 'administrator', 'support', 'sharemarium', 'system', 'official'
+    ) THEN
+        RAISE EXCEPTION 'Reserved user ID' USING ERRCODE = '23514';
+    END IF;
+
+    UPDATE public.profiles
+    SET username = btrim(p_username), user_id = normalized_user_id
+    WHERE id = current_profile_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Profile not found' USING ERRCODE = 'P0002';
+    END IF;
+
+    INSERT INTO public.account_details (
+        profile_id, full_name, birth_date, phone_number
+    ) VALUES (
+        current_profile_id, btrim(p_full_name), p_birth_date, normalized_phone
+    )
+    ON CONFLICT (profile_id) DO UPDATE
+    SET full_name = EXCLUDED.full_name,
+        birth_date = EXCLUDED.birth_date,
+        phone_number = EXCLUDED.phone_number,
+        phone_verified_at = CASE
+            WHEN public.account_details.phone_number = EXCLUDED.phone_number
+                THEN public.account_details.phone_verified_at
+            ELSE NULL
+        END,
+        updated_at = timezone('utc'::text, now());
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.complete_registration(TEXT, DATE, TEXT, TEXT, TEXT)
+    FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.complete_registration(TEXT, DATE, TEXT, TEXT, TEXT)
+    TO authenticated;
 
 -- Seed data now only includes profiles (books are fetched from external APIs)
-INSERT INTO public.profiles (id, username, avatar_url, bio, followers_count, following_count, read_count)
+INSERT INTO public.profiles (id, username, user_id, avatar_url, bio, followers_count, following_count, read_count)
 VALUES
-    ('d3b07384-d113-4ec5-a587-f3e098a58f4a', 'ryu_booklover', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80', '本を読むのが大好きなソフトウェアエンジニア。最近はSF小説とミステリーを多く読んでいます。', 128, 94, 42)
+    ('d3b07384-d113-4ec5-a587-f3e098a58f4a', 'ryu_booklover', 'ryu_booklover', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80', '本を読むのが大好きなソフトウェアエンジニア。最近はSF小説とミステリーを多く読んでいます。', 128, 94, 42)
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed user posts (book_id now holds an external identifier e.g., ISBN)

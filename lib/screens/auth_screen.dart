@@ -196,6 +196,9 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _signInWithX() =>
       _signInWithOAuth((service) => service.signInWithX());
 
+  Future<void> _signInWithLine() =>
+      _signInWithOAuth((service) => service.signInWithLine());
+
   Widget _buildLoginButton({
     required String label,
     required Color background,
@@ -283,9 +286,15 @@ class _AuthScreenState extends State<AuthScreen> {
                     background: Colors.black,
                     onPressed: _signInWithX,
                   ),
+                  const SizedBox(height: 10),
+                  _buildLoginButton(
+                    label: 'LINE',
+                    background: const Color(0xFF06C755),
+                    onPressed: _signInWithLine,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
-                    'GoogleまたはXの公式ログイン画面に移動して認証します。',
+                    'Google、XまたはLINEの公式ログイン画面に移動して認証します。',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),

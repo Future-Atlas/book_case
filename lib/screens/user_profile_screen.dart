@@ -226,7 +226,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       const SizedBox(height: 2),
                       // ⭕ 文字数が足りない場合の RangeError 回避
                       Text(
-                        _profile!.id.length >= 8
+                        _profile!.userId.isNotEmpty
+                            ? '@${_profile!.userId}'
+                            : _profile!.id.length >= 8
                             ? '@${_profile!.id.substring(0, 8)}'
                             : '@${_profile!.id}',
                         style: TextStyle(

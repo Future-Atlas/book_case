@@ -13,6 +13,7 @@ import 'screens/external_transmission_screen.dart';
 import 'screens/legal_consent_screen.dart';
 import 'screens/account_settings_screen.dart';
 import 'screens/contact_screen.dart';
+import 'screens/profile_onboarding_screen.dart';
 
 enum _HeaderMenuAction { myPage, settings, help, logout }
 
@@ -116,7 +117,9 @@ class MyApp extends StatelessWidget {
       themeMode: ThemeMode.system, // Dynamically follow device preference
       routes: {'/login': (context) => const AuthScreen()},
 
-      home: const LegalConsentGate(child: MainNavigationShell()),
+      home: const LegalConsentGate(
+        child: ProfileOnboardingGate(child: MainNavigationShell()),
+      ),
     );
   }
 }

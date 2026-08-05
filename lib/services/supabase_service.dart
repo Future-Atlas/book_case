@@ -20,6 +20,8 @@ class SupabaseService extends ChangeNotifier {
   String? _redirectUrl;
   bool? _hasCurrentLegalConsentCache;
   String? _cachedConsentUserId;
+  bool? _hasCompletedRegistrationCache;
+  String? _cachedRegistrationUserId;
 
   // ----- Initialization ----------------------------------------------------
   Future<void> initialize({
@@ -46,6 +48,10 @@ class SupabaseService extends ChangeNotifier {
           if (_cachedConsentUserId != user?.id) {
             _cachedConsentUserId = user?.id;
             _hasCurrentLegalConsentCache = null;
+          }
+          if (_cachedRegistrationUserId != user?.id) {
+            _cachedRegistrationUserId = user?.id;
+            _hasCompletedRegistrationCache = null;
           }
           if (user != null) {
             _ensureProfile(userId: user.id);
@@ -134,6 +140,28 @@ class SupabaseService extends ChangeNotifier {
       return e.message;
     } catch (e) {
       return 'Xログインに失敗しました: $e';
+    }
+  }
+
+  Future<String?> signInWithLine() async {
+    if (!_isInitialized || _client == null) {
+      return 'Supabaseが初期化されていません。';
+    }
+
+    try {
+      final started = await _client!.auth.signInWithOAuth(
+        const OAuthProvider('custom:line'),
+        redirectTo: kIsWeb ? null : _redirectUrl,
+      );
+
+      if (!started) {
+        return 'LINEログインを開始できませんでした。';
+      }
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'LINEログインに失敗しました: $e';
     }
   }
 
@@ -227,6 +255,7 @@ class SupabaseService extends ChangeNotifier {
       await _client!.from('profiles').insert({
         'id': userId,
         'username': generatedUsername,
+        'user_id': _anonymousUserId(userId),
         'avatar_url': '',
         'bio': '',
       });
@@ -241,6 +270,132 @@ class SupabaseService extends ChangeNotifier {
         ? compactId.substring(0, 10)
         : compactId;
     return 'reader_$suffix';
+  }
+
+  String _anonymousUserId(String profileId) {
+    final compactId = profileId.replaceAll('-', '').toLowerCase();
+    final suffix = compactId.length >= 10
+        ? compactId.substring(0, 10)
+        : compactId;
+    return 'reader_$suffix';
+  }
+
+  Future<bool> hasCompletedRegistration({bool forceRefresh = false}) async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return false;
+    if (!forceRefresh &&
+        _cachedRegistrationUserId == profileId &&
+        _hasCompletedRegistrationCache != null) {
+      return _hasCompletedRegistrationCache!;
+    }
+
+    try {
+      final profile = await _client!
+          .from('profiles')
+          .select('user_id, username')
+          .eq('id', profileId)
+          .maybeSingle();
+      final details = await _client!
+          .from('account_details')
+          .select('profile_id')
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      final completed =
+          profile != null &&
+          (profile['user_id']?.toString().isNotEmpty ?? false) &&
+          (profile['username']?.toString().isNotEmpty ?? false) &&
+          details != null;
+      _cachedRegistrationUserId = profileId;
+      _hasCompletedRegistrationCache = completed;
+      return completed;
+    } catch (e) {
+      debugPrint('Error checking registration status: $e');
+      return false;
+    }
+  }
+
+  Future<bool> isPublicUserIdAvailable(String userId) async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return false;
+
+    try {
+      final normalized = userId.trim().toLowerCase();
+      final existing = await _client!
+          .from('profiles')
+          .select('id')
+          .eq('user_id', normalized)
+          .neq('id', profileId)
+          .maybeSingle();
+      return existing == null;
+    } catch (e) {
+      debugPrint('Error checking public user ID: $e');
+      return false;
+    }
+  }
+
+  Future<String?> completeRegistration({
+    required String fullName,
+    required DateTime birthDate,
+    required String phoneNumber,
+    required String username,
+    required String userId,
+  }) async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+
+    try {
+      await _ensureProfile(userId: profileId);
+      await _client!.rpc(
+        'complete_registration',
+        params: {
+          'p_full_name': fullName.trim(),
+          'p_birth_date': birthDate.toIso8601String().split('T').first,
+          'p_phone_number': _normalizePhoneNumber(phoneNumber),
+          'p_username': username.trim(),
+          'p_user_id': userId.trim().toLowerCase(),
+        },
+      );
+      _cachedRegistrationUserId = profileId;
+      _hasCompletedRegistrationCache = true;
+      notifyListeners();
+      return null;
+    } on PostgrestException catch (e) {
+      debugPrint('Registration RPC error: $e');
+      if (e.code == '23505') {
+        return 'このユーザーIDはすでに使用されています。';
+      }
+      if (e.code == '23514') {
+        return '入力内容を確認してください。';
+      }
+      return '登録情報を保存できませんでした。データベース更新後にもう一度お試しください。';
+    } catch (e) {
+      debugPrint('Error completing registration: $e');
+      return '登録情報を保存できませんでした。もう一度お試しください。';
+    }
+  }
+
+  String _normalizePhoneNumber(String source) {
+    return source.trim().replaceAll(RegExp(r'[^0-9+]'), '');
+  }
+
+  Future<Map<String, dynamic>?> fetchCurrentAccountDetails() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return null;
+
+    try {
+      return await _client!
+          .from('account_details')
+          .select(
+            'full_name, birth_date, phone_number, phone_verified_at, updated_at',
+          )
+          .eq('profile_id', profileId)
+          .maybeSingle();
+    } catch (e) {
+      debugPrint('Error fetching account details: $e');
+      return null;
+    }
   }
 
   Future<bool> hasCurrentLegalConsent({bool forceRefresh = false}) async {
@@ -341,6 +496,8 @@ class SupabaseService extends ChangeNotifier {
       await signOut();
       _cachedConsentUserId = null;
       _hasCurrentLegalConsentCache = null;
+      _cachedRegistrationUserId = null;
+      _hasCompletedRegistrationCache = null;
       return null;
     } on FunctionException catch (e) {
       debugPrint('Delete account function error: $e');
@@ -407,6 +564,7 @@ class SupabaseService extends ChangeNotifier {
     return UserProfile(
       id: profileId,
       username: 'unknown',
+      userId: '',
       avatarUrl: '',
       bio: '',
       followersCount: 0,

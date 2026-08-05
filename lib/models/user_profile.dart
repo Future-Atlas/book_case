@@ -1,6 +1,7 @@
 class UserProfile {
   final String id;
   final String username;
+  final String userId;
   final String avatarUrl;
   final String bio;
   final int followersCount;
@@ -10,6 +11,7 @@ class UserProfile {
   UserProfile({
     required this.id,
     required this.username,
+    required this.userId,
     required this.avatarUrl,
     required this.bio,
     required this.followersCount,
@@ -21,6 +23,7 @@ class UserProfile {
     return UserProfile(
       id: json['id'] ?? '',
       username: json['username'] ?? '',
+      userId: json['user_id'] ?? '',
       avatarUrl: json['avatar_url'] ?? '',
       bio: json['bio'] ?? '',
       followersCount: json['followers_count'] ?? 0,
@@ -33,6 +36,7 @@ class UserProfile {
     return {
       'id': id,
       'username': username,
+      'user_id': userId,
       'avatar_url': avatarUrl,
       'bio': bio,
       'followers_count': followersCount,

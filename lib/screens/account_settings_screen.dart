@@ -14,6 +14,16 @@ class AccountSettingsScreen extends StatefulWidget {
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   bool _isDeleting = false;
+  Future<Map<String, dynamic>?>? _accountDetailsFuture;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _accountDetailsFuture ??= Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).fetchCurrentAccountDetails();
+  }
 
   Future<void> _deleteAccount() async {
     final confirmed = await showDialog<bool>(
@@ -91,11 +101,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       ),
                       const Divider(height: 1),
                       ListTile(
-                        title: const Text('電話番号'),
-                        subtitle: Text(user?.phone ?? '未登録'),
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
                         title: const Text('認証provider'),
                         subtitle: Text(provider),
                       ),
@@ -106,6 +111,53 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _accountDetailsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      );
+                    }
+                    final details = snapshot.data;
+                    final phone = details?['phone_number']?.toString();
+                    final verified = details?['phone_verified_at'] != null;
+                    return Card(
+                      child: Column(
+                        children: [
+                          ListTile(
+                            title: const Text('氏名（非公開）'),
+                            subtitle: Text(
+                              details?['full_name']?.toString() ?? '未登録',
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            title: const Text('生年月日（非公開）'),
+                            subtitle: Text(
+                              details?['birth_date']?.toString() ?? '未登録',
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            title: const Text('電話番号（非公開）'),
+                            subtitle: Text(
+                              phone == null
+                                  ? '未登録'
+                                  : verified
+                                  ? '$phone（確認済み）'
+                                  : '$phone（未確認）',
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 28),
                 const Text(
