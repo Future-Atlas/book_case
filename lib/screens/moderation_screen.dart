@@ -113,6 +113,76 @@ class _ModerationScreenState extends State<ModerationScreen> {
     );
   }
 
+  Future<void> _deleteAccount(ModerationReport report) async {
+    final reasonController = TextEditingController(text: '重大又は反復的な利用規約違反');
+    final confirmationController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('アカウントを完全に削除しますか？'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'この操作は元に戻せません。アカウントと関連データを削除し、'
+                  '不正な再登録を防ぐため、氏名・生年月日とメールアドレス又は電話番号の'
+                  '組み合わせから作成した復元できない照合値を3年間保存します。',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  maxLength: 500,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '削除理由',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: confirmationController,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: '確認のため「削除」と入力',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: confirmationController.text == '削除'
+                  ? () => Navigator.of(dialogContext).pop(true)
+                  : null,
+              style: FilledButton.styleFrom(backgroundColor: Colors.red[800]),
+              child: const Text('完全に削除'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final reason = reasonController.text.trim();
+    reasonController.dispose();
+    confirmationController.dispose();
+    if (confirmed != true || !mounted) return;
+    await _runAction(
+      report,
+      (service) => service.adminDeleteAccount(
+        profileId: report.reportedProfileId,
+        reason: reason,
+      ),
+      successMessage: 'アカウントを削除し、再登録防止情報を保存しました。',
+    );
+  }
+
   Future<void> _runAction(
     ModerationReport report,
     Future<bool> Function(SupabaseService service) action, {
@@ -243,6 +313,16 @@ class _ModerationScreenState extends State<ModerationScreen> {
                     label: Text(
                       report.reportedAccountSuspended ? '停止解除' : 'アカウント停止',
                     ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: processing || report.reportedProfileId.isEmpty
+                        ? null
+                        : () => _deleteAccount(report),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red[900],
+                    ),
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('アカウント削除'),
                   ),
                   TextButton(
                     onPressed: processing ? null : () => _dismissReport(report),

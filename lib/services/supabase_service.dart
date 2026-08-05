@@ -435,6 +435,9 @@ class SupabaseService extends ChangeNotifier {
       return null;
     } on PostgrestException catch (e) {
       debugPrint('Registration RPC error: $e');
+      if (e.message.contains('REGISTRATION_DENIED')) {
+        return 'この登録情報では利用登録できません。心当たりがない場合は、お問い合わせフォームからご連絡ください。';
+      }
       if (e.code == '23505') {
         return 'このユーザーIDはすでに使用されています。';
       }
@@ -1583,6 +1586,37 @@ class SupabaseService extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Error changing account suspension: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteAccount({
+    required String profileId,
+    required String reason,
+  }) async {
+    if (!_isInitialized ||
+        _client == null ||
+        !isAuthenticated ||
+        profileId.isEmpty) {
+      return false;
+    }
+    try {
+      final response = await _client!.functions.invoke(
+        'admin-delete-account',
+        body: {
+          'targetProfileId': profileId,
+          'reason': reason.trim(),
+          'confirmation': 'DELETE',
+        },
+      );
+      if (response.status < 200 || response.status >= 300) return false;
+      notifyListeners();
+      return true;
+    } on FunctionException catch (e) {
+      debugPrint('Admin delete account function error: $e');
+      return false;
+    } catch (e) {
+      debugPrint('Error deleting account as administrator: $e');
       return false;
     }
   }

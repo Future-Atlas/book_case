@@ -54,10 +54,24 @@ Deno.serve(async (request) => {
     )
   }
 
+  const { error: prepareError } = await admin.rpc(
+    'prepare_self_account_deletion',
+    { target_profile: userData.user.id },
+  )
+  if (prepareError) {
+    return Response.json(
+      { error: prepareError.message },
+      { status: 500, headers: corsHeaders },
+    )
+  }
+
   const { error: deleteError } = await admin.auth.admin.deleteUser(
     userData.user.id,
   )
   if (deleteError) {
+    await admin.rpc('cancel_self_account_deletion', {
+      target_profile: userData.user.id,
+    })
     return Response.json(
       { error: deleteError.message },
       { status: 500, headers: corsHeaders },
