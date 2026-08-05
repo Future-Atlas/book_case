@@ -1,69 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
+import 'community_guidelines_screen.dart';
+import 'contact_screen.dart';
+import 'external_transmission_screen.dart';
+import 'infringement_policy_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'profile_onboarding_screen.dart';
+import 'terms_screen.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
-  const AccountSettingsScreen({super.key, required this.onAccountDeleted});
+  const AccountSettingsScreen({
+    super.key,
+    required this.onAccountDeleted,
+    this.openPrivacyPasswordRecovery = false,
+  });
 
   final VoidCallback onAccountDeleted;
+  final bool openPrivacyPasswordRecovery;
 
   @override
   State<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
 }
 
 class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
-  bool _isDeleting = false;
-  bool _isLoadingPrivacy = true;
-  bool _isSavingPrivacy = false;
-  bool _isPrivate = false;
-  bool _privacyLoadStarted = false;
-  Future<Map<String, dynamic>?>? _accountDetailsFuture;
+  late bool _showRecovery = widget.openPrivacyPasswordRecovery;
+  bool _deleting = false;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _accountDetailsFuture ??= Provider.of<SupabaseService>(
-      context,
-      listen: false,
-    ).fetchCurrentAccountDetails();
-    if (!_privacyLoadStarted) {
-      _privacyLoadStarted = true;
-      _loadPrivacySetting();
-    }
+  void _push(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 
-  Future<void> _loadPrivacySetting() async {
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    final value = await service.fetchCurrentProfilePrivacy();
-    if (!mounted) return;
-    setState(() {
-      _isPrivate = value ?? false;
-      _isLoadingPrivacy = false;
-    });
-  }
-
-  Future<void> _updatePrivacySetting(bool value) async {
-    final previousValue = _isPrivate;
-    setState(() {
-      _isPrivate = value;
-      _isSavingPrivacy = true;
-    });
-
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    final error = await service.updateCurrentProfilePrivacy(isPrivate: value);
-    if (!mounted) return;
-
-    setState(() {
-      _isSavingPrivacy = false;
-      if (error != null) _isPrivate = previousValue;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(error ?? (value ? '鍵アカウントに設定しました。' : 'アカウントを公開しました。')),
-      ),
+  Future<void> _openPrivacySettings() async {
+    final password = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PrivacyPasswordDialog(onForgot: _startRecovery),
     );
+    if (!mounted || password == null) return;
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final verified = await service.verifyPrivacyPassword(password);
+    if (!mounted) return;
+    if (!verified) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('パスワードが正しくないか、一時的にロックされています。')),
+      );
+      return;
+    }
+    _push(_PrivacySettingsScreen(password: password));
+  }
+
+  Future<void> _startRecovery() async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final error = await service.beginPrivacyPasswordRecovery();
+    if (!mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 
   Future<void> _deleteAccount() async {
@@ -71,9 +65,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('本当に退会しますか？'),
-        content: const Text(
-          'アカウント、プロフィール、投稿、本棚、お気に入り及び同意履歴が削除されます。この操作は取り消せません。',
-        ),
+        content: const Text('アカウントと関連データが削除されます。この操作は取り消せません。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -81,183 +73,824 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('退会して削除する'),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('退会する'),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
-
-    setState(() => _isDeleting = true);
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    final error = await service.deleteCurrentAccount();
+    setState(() => _deleting = true);
+    final error = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).deleteCurrentAccount();
     if (!mounted) return;
-    setState(() => _isDeleting = false);
-
+    setState(() => _deleting = false);
     if (error != null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-
     widget.onAccountDeleted();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('退会処理が完了しました。')));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SupabaseService>(
-      builder: (context, service, _) {
-        if (!service.isAuthenticated) {
-          return const Center(child: Text('アカウント設定を利用するにはログインしてください。'));
-        }
+    final service = Provider.of<SupabaseService>(context);
+    if (!service.isAuthenticated) {
+      return const Center(child: Text('設定を利用するにはログインしてください。'));
+    }
+    if (_showRecovery) {
+      return _PrivacyPasswordRecoveryScreen(
+        onCompleted: () => setState(() => _showRecovery = false),
+      );
+    }
 
-        final user = service.currentUser;
-        final provider = user?.appMetadata['provider']?.toString() ?? '不明';
-        return Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            const _SectionTitle('設定'),
+            _SettingsCard(
               children: [
-                const Text(
-                  'アカウント設定',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ListTile(
+                  leading: const Icon(Icons.manage_accounts_outlined),
+                  title: const Text('アカウント'),
+                  subtitle: const Text('ユーザー名・ユーザーID・鍵アカウント'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _push(const _PublicAccountSettingsScreen()),
                 ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Column(
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined),
+                  title: const Text('プライバシー設定'),
+                  subtitle: const Text('氏名・生年月日・電話番号・メールアドレス'),
+                  trailing: const Icon(Icons.lock_outline),
+                  onTap: _openPrivacySettings,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.only(left: 40, right: 16),
+                  leading: const Icon(Icons.block_outlined),
+                  title: const Text('ブロックしているアカウント'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _push(const _BlockedAccountsScreen()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const _SectionTitle('各種ポリシー'),
+            _SettingsCard(
+              children: [
+                _policyTile('利用規約', const TermsScreen()),
+                _policyTile('プライバシーポリシー', const PrivacyPolicyScreen()),
+                _policyTile('コミュニティガイドライン', const CommunityGuidelinesScreen()),
+                _policyTile('権利侵害・通報ポリシー', const InfringementPolicyScreen()),
+                _policyTile(
+                  '外部送信に関する公表事項',
+                  const ExternalTransmissionScreen(),
+                  last: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const _SectionTitle('お問い合わせ'),
+            _SettingsCard(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.mail_outline),
+                  title: const Text('お問い合わせフォーム'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _push(const ContactScreen()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.delete_forever_outlined),
+                  iconColor: Colors.red,
+                  textColor: Colors.red,
+                  title: const Text('退会'),
+                  trailing: _deleting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: _deleting ? null : _deleteAccount,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const _SectionTitle('アプリ情報'),
+            const _SettingsCard(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('Sharemarium'),
+                  subtitle: Text('バージョン 1.0.0+1'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _policyTile(String title, Widget screen, {bool last = false}) =>
+      Column(
+        children: [
+          ListTile(
+            title: Text(title),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _push(screen),
+          ),
+          if (!last) const Divider(height: 1),
+        ],
+      );
+}
+
+class _PublicAccountSettingsScreen extends StatefulWidget {
+  const _PublicAccountSettingsScreen();
+
+  @override
+  State<_PublicAccountSettingsScreen> createState() =>
+      _PublicAccountSettingsScreenState();
+}
+
+class _PublicAccountSettingsScreenState
+    extends State<_PublicAccountSettingsScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
+  final _userIdController = TextEditingController();
+  bool _isPrivate = false;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loading) _load();
+  }
+
+  Future<void> _load() async {
+    final data = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).fetchCurrentSettingsData();
+    if (!mounted) return;
+    _usernameController.text = data?['username']?.toString() ?? '';
+    _userIdController.text = data?['user_id']?.toString() ?? '';
+    setState(() {
+      _isPrivate = data?['is_private'] == true;
+      _loading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _userIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final error = await Provider.of<SupabaseService>(context, listen: false)
+        .updatePublicProfile(
+          username: _usernameController.text,
+          userId: _userIdController.text,
+          isPrivate: _isPrivate,
+        );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error ?? 'アカウント設定を保存しました。')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('アカウント')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
                     children: [
-                      ListTile(
-                        title: const Text('メールアドレス'),
-                        subtitle: Text(user?.email ?? '未登録'),
+                      TextFormField(
+                        controller: _usernameController,
+                        maxLength: 30,
+                        decoration: const InputDecoration(
+                          labelText: 'ユーザー名',
+                          helperText: 'プロフィールに表示される名前です。いつでも変更できます。',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => (value?.trim().isEmpty ?? true)
+                            ? 'ユーザー名を入力してください。'
+                            : null,
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        title: const Text('認証provider'),
-                        subtitle: Text(provider),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _userIdController,
+                        maxLength: 20,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9_]'),
+                          ),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'ユーザーID',
+                          prefixText: '@',
+                          helperText: '半角英小文字・数字・_で3〜20文字。重複はできません。',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            RegExp(
+                              r'^[a-z0-9_]{3,20}$',
+                            ).hasMatch((value ?? '').trim().toLowerCase())
+                            ? null
+                            : 'ユーザーIDの形式を確認してください。',
                       ),
-                      const Divider(height: 1),
-                      ListTile(
-                        title: const Text('UID'),
-                        subtitle: Text(user?.id ?? ''),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('鍵アカウント'),
+                        subtitle: Text(
+                          _isPrivate
+                              ? '承認したフォロワーだけが投稿を閲覧できます。'
+                              : '誰でも投稿を閲覧できます。',
+                        ),
+                        value: _isPrivate,
+                        onChanged: (value) =>
+                            setState(() => _isPrivate = value),
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: _saving
+                            ? const CircularProgressIndicator()
+                            : const Text('保存する'),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                Card(
-                  child: SwitchListTile(
-                    secondary: Icon(
-                      _isPrivate ? Icons.lock_outline : Icons.public,
-                    ),
-                    title: const Text('鍵アカウント'),
-                    subtitle: Text(
-                      _isPrivate
-                          ? '投稿・本棚・お気に入りは、本人以外には表示されません。'
-                          : '投稿・本棚・お気に入りは公開されます。',
-                    ),
-                    value: _isPrivate,
-                    onChanged: _isLoadingPrivacy || _isSavingPrivacy
-                        ? null
-                        : _updatePrivacySetting,
-                  ),
-                ),
-                if (_isLoadingPrivacy || _isSavingPrivacy) ...[
-                  const SizedBox(height: 6),
-                  const LinearProgressIndicator(minHeight: 2),
-                ],
-                const SizedBox(height: 16),
-                FutureBuilder<Map<String, dynamic>?>(
-                  future: _accountDetailsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                      );
-                    }
-                    final details = snapshot.data;
-                    final phone = details?['phone_number']?.toString();
-                    final verified = details?['phone_verified_at'] != null;
-                    return Card(
-                      child: Column(
-                        children: [
-                          ListTile(
-                            title: const Text('氏名（非公開）'),
-                            subtitle: Text(
-                              details?['full_name']?.toString() ?? '未登録',
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            title: const Text('生年月日（非公開）'),
-                            subtitle: Text(
-                              details?['birth_date']?.toString() ?? '未登録',
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            title: const Text('電話番号（非公開）'),
-                            subtitle: Text(
-                              phone == null
-                                  ? '未登録'
-                                  : verified
-                                  ? '$phone（確認済み）'
-                                  : '$phone（未確認）',
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 28),
-                const Text(
-                  '退会',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '退会するとアカウントに紐づくデータが削除され、元に戻すことはできません。',
-                  style: TextStyle(height: 1.5),
-                ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: _isDeleting ? null : _deleteAccount,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  icon: _isDeleting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.delete_forever_outlined),
-                  label: const Text('退会してアカウントを削除'),
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
     );
   }
+}
+
+class _PrivacySettingsScreen extends StatefulWidget {
+  const _PrivacySettingsScreen({required this.password});
+
+  final String password;
+
+  @override
+  State<_PrivacySettingsScreen> createState() => _PrivacySettingsScreenState();
+}
+
+class _PrivacySettingsScreenState extends State<_PrivacySettingsScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  DateTime? _birthDate;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loading) _load();
+  }
+
+  Future<void> _load() async {
+    final data = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).fetchCurrentSettingsData();
+    if (!mounted) return;
+    _nameController.text = data?['full_name']?.toString() ?? '';
+    _phoneController.text = data?['phone_number']?.toString() ?? '';
+    _emailController.text = data?['email']?.toString() ?? '';
+    _birthDate = DateTime.tryParse(data?['birth_date']?.toString() ?? '');
+    setState(() => _loading = false);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 20),
+      firstDate: DateTime(1900),
+      lastDate: now,
+    );
+    if (selected != null && mounted) setState(() => _birthDate = selected);
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate() || _birthDate == null) return;
+    setState(() => _saving = true);
+    final error = await Provider.of<SupabaseService>(context, listen: false)
+        .updatePrivateAccountDetails(
+          password: widget.password,
+          fullName: _nameController.text,
+          birthDate: _birthDate!,
+          phoneNumber: _phoneController.text,
+          email: _emailController.text,
+        );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error ?? 'プライバシー設定を保存しました。')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('プライバシー設定')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      const Text(
+                        '以下の情報は公開されません。',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 18),
+                      TextFormField(
+                        controller: _nameController,
+                        maxLength: 100,
+                        decoration: const InputDecoration(
+                          labelText: '氏名',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: _required,
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('生年月日'),
+                        subtitle: Text(
+                          _birthDate == null
+                              ? '未登録'
+                              : '${_birthDate!.year}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.day.toString().padLeft(2, '0')}',
+                        ),
+                        trailing: const Icon(Icons.calendar_month),
+                        onTap: _selectDate,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: '電話番号',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          final phone = (value ?? '').replaceAll(
+                            RegExp(r'[^0-9+]'),
+                            '',
+                          );
+                          return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(phone)
+                              ? null
+                              : '有効な電話番号を入力してください。';
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'メールアドレス',
+                          helperText: '変更時は新しいメールアドレスでの確認が必要になる場合があります。',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => (value ?? '').contains('@')
+                            ? null
+                            : '有効なメールアドレスを入力してください。',
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: _saving
+                            ? const CircularProgressIndicator()
+                            : const Text('変更を保存する'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => _ChangePrivacyPasswordScreen(
+                              currentPassword: widget.password,
+                            ),
+                          ),
+                        ),
+                        child: const Text('個人情報変更用パスワードを変更'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  static String? _required(String? value) =>
+      (value?.trim().isEmpty ?? true) ? '入力してください。' : null;
+}
+
+class _BlockedAccountsScreen extends StatefulWidget {
+  const _BlockedAccountsScreen();
+
+  @override
+  State<_BlockedAccountsScreen> createState() => _BlockedAccountsScreenState();
+}
+
+class _BlockedAccountsScreenState extends State<_BlockedAccountsScreen> {
+  late Future<List<UserProfile>> _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _future = Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).fetchBlockedProfiles();
+  }
+
+  Future<void> _unblock(UserProfile profile) async {
+    final success = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).unblockProfile(profile.id);
+    if (!mounted) return;
+    if (success) {
+      setState(() {
+        _future = Provider.of<SupabaseService>(
+          context,
+          listen: false,
+        ).fetchBlockedProfiles();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('ブロックしているアカウント')),
+      body: FutureBuilder<List<UserProfile>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final profiles = snapshot.data!;
+          if (profiles.isEmpty) {
+            return const Center(child: Text('ブロックしているアカウントはありません。'));
+          }
+          return ListView.separated(
+            itemCount: profiles.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final profile = profiles[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: profile.avatarUrl.isEmpty
+                      ? null
+                      : NetworkImage(profile.avatarUrl),
+                  child: profile.avatarUrl.isEmpty
+                      ? const Icon(Icons.person_outline)
+                      : null,
+                ),
+                title: Text(profile.username),
+                subtitle: Text('@${profile.userId}'),
+                trailing: OutlinedButton(
+                  onPressed: () => _unblock(profile),
+                  child: const Text('解除'),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PrivacyPasswordDialog extends StatefulWidget {
+  const _PrivacyPasswordDialog({required this.onForgot});
+
+  final VoidCallback onForgot;
+
+  @override
+  State<_PrivacyPasswordDialog> createState() => _PrivacyPasswordDialogState();
+}
+
+class _PrivacyPasswordDialogState extends State<_PrivacyPasswordDialog> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('パスワードを入力'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        obscureText: _obscure,
+        onSubmitted: (value) {
+          if (value.isNotEmpty) Navigator.of(context).pop(value);
+        },
+        decoration: InputDecoration(
+          labelText: '個人情報変更用パスワード',
+          border: const OutlineInputBorder(),
+          suffixIcon: IconButton(
+            tooltip: _obscure ? 'パスワードを表示' : 'パスワードを隠す',
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              widget.onForgot();
+            });
+          },
+          child: const Text('パスワードを忘れた方'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_controller.text.isNotEmpty) {
+              Navigator.of(context).pop(_controller.text);
+            }
+          },
+          child: const Text('確認'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChangePrivacyPasswordScreen extends StatefulWidget {
+  const _ChangePrivacyPasswordScreen({required this.currentPassword});
+
+  final String currentPassword;
+
+  @override
+  State<_ChangePrivacyPasswordScreen> createState() =>
+      _ChangePrivacyPasswordScreenState();
+}
+
+class _ChangePrivacyPasswordScreenState
+    extends State<_ChangePrivacyPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmationController = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final error = await Provider.of<SupabaseService>(context, listen: false)
+        .changePrivacyPassword(
+          currentPassword: widget.currentPassword,
+          newPassword: _passwordController.text,
+        );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('パスワード変更')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            TextFormField(
+              controller: _passwordController,
+              obscureText: _obscure,
+              decoration: InputDecoration(
+                labelText: '新しいパスワード',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon: Icon(
+                    _obscure ? Icons.visibility : Icons.visibility_off,
+                  ),
+                ),
+              ),
+              validator: validatePrivacyPassword,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _confirmationController,
+              obscureText: _obscure,
+              decoration: const InputDecoration(
+                labelText: '新しいパスワード（確認）',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) =>
+                  value != _passwordController.text ? 'パスワードが一致しません。' : null,
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: const Text('変更する'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivacyPasswordRecoveryScreen extends StatefulWidget {
+  const _PrivacyPasswordRecoveryScreen({required this.onCompleted});
+
+  final VoidCallback onCompleted;
+
+  @override
+  State<_PrivacyPasswordRecoveryScreen> createState() =>
+      _PrivacyPasswordRecoveryScreenState();
+}
+
+class _PrivacyPasswordRecoveryScreenState
+    extends State<_PrivacyPasswordRecoveryScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmationController = TextEditingController();
+  bool _obscure = true;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    final error = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).resetPrivacyPasswordAfterReauthentication(_passwordController.text);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    widget.onCompleted();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('パスワードを再設定しました。')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              const Text(
+                'パスワードを再設定',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('連携サービスでの本人確認が完了しました。15分以内に再設定してください。'),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscure,
+                decoration: InputDecoration(
+                  labelText: '新しいパスワード',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(
+                      _obscure ? Icons.visibility : Icons.visibility_off,
+                    ),
+                  ),
+                ),
+                validator: validatePrivacyPassword,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmationController,
+                obscureText: _obscure,
+                decoration: const InputDecoration(
+                  labelText: '新しいパスワード（確認）',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) =>
+                    value != _passwordController.text ? 'パスワードが一致しません。' : null,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                child: const Text('再設定する'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    ),
+  );
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
+    child: Column(children: children),
+  );
 }

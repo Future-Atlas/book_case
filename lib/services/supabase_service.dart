@@ -146,26 +146,63 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
-  Future<String?> signInWithLine() async {
+  Future<String?> signInWithFacebook({bool privacyRecovery = false}) =>
+      _signInWithSocialProvider(
+        OAuthProvider.facebook,
+        label: 'Facebook',
+        privacyRecovery: privacyRecovery,
+      );
+
+  Future<String?> signInWithApple({bool privacyRecovery = false}) =>
+      _signInWithSocialProvider(
+        OAuthProvider.apple,
+        label: 'Apple',
+        privacyRecovery: privacyRecovery,
+      );
+
+  Future<String?> signInWithDiscord({bool privacyRecovery = false}) =>
+      _signInWithSocialProvider(
+        OAuthProvider.discord,
+        label: 'Discord',
+        privacyRecovery: privacyRecovery,
+      );
+
+  Future<String?> _signInWithSocialProvider(
+    OAuthProvider provider, {
+    required String label,
+    bool privacyRecovery = false,
+  }) async {
     if (!_isInitialized || _client == null) {
       return 'Supabaseが初期化されていません。';
     }
 
     try {
+      final redirectTo = privacyRecovery
+          ? _privacyRecoveryRedirectUrl()
+          : (kIsWeb ? null : _redirectUrl);
       final started = await _client!.auth.signInWithOAuth(
-        const OAuthProvider('custom:line'),
-        redirectTo: kIsWeb ? null : _redirectUrl,
+        provider,
+        redirectTo: redirectTo,
       );
-
-      if (!started) {
-        return 'LINEログインを開始できませんでした。';
-      }
-      return null;
+      return started ? null : '$labelログインを開始できませんでした。';
     } on AuthException catch (e) {
       return e.message;
     } catch (e) {
-      return 'LINEログインに失敗しました: $e';
+      return '$labelログインに失敗しました: $e';
     }
+  }
+
+  String? _privacyRecoveryRedirectUrl() {
+    final source = kIsWeb ? Uri.base.toString() : _redirectUrl;
+    if (source == null || source.isEmpty) return null;
+    final uri = Uri.tryParse(source);
+    if (uri == null) return source;
+    return uri
+        .replace(
+          queryParameters: const {'privacy_password_recovery': '1'},
+          fragment: '',
+        )
+        .toString();
   }
 
   Future<String?> signInWithEmail({
@@ -317,6 +354,35 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> hasPrivacyPassword() async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      final result = await _client!.rpc('has_privacy_password');
+      return result == true;
+    } catch (e) {
+      debugPrint('Error checking privacy password: $e');
+      return false;
+    }
+  }
+
+  Future<String?> initializePrivacyPassword(String password) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      await _client!.rpc(
+        'initialize_privacy_password',
+        params: {'p_password': password},
+      );
+      return null;
+    } on PostgrestException catch (e) {
+      if (e.code == '23514') return 'パスワードの条件を確認してください。';
+      return e.message;
+    } catch (e) {
+      return 'パスワードを保存できませんでした。';
+    }
+  }
+
   Future<bool> isPublicUserIdAvailable(String userId) async {
     final profileId = activeProfileId;
     if (!_isInitialized || _client == null || profileId.isEmpty) return false;
@@ -342,6 +408,7 @@ class SupabaseService extends ChangeNotifier {
     required String phoneNumber,
     required String username,
     required String userId,
+    required String privacyPassword,
   }) async {
     final profileId = activeProfileId;
     if (!_isInitialized || _client == null || profileId.isEmpty) {
@@ -358,6 +425,7 @@ class SupabaseService extends ChangeNotifier {
           'p_phone_number': _normalizePhoneNumber(phoneNumber),
           'p_username': username.trim(),
           'p_user_id': userId.trim().toLowerCase(),
+          'p_privacy_password': privacyPassword,
         },
       );
       _cachedRegistrationUserId = profileId;
@@ -398,6 +466,217 @@ class SupabaseService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error fetching account details: $e');
       return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchCurrentSettingsData() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return null;
+    try {
+      final profile = await _client!
+          .from('profiles')
+          .select('username, user_id, is_private')
+          .eq('id', profileId)
+          .single();
+      final details = await fetchCurrentAccountDetails();
+      return {...profile, ...?details, 'email': currentUser?.email ?? ''};
+    } catch (e) {
+      debugPrint('Error fetching settings data: $e');
+      return null;
+    }
+  }
+
+  Future<String?> updatePublicProfile({
+    required String username,
+    required String userId,
+    required bool isPrivate,
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      await _client!.rpc(
+        'update_public_profile',
+        params: {
+          'p_username': username.trim(),
+          'p_user_id': userId.trim().toLowerCase(),
+          'p_is_private': isPrivate,
+        },
+      );
+      notifyListeners();
+      return null;
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') return 'このユーザーIDはすでに使用されています。';
+      if (e.code == '23514') return '入力内容を確認してください。';
+      return e.message;
+    } catch (e) {
+      return 'アカウント設定を保存できませんでした。';
+    }
+  }
+
+  Future<bool> verifyPrivacyPassword(String password) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    try {
+      final result = await _client!.rpc(
+        'verify_privacy_password',
+        params: {'p_password': password},
+      );
+      return result == true;
+    } catch (e) {
+      debugPrint('Error verifying privacy password: $e');
+      return false;
+    }
+  }
+
+  Future<String?> updatePrivateAccountDetails({
+    required String password,
+    required String fullName,
+    required DateTime birthDate,
+    required String phoneNumber,
+    required String email,
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      final verified = await verifyPrivacyPassword(password);
+      if (!verified) return 'パスワードが正しくありません。';
+
+      final normalizedEmail = email.trim();
+      if (normalizedEmail != (currentUser?.email ?? '')) {
+        await _client!.auth.updateUser(
+          UserAttributes(email: normalizedEmail),
+          emailRedirectTo: _redirectUrl,
+        );
+      }
+      final updated = await _client!.rpc(
+        'update_private_account_details',
+        params: {
+          'p_password': password,
+          'p_full_name': fullName.trim(),
+          'p_birth_date': birthDate.toIso8601String().split('T').first,
+          'p_phone_number': _normalizePhoneNumber(phoneNumber),
+        },
+      );
+      if (updated != true) return 'パスワードが正しくありません。';
+      notifyListeners();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } on PostgrestException catch (e) {
+      if (e.code == '28P01') return 'パスワードが正しくありません。';
+      if (e.code == '23514') return '入力内容を確認してください。';
+      return e.message;
+    } catch (e) {
+      return 'プライバシー設定を保存できませんでした。';
+    }
+  }
+
+  Future<String?> changePrivacyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      final changed = await _client!.rpc(
+        'change_privacy_password',
+        params: {
+          'p_current_password': currentPassword,
+          'p_new_password': newPassword,
+        },
+      );
+      if (changed != true) return '現在のパスワードが正しくありません。';
+      return null;
+    } on PostgrestException catch (e) {
+      if (e.code == '28P01') return '現在のパスワードが正しくありません。';
+      if (e.code == '23514') return '新しいパスワードの条件を確認してください。';
+      return e.message;
+    } catch (e) {
+      return 'パスワードを変更できませんでした。';
+    }
+  }
+
+  Future<String?> beginPrivacyPasswordRecovery() async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      final provider = currentUser?.appMetadata['provider']?.toString() ?? '';
+      await _client!.rpc('begin_privacy_password_recovery');
+      switch (provider) {
+        case 'google':
+          return _signInWithSocialProvider(
+            OAuthProvider.google,
+            label: 'Google',
+            privacyRecovery: true,
+          );
+        case 'twitter':
+        case 'x':
+          return _signInWithSocialProvider(
+            OAuthProvider.x,
+            label: 'X',
+            privacyRecovery: true,
+          );
+        case 'facebook':
+          return signInWithFacebook(privacyRecovery: true);
+        case 'apple':
+          return signInWithApple(privacyRecovery: true);
+        case 'discord':
+          return signInWithDiscord(privacyRecovery: true);
+        default:
+          return 'このログイン方法では再認証できません。お問い合わせからご連絡ください。';
+      }
+    } on PostgrestException catch (e) {
+      return e.message;
+    } catch (e) {
+      return '本人確認を開始できませんでした。';
+    }
+  }
+
+  Future<String?> resetPrivacyPasswordAfterReauthentication(
+    String newPassword,
+  ) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      await _client!.rpc(
+        'reset_privacy_password_after_reauthentication',
+        params: {'p_new_password': newPassword},
+      );
+      return null;
+    } on PostgrestException catch (e) {
+      if (e.code == '42501') return '本人確認の有効期限が切れました。もう一度お試しください。';
+      if (e.code == '23514') return '新しいパスワードの条件を確認してください。';
+      return e.message;
+    } catch (e) {
+      return 'パスワードを再設定できませんでした。';
+    }
+  }
+
+  Future<List<UserProfile>> fetchBlockedProfiles() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return [];
+    try {
+      final response = await _client!
+          .from('blocks')
+          .select(
+            'blocked:profiles!blocks_blocked_id_fkey('
+            'id, username, user_id, avatar_url, bio, followers_count, '
+            'following_count, read_count, is_private)',
+          )
+          .eq('blocker_id', profileId)
+          .order('created_at', ascending: false);
+      return (response as List<dynamic>)
+          .map((row) => row['blocked'])
+          .whereType<Map<String, dynamic>>()
+          .map(UserProfile.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching blocked profiles: $e');
+      return [];
     }
   }
 

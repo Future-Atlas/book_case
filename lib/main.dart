@@ -137,10 +137,18 @@ class MainNavigationShell extends StatefulWidget {
 }
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
-  int _currentScreenIndex =
-      0; // 0 = Home, 1 = Profile, 2 = Settings, 3 = Help, 4 = Moderation
+  late int _currentScreenIndex;
+  late bool _openPrivacyPasswordRecovery;
   String? _adminCheckedUserId;
   bool _isAdmin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _openPrivacyPasswordRecovery =
+        Uri.base.queryParameters['privacy_password_recovery'] == '1';
+    _currentScreenIndex = _openPrivacyPasswordRecovery ? 2 : 0;
+  }
 
   Future<void> _checkAdministratorAccess(
     SupabaseService service,
@@ -398,6 +406,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         ? AccountSettingsScreen(
                             key: const ValueKey('SettingsScreen'),
                             onAccountDeleted: _goToBookList,
+                            openPrivacyPasswordRecovery:
+                                _openPrivacyPasswordRecovery,
                           )
                         : _currentScreenIndex == 3
                         ? const _HelpScreen(key: ValueKey('HelpScreen'))
