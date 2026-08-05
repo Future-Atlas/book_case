@@ -1,30 +1,20 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_application_1/main.dart';
+import 'package:flutter_application_1/screens/profile_onboarding_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('個人情報変更用パスワード', () {
+    test('大文字・小文字・数字を含む8〜20文字を受け付ける', () {
+      expect(validatePrivacyPassword('Share123'), isNull);
+      expect(validatePrivacyPassword('Abcdefg1Abcdefg1'), isNull);
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('条件を満たさないパスワードを拒否する', () {
+      expect(validatePrivacyPassword('Short1'), isNotNull);
+      expect(validatePrivacyPassword('lowercase1'), isNotNull);
+      expect(validatePrivacyPassword('UPPERCASE1'), isNotNull);
+      expect(validatePrivacyPassword('NoNumbers'), isNotNull);
+      expect(validatePrivacyPassword('Abcdefghij12345678901'), isNotNull);
+    });
   });
 }
