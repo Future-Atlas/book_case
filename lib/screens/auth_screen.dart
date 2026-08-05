@@ -160,7 +160,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 24),
                     _loginButton(
                       label: 'Google',
-                      background: Colors.white,
+                      background: Colors.yellow,
                       foreground: Colors.black,
                       action: (service) => service.signInWithGoogle(),
                     ),
@@ -179,7 +179,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 10),
                     _loginButton(
                       label: 'Apple',
-                      background: Colors.black,
+                      background: Colors.red,
                       action: (service) => service.signInWithApple(),
                     ),
                     const SizedBox(height: 10),
