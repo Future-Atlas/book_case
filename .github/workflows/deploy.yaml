@@ -8,6 +8,11 @@ on:
 jobs:
     deploy:
         runs-on: ubuntu-latest
+        env:
+            VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+            VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+            VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+            VERCEL_SCOPE: sharemarium
         steps:
             # 1. コードのチェックアウト
             - name: Checkout code
@@ -30,25 +35,19 @@ jobs:
 
             # 5. Vercelのツールをインストール
             - name: Install Vercel CLI
-              run: npm install --global vercel
+              run: npm install --global vercel@58.7.1
+
+            - name: Verify Vercel Project Access
+              run: vercel project inspect "$VERCEL_PROJECT_ID" --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
 
             # 6. Vercelのプロジェクト設定を取得
             - name: Pull Vercel Environment Information
-              run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-              env:
-                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+              run: vercel pull --yes --environment=production --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
 
             # 7. Vercel BuildでFunctions/rewrites込みの成果物を作成
             - name: Build Vercel Prebuilt Output
-              run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-              env:
-                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+              run: vercel build --prod --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
 
             # 8. prebuilt成果物を本番デプロイ
             - name: Deploy to Vercel
-              run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-              env:
-                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+              run: vercel deploy --prebuilt --prod --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
