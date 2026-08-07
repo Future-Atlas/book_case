@@ -1187,47 +1187,23 @@ class SupabaseService extends ChangeNotifier {
   Future<List<Book>> fetchUserCollections(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        final collectionRes = await _client!
-            .from('collections')
-            .select('book_id')
-            .eq('profile_id', profileId);
-
-        // Include books that were posted as read, even if legacy data has no collection row.
+        // A posted review is the source of truth for a completed book. Ordering
+        // by the newest post first also defines the bookshelf display order.
         final postRes = await _client!
             .from('posts')
-            .select('book_id')
-            .eq('profile_id', profileId);
+            .select('book_id, created_at')
+            .eq('profile_id', profileId)
+            .order('created_at', ascending: false);
 
-        final bookIds = <String>{};
-        for (final row in (collectionRes as List<dynamic>)) {
-          final id = (row['book_id'] ?? '').toString().trim();
-          if (id.isNotEmpty) bookIds.add(id);
-        }
+        final bookIds = <String>[];
+        final seenBookIds = <String>{};
         for (final row in (postRes as List<dynamic>)) {
           final id = (row['book_id'] ?? '').toString().trim();
-          if (id.isNotEmpty) bookIds.add(id);
+          if (id.isNotEmpty && seenBookIds.add(id)) bookIds.add(id);
         }
 
         if (bookIds.isEmpty) return [];
-
-        // Only the owner may backfill collection rows. Public profile viewers
-        // must remain read-only, and private-profile RLS may return no rows.
-        if (profileId == activeProfileId) {
-          final upsertRows = bookIds
-              .map(
-                (bookId) => {
-                  'profile_id': profileId,
-                  'book_id': bookId,
-                  'status': 'read',
-                },
-              )
-              .toList();
-          await _client!
-              .from('collections')
-              .upsert(upsertRows, onConflict: 'profile_id,book_id');
-        }
-
-        return _resolveBooksByIds(bookIds.toList());
+        return _resolveBooksByIds(bookIds);
       } catch (e) {
         debugPrint('Error fetching user collection in Supabase: $e');
       }
@@ -1260,10 +1236,8 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('posts')
           .select('*, profiles(username, avatar_url)')
-          .eq(
-            'profile_id',
-            uid,
-          ); // ※既存のcreatePostが'profile_id'で保存しているため、ここもprofile_idに合わせます
+          .eq('profile_id', uid)
+          .order('created_at', ascending: false);
 
       // 2. 返ってきた生データを、正しくPostモデルの形に変換する
       final List<dynamic> data = response as List<dynamic>;
@@ -1730,10 +1704,6 @@ class SupabaseService extends ChangeNotifier {
         // Any completed post is also tracked in collections as 'read'.
         await _upsertReadCollection(profileId: profileId, bookId: book.id);
 
-        await _client!.rpc(
-          'increment_read_count',
-          params: {'user_id': profileId},
-        );
         notifyListeners();
         return true;
       } catch (e) {
@@ -1742,6 +1712,26 @@ class SupabaseService extends ChangeNotifier {
     }
     debugPrint('Supabase not initialized – post not created.');
     return false;
+  }
+
+  Future<bool> deleteOwnPost(String postId) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty || !_isInitialized || _client == null) return false;
+
+    try {
+      final deletedRows = await _client!
+          .from('posts')
+          .delete()
+          .eq('id', postId)
+          .eq('profile_id', profileId)
+          .select('id');
+      final deleted = (deletedRows as List<dynamic>).isNotEmpty;
+      if (deleted) notifyListeners();
+      return deleted;
+    } catch (e) {
+      debugPrint('Error deleting own post in Supabase: $e');
+      return false;
+    }
   }
 
   Future<bool> toggleFavorite(String bookId) async {

@@ -5,6 +5,7 @@ import '../widgets/ad_banner.dart';
 import '../widgets/post_card.dart';
 import '../controllers/book_list_controller.dart';
 import '../models/book.dart';
+import '../models/post.dart';
 import '../models/social_models.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_composer_dialog.dart';
@@ -73,6 +74,47 @@ class _BookListScreenState extends State<BookListScreen> {
   Future<void> _reportPost(String postId) async {
     if (!await _ensureAuthenticated() || !mounted) return;
     await showPostReportDialog(context: context, postId: postId);
+  }
+
+  Future<void> _deletePost(Post post) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (post.profileId != service.activeProfileId) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('投稿を削除しますか？'),
+        content: Text(
+          '「${post.bookTitle}」の投稿を削除します。\n'
+          'この本への投稿がほかにない場合、本棚からも削除されます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final deleted = await service.deleteOwnPost(post.id);
+    if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('投稿を削除できませんでした。')));
+      return;
+    }
+    await _controller.loadData(context);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('投稿を削除しました。')));
   }
 
   void _showBookDetailDialog(Book book) {
@@ -161,11 +203,6 @@ class _BookListScreenState extends State<BookListScreen> {
                                     height: 64,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        if (!isRead) {
-                                          await service.markBookAsRead(
-                                            bookId: book.id,
-                                          );
-                                        }
                                         if (!mounted) return;
                                         Navigator.of(this.context).pop();
                                         _showPostComposerDialog(book);
@@ -693,6 +730,9 @@ class _BookListScreenState extends State<BookListScreen> {
           onReaction: post.profileId == currentProfileId
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),
+          onDelete: post.profileId == currentProfileId
+              ? () => _deletePost(post)
+              : null,
           onReport: post.profileId == currentProfileId
               ? null
               : () => _reportPost(post.id),

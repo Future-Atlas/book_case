@@ -8,6 +8,7 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onUserTap;
   final Future<void> Function(PostReactionType reaction)? onReaction;
   final VoidCallback? onReport;
+  final VoidCallback? onDelete;
   final bool concealSpoiler;
 
   const PostCard({
@@ -17,6 +18,7 @@ class PostCard extends StatefulWidget {
     this.onUserTap,
     this.onReaction,
     this.onReport,
+    this.onDelete,
     this.concealSpoiler = true,
   });
 
@@ -33,6 +35,7 @@ class _PostCardState extends State<PostCard> {
   Future<void> Function(PostReactionType reaction)? get onReaction =>
       widget.onReaction;
   VoidCallback? get onReport => widget.onReport;
+  VoidCallback? get onDelete => widget.onDelete;
 
   @override
   void didUpdateWidget(covariant PostCard oldWidget) {
@@ -96,13 +99,6 @@ class _PostCardState extends State<PostCard> {
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                               color: primaryTextColor,
-                            ),
-                          ),
-                          Text(
-                            _formatDate(post.createdAt),
-                            style: TextStyle(
-                              color: tertiaryTextColor,
-                              fontSize: 11,
                             ),
                           ),
                         ],
@@ -222,20 +218,17 @@ class _PostCardState extends State<PostCard> {
                           ),
                         ),
 
-                      // Date if not showing user info (like in user profile tab)
-                      if (!showUserInfo) ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: Text(
-                            _formatDate(post.createdAt),
-                            style: TextStyle(
-                              color: tertiaryTextColor,
-                              fontSize: 10,
-                            ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Text(
+                          _formatDate(post.createdAt),
+                          style: TextStyle(
+                            color: tertiaryTextColor,
+                            fontSize: 10,
                           ),
                         ),
-                      ],
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -248,6 +241,39 @@ class _PostCardState extends State<PostCard> {
                             const SizedBox(width: 4),
                           ],
                           const Spacer(),
+                          if (onDelete != null)
+                            PopupMenuButton<String>(
+                              tooltip: '投稿メニュー',
+                              icon: Icon(
+                                Icons.more_vert,
+                                size: 22,
+                                color: tertiaryTextColor,
+                              ),
+                              padding: EdgeInsets.zero,
+                              position: PopupMenuPosition.under,
+                              onSelected: (value) {
+                                if (value == 'delete') onDelete!();
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                        size: 19,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        '投稿削除',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           if (onReport != null)
                             TextButton.icon(
                               onPressed: onReport,
@@ -347,6 +373,6 @@ class _PostCardState extends State<PostCard> {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    return '${date.year}年${date.month}月${date.day}日';
   }
 }

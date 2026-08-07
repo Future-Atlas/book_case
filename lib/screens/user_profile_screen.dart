@@ -335,6 +335,47 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     await showPostReportDialog(context: context, postId: postId);
   }
 
+  Future<void> _deletePost(Post post) async {
+    if (!_isOwnProfile) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('投稿を削除しますか？'),
+        content: Text(
+          '「${post.bookTitle}」の投稿を削除します。\n'
+          'この本への投稿がほかにない場合、本棚からも削除されます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('削除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final deleted = await service.deleteOwnPost(post.id);
+    if (!mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('投稿を削除できませんでした。')));
+      return;
+    }
+    await _loadProfileData();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('投稿を削除しました。')));
+  }
+
   Future<void> _openBookSearch() async {
     final posted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const ProfileBookSearchScreen()),
@@ -743,6 +784,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           onReaction: _isOwnProfile
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),
+          onDelete: _isOwnProfile ? () => _deletePost(post) : null,
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
         );
       },
