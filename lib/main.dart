@@ -18,7 +18,7 @@ import 'screens/notifications_screen.dart';
 import 'screens/moderation_screen.dart';
 import 'screens/account_suspension_gate.dart';
 
-enum _HeaderMenuAction { myPage, settings, help, moderation, logout }
+enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 
 final supabaseService = SupabaseService();
 
@@ -183,6 +183,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   Future<void> _onMenuAction(_HeaderMenuAction action) async {
     switch (action) {
+      case _HeaderMenuAction.home:
+        _goToBookList();
+        break;
       case _HeaderMenuAction.myPage:
         await _goToProfile();
         break;
@@ -281,6 +284,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             color: Colors.white,
                             onSelected: _onMenuAction,
                             itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: _HeaderMenuAction.home,
+                                child: Text(
+                                  'ホーム',
+                                  style: TextStyle(
+                                    fontSize: 28 / 2,
+                                    color: popupMenuTextColor,
+                                  ),
+                                ),
+                              ),
                               PopupMenuItem(
                                 value: _HeaderMenuAction.myPage,
                                 child: Text(
