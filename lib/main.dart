@@ -242,6 +242,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
+        final headerSideWidth = service.isAuthenticated ? 146.0 : 104.0;
 
         // If auth is lost while on profile, force navigation back to list.
         if (!service.isAuthenticated &&
@@ -270,7 +271,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 104,
+                        width: headerSideWidth,
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: PopupMenuButton<_HeaderMenuAction>(
@@ -351,54 +352,66 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       ),
                       Expanded(
                         child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _currentHeaderTitle(),
-                                style: const TextStyle(
-                                  color: Color(0xFFF1D600),
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _currentHeaderTitle(),
+                              style: const TextStyle(
+                                color: Color(0xFFF1D600),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
                               ),
-                              if (_currentScreenIndex == 1 &&
-                                  service.isAuthenticated) ...[
-                                const SizedBox(width: 2),
-                                const NotificationBellButton(),
-                              ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
                       SizedBox(
-                        width: 104,
+                        width: headerSideWidth,
                         height: 36,
-                        child: ElevatedButton.icon(
-                          onPressed: _goToProfile,
-                          icon: Icon(
-                            service.isAuthenticated
-                                ? Icons.person_outline
-                                : Icons.login,
-                            size: 16,
-                          ),
-                          label: Text(
-                            service.isAuthenticated ? 'プロフィール' : 'ログイン',
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (service.isAuthenticated)
+                              const SizedBox(
+                                width: 42,
+                                child: NotificationBellButton(),
+                              ),
+                            SizedBox(
+                              width: 104,
+                              height: 36,
+                              child: ElevatedButton.icon(
+                                onPressed: _goToProfile,
+                                icon: Icon(
+                                  service.isAuthenticated
+                                      ? Icons.person_outline
+                                      : Icons.login,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  service.isAuthenticated
+                                      ? 'プロフィール'
+                                      : 'ログイン',
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF3B30),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  elevation: 0,
+                                  shape: const StadiumBorder(),
+                                ),
+                              ),
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF3B30),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            elevation: 0,
-                            shape: const StadiumBorder(),
-                          ),
+                          ],
                         ),
                       ),
                     ],

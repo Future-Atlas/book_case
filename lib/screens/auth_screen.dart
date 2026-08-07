@@ -16,6 +16,9 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   bool _isSubmitting = false;
 
+  // Providers can be enabled here after their Supabase OAuth setup is ready.
+  final Set<String> _enabledLoginProviders = {'x'};
+
   Future<bool> _showTermsDialog() async {
     var agreedTerms = false;
     var agreedPrivacy = false;
@@ -158,41 +161,49 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _loginButton(
-                      label: 'Google',
-                      background: Colors.yellow,
-                      foreground: Colors.black,
-                      action: (service) => service.signInWithGoogle(),
-                    ),
-                    const SizedBox(height: 10),
+                    if (_enabledLoginProviders.contains('google')) ...[
+                      _loginButton(
+                        label: 'Google',
+                        background: Colors.yellow,
+                        foreground: Colors.black,
+                        action: (service) => service.signInWithGoogle(),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     _loginButton(
                       label: 'X',
                       background: Colors.black,
                       action: (service) => service.signInWithX(),
                     ),
-                    const SizedBox(height: 10),
-                    _loginButton(
-                      label: 'Facebook',
-                      background: const Color(0xFF1877F2),
-                      action: (service) => service.signInWithFacebook(),
-                    ),
-                    const SizedBox(height: 10),
-                    _loginButton(
-                      label: 'Apple',
-                      background: const Color(0xFFB71C1C),
-                      action: (service) => service.signInWithApple(),
-                    ),
-                    const SizedBox(height: 10),
-                    _loginButton(
-                      label: 'Discord',
-                      background: const Color(0xFF4A148C),
-                      action: (service) => service.signInWithDiscord(),
-                    ),
+                    if (_enabledLoginProviders.contains('facebook')) ...[
+                      const SizedBox(height: 10),
+                      _loginButton(
+                        label: 'Facebook',
+                        background: const Color(0xFF1877F2),
+                        action: (service) => service.signInWithFacebook(),
+                      ),
+                    ],
+                    if (_enabledLoginProviders.contains('apple')) ...[
+                      const SizedBox(height: 10),
+                      _loginButton(
+                        label: 'Apple',
+                        background: const Color(0xFFB71C1C),
+                        action: (service) => service.signInWithApple(),
+                      ),
+                    ],
+                    if (_enabledLoginProviders.contains('discord')) ...[
+                      const SizedBox(height: 10),
+                      _loginButton(
+                        label: 'Discord',
+                        background: const Color(0xFF4A148C),
+                        action: (service) => service.signInWithDiscord(),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     const SizedBox(
                       width: 280,
                       child: Text(
-                        '有効化済みのサービスだけ利用できます。外部サービスの認証画面へ移動してログインします。',
+                        '現在利用できるログイン方法はXのみです。Xの認証画面へ移動してログインします。',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.black54),
                       ),
