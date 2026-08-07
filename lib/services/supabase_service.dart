@@ -92,7 +92,7 @@ class SupabaseService extends ChangeNotifier {
       await _client!.auth.signInWithOtp(
         email: email,
         shouldCreateUser: true,
-        emailRedirectTo: _redirectUrl,
+        emailRedirectTo: _authRedirectUrl(),
       );
       return null;
     } on AuthException catch (e) {
@@ -110,7 +110,7 @@ class SupabaseService extends ChangeNotifier {
     try {
       final started = await _client!.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: kIsWeb ? null : _redirectUrl,
+        redirectTo: _authRedirectUrl(),
         queryParams: const {'prompt': 'select_account'},
       );
 
@@ -133,7 +133,7 @@ class SupabaseService extends ChangeNotifier {
     try {
       final started = await _client!.auth.signInWithOAuth(
         OAuthProvider.x,
-        redirectTo: kIsWeb ? null : _redirectUrl,
+        redirectTo: _authRedirectUrl(),
       );
 
       if (!started) {
@@ -180,7 +180,7 @@ class SupabaseService extends ChangeNotifier {
     try {
       final redirectTo = privacyRecovery
           ? _privacyRecoveryRedirectUrl()
-          : (kIsWeb ? null : _redirectUrl);
+          : _authRedirectUrl();
       final started = await _client!.auth.signInWithOAuth(
         provider,
         redirectTo: redirectTo,
@@ -194,7 +194,7 @@ class SupabaseService extends ChangeNotifier {
   }
 
   String? _privacyRecoveryRedirectUrl() {
-    final source = kIsWeb ? Uri.base.toString() : _redirectUrl;
+    final source = _authRedirectUrl();
     if (source == null || source.isEmpty) return null;
     final uri = Uri.tryParse(source);
     if (uri == null) return source;
@@ -204,6 +204,26 @@ class SupabaseService extends ChangeNotifier {
           fragment: '',
         )
         .toString();
+  }
+
+  /// Returns the URL to which Supabase should send the user after auth.
+  ///
+  /// On web, always use the origin that is currently serving the app. This
+  /// prevents a stale Supabase Site URL from sending production users back to
+  /// an old Vercel deployment URL. Native apps continue to use the configured
+  /// redirect URL.
+  String? _authRedirectUrl() {
+    if (!kIsWeb) return _redirectUrl;
+
+    final current = Uri.base;
+    if (!current.hasScheme || current.host.isEmpty) return _redirectUrl;
+
+    return Uri(
+      scheme: current.scheme,
+      host: current.host,
+      port: current.hasPort ? current.port : null,
+      path: '/',
+    ).toString();
   }
 
   Future<String?> signInWithEmail({
