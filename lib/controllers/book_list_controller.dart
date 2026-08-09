@@ -126,12 +126,18 @@ class BookListController extends ChangeNotifier {
     isSearching = true;
     notifyListeners();
 
-    var noProgressStreak = 0;
+    const maxPagesPerSearch = 20;
+    var fetchedPages = 0;
 
     try {
       while (searchResults.length < 10 && hasMoreSearch) {
         if (query != searchQuery.trim()) {
           return;
+        }
+
+        if (fetchedPages >= maxPagesPerSearch) {
+          hasMoreSearch = false;
+          break;
         }
 
         final batch = await _repository.searchBooks(
@@ -140,30 +146,18 @@ class BookListController extends ChangeNotifier {
           count: 100,
         );
         searchPage += 1;
+        fetchedPages += 1;
 
         if (batch.isEmpty) {
           hasMoreSearch = false;
           break;
         }
 
-        final beforeLength = searchResults.length;
         for (final book in batch) {
           if (_searchResultIds.contains(book.id)) continue;
           if (!_matchesQuery(book, query)) continue;
           _searchResultIds.add(book.id);
           searchResults.add(book);
-        }
-
-        if (searchResults.length == beforeLength) {
-          noProgressStreak += 1;
-        } else {
-          noProgressStreak = 0;
-        }
-
-        // 連続して増分がない場合は、同一データの循環を避けるため探索を終了する。
-        if (noProgressStreak >= 3) {
-          hasMoreSearch = false;
-          break;
         }
       }
     } finally {
