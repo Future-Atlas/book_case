@@ -1,5 +1,4 @@
 import '../models/book.dart';
-import '../api/ndl_api.dart';
 import '../api/rakuten_api.dart';
 import '../services/content_safety_service.dart';
 
@@ -40,24 +39,24 @@ class BookRepository {
   }
 
   /// 📌 2. 全件取得（初期表示用など）
-  /// 網羅性を重視するため、国会図書館APIを使用します。
+  /// 楽天APIから取得します。
   Future<List<Book>> fetchAllBooks() async {
     try {
-      print('📦 [Repository] 国会図書館APIから全件（初期表示）を取得します');
-      final ndlBooks = await NdlApi.searchBySelectedGenre(
-        selectedGenre: '', // 空文字で全ジャンル
+      print('📦 [Repository] 楽天APIから全件（初期表示）を取得します');
+      final rakutenBooks = await RakutenApi.searchBySelectedGenre(
+        selectedGenre: '',
         page: 1,
         count: 10,
       );
-      return _filterForViewer(ndlBooks);
+      return _filterForViewer(rakutenBooks);
     } catch (e) {
-      print('❌ [Repository] 国会図書館全件取得でエラーが発生しました: $e');
+      print('❌ [Repository] 楽天全件取得でエラーが発生しました: $e');
       return [];
     }
   }
 
   /// 📌 3. 検索窓からのキーワード検索（網羅性重視）
-  /// すべての図書が見えるように、国会図書館APIを直接使用します！
+  /// 楽天APIでキーワード検索を行います。
   Future<List<Book>> searchBooks(
     String query, {
     int page = 1,
@@ -69,17 +68,15 @@ class BookRepository {
     }
 
     try {
-      print('📦 [Repository] 国会図書館APIからキーワード検索を行います: $query (Page: $page)');
-      // 国会図書館APIの searchBySelectedGenre を呼び出す
-      // 前のステップで ndl_api.dart は自由なキーワード（any）に対応させてあります
-      final ndlBooks = await NdlApi.searchBySelectedGenre(
+      print('📦 [Repository] 楽天APIからキーワード検索を行います: $query (Page: $page)');
+      final rakutenBooks = await RakutenApi.searchBySelectedGenre(
         selectedGenre: query,
         page: page,
         count: count,
       );
-      return _filterForViewer(ndlBooks);
+      return _filterForViewer(rakutenBooks);
     } catch (e) {
-      print('❌ [Repository] 国会図書館検索でエラーが発生しました: $e');
+      print('❌ [Repository] 楽天検索でエラーが発生しました: $e');
       return [];
     }
   }

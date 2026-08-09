@@ -86,13 +86,16 @@ class RakutenApi {
       return [];
     }
 
+    // 楽天APIの hits は上限があるため、要求件数を安全な範囲に収める。
+    final effectiveCount = count.clamp(1, 30);
+
     String urlString = '';
 
     // 💡 選択されたタブ・ジャンルによって、叩くAPIとパラメータを完全に切り替える
     if (selectedGenre.contains('English') || selectedGenre.contains('洋書')) {
       // ⭕ 洋書検索APIを呼び出す（必須条件：booksGenreId=005を指定）
       urlString =
-          '$_foreignBookBaseUrl?format=json&page=$page&hits=$count&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=005';
+          '$_foreignBookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=005';
     } else {
       // ⭕ 通常の書籍検索API（日本語の本）を呼び出す
       String genreId = '001';
@@ -112,7 +115,7 @@ class RakutenApi {
       }
 
       urlString =
-          '$_bookBaseUrl?format=json&page=$page&hits=$count&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=$genreId';
+          '$_bookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=$genreId';
 
       if (keyword.isNotEmpty) {
         urlString += '&keyword=${Uri.encodeComponent(keyword)}';
