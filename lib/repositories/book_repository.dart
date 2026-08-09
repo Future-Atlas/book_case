@@ -58,7 +58,11 @@ class BookRepository {
 
   /// 📌 3. 検索窓からのキーワード検索（網羅性重視）
   /// すべての図書が見えるように、国会図書館APIを直接使用します！
-  Future<List<Book>> searchBooks(String query, {int page = 1}) async {
+  Future<List<Book>> searchBooks(
+    String query, {
+    int page = 1,
+    int count = 10,
+  }) async {
     if (query.isEmpty) return fetchAllBooks();
     if (!allowAdultContent && ContentSafetyService.isAdultSearchQuery(query)) {
       return [];
@@ -71,7 +75,7 @@ class BookRepository {
       final ndlBooks = await NdlApi.searchBySelectedGenre(
         selectedGenre: query,
         page: page,
-        count: 10,
+        count: count,
       );
       return _filterForViewer(ndlBooks);
     } catch (e) {

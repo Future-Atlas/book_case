@@ -375,6 +375,9 @@ class _BookListScreenState extends State<BookListScreen> {
                                   sectionCode: 'Section 3',
                                   bookList: _controller.recommendedBooks,
                                   onLoadMore: _controller.loadMoreRecommended,
+                                  isLoadingMore:
+                                      _controller.isLoadingMoreRecommended,
+                                  hasMore: _controller.hasMoreRecommended,
                                 ),
                                 const AdBanner(sectionLabel: 'Section 2'),
                                 _buildGenreSection(
@@ -382,12 +385,16 @@ class _BookListScreenState extends State<BookListScreen> {
                                   sectionCode: 'Section 4',
                                   bookList: _controller.westernBooks,
                                   onLoadMore: _controller.loadMoreWestern,
+                                  isLoadingMore: _controller.isLoadingMoreWestern,
+                                  hasMore: _controller.hasMoreWestern,
                                 ),
                                 _buildGenreSection(
                                   title: '人気作品',
                                   sectionCode: 'Section 6',
                                   bookList: _controller.popularBooks,
                                   onLoadMore: _controller.loadMorePopular,
+                                  isLoadingMore: _controller.isLoadingMorePopular,
+                                  hasMore: _controller.hasMorePopular,
                                 ),
                                 const AdBanner(sectionLabel: 'Section 5'),
                                 _buildSectionHeader('タイムライン', 'Section 5'),
@@ -488,13 +495,22 @@ class _BookListScreenState extends State<BookListScreen> {
     required String title,
     required String sectionCode,
     required List<Book> bookList,
-    required VoidCallback onLoadMore,
+    required Future<void> Function() onLoadMore,
+    required bool isLoadingMore,
+    required bool hasMore,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(title, sectionCode, failedToLoad: bookList.isEmpty),
-        _buildBookCarousel(bookList, onLoadMore),
+        _buildSectionHeader(
+          title,
+          sectionCode,
+          failedToLoad: bookList.isEmpty,
+          isLoadingMore: isLoadingMore,
+          hasMore: hasMore,
+          onNextPage: onLoadMore,
+        ),
+        _buildBookCarousel(bookList),
       ],
     );
   }
@@ -503,6 +519,9 @@ class _BookListScreenState extends State<BookListScreen> {
     String title,
     String sectionCode, {
     bool failedToLoad = false,
+    bool isLoadingMore = false,
+    bool hasMore = true,
+    Future<void> Function()? onNextPage,
   }) {
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 12),
@@ -564,15 +583,30 @@ class _BookListScreenState extends State<BookListScreen> {
             ),
           ),
           TextButton(
-            onPressed: () {},
-            child: const Icon(Icons.chevron_right, color: Color(0xFFFF3B30)),
+            onPressed: (!hasMore || isLoadingMore || onNextPage == null)
+                ? null
+                : () async {
+                    await onNextPage();
+                  },
+            child: isLoadingMore
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    Icons.chevron_right,
+                    color: hasMore
+                        ? const Color(0xFFFF3B30)
+                        : Colors.grey[400],
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBookCarousel(List<Book> bookList, VoidCallback onLoadMore) {
+  Widget _buildBookCarousel(List<Book> bookList) {
     if (bookList.isEmpty) {
       return Container(
         height: 205,
@@ -611,29 +645,9 @@ class _BookListScreenState extends State<BookListScreen> {
       );
     }
 
-    final scrollController = ScrollController();
-    bool isTriggered = false;
-
-    scrollController.addListener(() {
-      final maxScroll = scrollController.position.maxScrollExtent;
-      final currentScroll = scrollController.position.pixels;
-
-      if (currentScroll >= maxScroll - 100) {
-        if (!isTriggered) {
-          isTriggered = true;
-          onLoadMore();
-        }
-      } else {
-        if (currentScroll < maxScroll - 150) {
-          isTriggered = false;
-        }
-      }
-    });
-
     return SizedBox(
       height: 205,
       child: ListView.builder(
-        controller: scrollController,
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: bookList.length,
@@ -646,15 +660,7 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchResults() {
-    final lowerQuery = _controller.searchQuery.toLowerCase();
-    final results = _controller.books
-        .where(
-          (book) =>
-              book.title.toLowerCase().contains(lowerQuery) ||
-              book.author.toLowerCase().contains(lowerQuery) ||
-              book.genre.toLowerCase().contains(lowerQuery),
-        )
-        .toList();
+    final results = _controller.searchResults;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,38 +668,64 @@ class _BookListScreenState extends State<BookListScreen> {
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: Text(
-            '検索結果 (${results.length}件)',
+            _controller.isSearching
+                ? '検索中... (${results.length}件)'
+                : '検索結果 (${results.length}件)',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
+        if (_controller.isSearching)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
         if (results.isEmpty)
           Container(
             height: 200,
             alignment: Alignment.center,
             child: Text(
-              'お探しの作品が見つかりませんでした。',
+              _controller.isSearching
+                  ? '検索しています...'
+                  : 'お探しの作品が見つかりませんでした。',
               style: TextStyle(color: Colors.grey[500]),
             ),
           )
         else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.65,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: results.length,
-            itemBuilder: (context, index) {
-              final book = results[index];
-              return BookCard(
-                book: book,
-                width: double.infinity,
-                onTap: () => _showBookDetailDialog(book),
-              );
-            },
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.65,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: results.length,
+                itemBuilder: (context, index) {
+                  final book = results[index];
+                  return BookCard(
+                    book: book,
+                    width: double.infinity,
+                    onTap: () => _showBookDetailDialog(book),
+                  );
+                },
+              ),
+              if (!_controller.isSearching && _controller.hasMoreSearch)
+                Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: OutlinedButton.icon(
+                      onPressed: _controller.loadMoreSearchResults,
+                      icon: const Icon(Icons.expand_more),
+                      label: const Text('さらに検索結果を読み込む'),
+                    ),
+                  ),
+                ),
+            ],
           ),
         const SizedBox(height: 40),
       ],

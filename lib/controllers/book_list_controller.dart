@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../repositories/book_repository.dart';
@@ -7,7 +9,14 @@ import '../services/supabase_service.dart';
 class BookListController extends ChangeNotifier {
   final TextEditingController searchController = TextEditingController();
   String searchQuery = '';
+  Timer? _searchDebounce;
   bool isLoading = true;
+
+  bool isSearching = false;
+  bool hasMoreSearch = true;
+  int searchPage = 1;
+  List<Book> searchResults = [];
+  final Set<String> _searchResultIds = <String>{};
 
   // ジャンルごとに「リスト」「現在のページ」「まだ続きがあるか」を独立して管理
   List<Book> recommendedBooks = [];
@@ -41,12 +50,103 @@ class BookListController extends ChangeNotifier {
   @override
   void dispose() {
     searchController.removeListener(_onSearchChanged);
+    _searchDebounce?.cancel();
     searchController.dispose();
     super.dispose();
   }
 
   void _onSearchChanged() {
-    searchQuery = searchController.text;
+    searchQuery = searchController.text.trim();
+    _searchDebounce?.cancel();
+
+    if (searchQuery.isEmpty) {
+      isSearching = false;
+      hasMoreSearch = true;
+      searchPage = 1;
+      searchResults = [];
+      _searchResultIds.clear();
+      notifyListeners();
+      return;
+    }
+
+    isSearching = true;
+    notifyListeners();
+
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _searchUntilTen(reset: true);
+    });
+  }
+
+  bool _matchesQuery(Book book, String lowerQuery) {
+    return book.title.toLowerCase().contains(lowerQuery) ||
+        book.author.toLowerCase().contains(lowerQuery) ||
+        book.genre.toLowerCase().contains(lowerQuery) ||
+        book.description.toLowerCase().contains(lowerQuery);
+  }
+
+  Future<void> _searchUntilTen({required bool reset}) async {
+    final query = searchQuery.trim();
+    if (query.isEmpty) {
+      isSearching = false;
+      notifyListeners();
+      return;
+    }
+
+    if (reset) {
+      hasMoreSearch = true;
+      searchPage = 1;
+      searchResults = [];
+      _searchResultIds.clear();
+    } else if (!hasMoreSearch || isSearching) {
+      return;
+    }
+
+    isSearching = true;
+    notifyListeners();
+
+    final lowerQuery = query.toLowerCase();
+
+    try {
+      while (searchResults.length < 10 && hasMoreSearch) {
+        if (query != searchQuery.trim()) {
+          return;
+        }
+
+        final batch = await _repository.searchBooks(
+          query,
+          page: searchPage,
+          count: 100,
+        );
+        searchPage += 1;
+
+        if (batch.isEmpty) {
+          hasMoreSearch = false;
+          break;
+        }
+
+        for (final book in batch) {
+          if (_searchResultIds.contains(book.id)) continue;
+          if (!_matchesQuery(book, lowerQuery)) continue;
+          _searchResultIds.add(book.id);
+          searchResults.add(book);
+        }
+
+        if (batch.length < 100) {
+          hasMoreSearch = false;
+          break;
+        }
+      }
+    } finally {
+      if (query == searchQuery.trim()) {
+        isSearching = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> loadMoreSearchResults() async {
+    if (searchQuery.isEmpty) return;
+    await _searchUntilTen(reset: false);
     notifyListeners();
   }
 
@@ -69,9 +169,11 @@ class BookListController extends ChangeNotifier {
         '話題の本',
         page: recommendedPage,
       );
+      hasMoreRecommended = recommendedBooks.length >= 10;
     } catch (e) {
       print('おすすめ本の取得でエラーが発生しました: $e');
       recommendedBooks = [];
+      hasMoreRecommended = false;
     }
 
     try {
@@ -79,9 +181,11 @@ class BookListController extends ChangeNotifier {
         'English',
         page: westernPage,
       );
+      hasMoreWestern = westernBooks.length >= 10;
     } catch (e) {
       print('洋書の取得でエラーが発生しました: $e');
       westernBooks = [];
+      hasMoreWestern = false;
     }
 
     try {
@@ -89,9 +193,11 @@ class BookListController extends ChangeNotifier {
         'ベストセラー',
         page: popularPage,
       );
+      hasMorePopular = popularBooks.length >= 10;
     } catch (e) {
       print('人気作品の取得でエラーが発生しました: $e');
       popularBooks = [];
+      hasMorePopular = false;
     }
 
     try {
@@ -105,13 +211,10 @@ class BookListController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🛠️ 変更点: 裏でサイレントに通信し、データが合体したタイミングで1回だけ画面に通知する
-
-  // おすすめ本の追加（順次読み込み）
   Future<void> loadMoreRecommended() async {
     if (isLoadingMoreRecommended || !hasMoreRecommended) return;
     isLoadingMoreRecommended = true;
-    // 📌 通信前の notifyListeners() を削除（画面のガクつき・暴走を防ぐため）
+    notifyListeners();
 
     try {
       final nextPage = recommendedPage + 1;
@@ -125,21 +228,22 @@ class BookListController extends ChangeNotifier {
       if (newBooks.isEmpty) {
         hasMoreRecommended = false;
       } else {
-        recommendedBooks.addAll(newBooks); // 後ろに追加合体
-        recommendedPage = nextPage; // 成功時のみページを進める
+        recommendedBooks = newBooks;
+        recommendedPage = nextPage;
+        hasMoreRecommended = newBooks.length >= 10;
       }
     } catch (e) {
       print('おすすめ本の追加取得エラー: $e');
     } finally {
       isLoadingMoreRecommended = false;
-      notifyListeners(); // 📌 結合が終わったこの瞬間だけ画面を更新！
+      notifyListeners();
     }
   }
 
-  // 洋書の追加（順次読み込み）
   Future<void> loadMoreWestern() async {
     if (isLoadingMoreWestern || !hasMoreWestern) return;
     isLoadingMoreWestern = true;
+    notifyListeners();
 
     try {
       final nextPage = westernPage + 1;
@@ -153,8 +257,9 @@ class BookListController extends ChangeNotifier {
       if (newBooks.isEmpty) {
         hasMoreWestern = false;
       } else {
-        westernBooks.addAll(newBooks);
+        westernBooks = newBooks;
         westernPage = nextPage;
+        hasMoreWestern = newBooks.length >= 10;
       }
     } catch (e) {
       print('洋書の追加取得エラー: $e');
@@ -164,10 +269,10 @@ class BookListController extends ChangeNotifier {
     }
   }
 
-  // 人気作品の追加（順次読み込み）
   Future<void> loadMorePopular() async {
     if (isLoadingMorePopular || !hasMorePopular) return;
     isLoadingMorePopular = true;
+    notifyListeners();
 
     try {
       final nextPage = popularPage + 1;
@@ -181,8 +286,9 @@ class BookListController extends ChangeNotifier {
       if (newBooks.isEmpty) {
         hasMorePopular = false;
       } else {
-        popularBooks.addAll(newBooks);
+        popularBooks = newBooks;
         popularPage = nextPage;
+        hasMorePopular = newBooks.length >= 10;
       }
     } catch (e) {
       print('人気作品の追加取得エラー: $e');
