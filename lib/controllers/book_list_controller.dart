@@ -77,11 +77,33 @@ class BookListController extends ChangeNotifier {
     });
   }
 
-  bool _matchesQuery(Book book, String lowerQuery) {
-    return book.title.toLowerCase().contains(lowerQuery) ||
-        book.author.toLowerCase().contains(lowerQuery) ||
-        book.genre.toLowerCase().contains(lowerQuery) ||
-        book.description.toLowerCase().contains(lowerQuery);
+  String _normalizeForSearch(String input) {
+    return input
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^0-9a-zぁ-んァ-ヶ一-龥]+'), '');
+  }
+
+  bool _matchesQuery(Book book, String rawQuery) {
+    final normalizedQuery = _normalizeForSearch(rawQuery);
+    if (normalizedQuery.isEmpty) return false;
+
+    final tokens = rawQuery
+        .toLowerCase()
+        .split(RegExp(r'[\s\u3000]+'))
+        .map(_normalizeForSearch)
+        .where((token) => token.isNotEmpty)
+        .toList();
+
+    final target = _normalizeForSearch(
+      '${book.title} ${book.author} ${book.description}',
+    );
+
+    if (tokens.isEmpty) {
+      return target.contains(normalizedQuery);
+    }
+
+    // 複数語検索は全トークン一致（AND）にしてノイズを抑える。
+    return tokens.every(target.contains);
   }
 
   Future<void> _searchUntilTen({required bool reset}) async {
@@ -104,7 +126,6 @@ class BookListController extends ChangeNotifier {
     isSearching = true;
     notifyListeners();
 
-    final lowerQuery = query.toLowerCase();
     var noProgressStreak = 0;
 
     try {
@@ -128,7 +149,7 @@ class BookListController extends ChangeNotifier {
         final beforeLength = searchResults.length;
         for (final book in batch) {
           if (_searchResultIds.contains(book.id)) continue;
-          if (!_matchesQuery(book, lowerQuery)) continue;
+          if (!_matchesQuery(book, query)) continue;
           _searchResultIds.add(book.id);
           searchResults.add(book);
         }
