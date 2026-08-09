@@ -15,6 +15,34 @@ class RakutenApi {
   static const String _appId = String.fromEnvironment('RAKUTEN_APP_ID');
   static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
 
+  static Future<http.Response?> _getWithRateLimitRetry(
+    Uri uri, {
+    int maxRetries = 3,
+  }) async {
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      final response = await http.get(uri);
+
+      if (response.statusCode != 429) {
+        return response;
+      }
+
+      if (attempt == maxRetries) {
+        return response;
+      }
+
+      final retryAfterHeader = response.headers['retry-after'];
+      final retryAfterSeconds = int.tryParse(retryAfterHeader ?? '') ?? 1;
+      final safeWait = retryAfterSeconds < 1 ? 1 : retryAfterSeconds;
+
+      print(
+        '⚠️ [RakutenApi] 429制限に到達。$safeWait秒待機して再試行します (${attempt + 1}/$maxRetries)',
+      );
+      await Future.delayed(Duration(seconds: safeWait));
+    }
+
+    return null;
+  }
+
   static Future<Book?> fetchBookById(String bookId) async {
     if (_appId.isEmpty || _accessKey.isEmpty || bookId.trim().isEmpty) {
       return null;
@@ -126,7 +154,12 @@ class RakutenApi {
 
     try {
       final uri = Uri.parse(urlString);
-      final response = await http.get(uri);
+      final response = await _getWithRateLimitRetry(uri);
+
+      if (response == null) {
+        print('❌ [RakutenApi] レスポンス取得に失敗しました。');
+        return [];
+      }
 
       if (response.statusCode != 200) {
         print(

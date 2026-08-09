@@ -69,6 +69,10 @@ class BookRepository {
 
     try {
       print('📦 [Repository] 楽天APIからキーワード検索を行います: $query (Page: $page)');
+
+      // 連続ページ取得時に429を避けるため、検索にも最小待機を入れる。
+      await Future.delayed(const Duration(seconds: 1));
+
       final rakutenBooks = await RakutenApi.searchBySelectedGenre(
         selectedGenre: query,
         page: page,
