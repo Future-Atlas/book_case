@@ -34,13 +34,17 @@ class _AdBannerState extends State<AdBanner> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFFB703).withOpacity(_isHovered ? 0.35 : 0.15),
+              color: const Color(0xFFFFB703).withValues(alpha: _isHovered ? 0.35 : 0.15),
               blurRadius: _isHovered ? 16 : 8,
               offset: Offset(0, _isHovered ? 6 : 3),
             )
           ],
         ),
-        transform: Matrix4.identity()..scale(_isHovered ? 1.015 : 1.0),
+        transform: Matrix4.diagonal3Values(
+          _isHovered ? 1.015 : 1.0,
+          _isHovered ? 1.015 : 1.0,
+          1.0,
+        ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Stack(
@@ -53,7 +57,7 @@ class _AdBannerState extends State<AdBanner> {
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -65,7 +69,7 @@ class _AdBannerState extends State<AdBanner> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -78,7 +82,7 @@ class _AdBannerState extends State<AdBanner> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       margin: const EdgeInsets.only(right: 12),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

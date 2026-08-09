@@ -62,13 +62,17 @@ class _BookCardState extends State<BookCard> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(_isHovered ? 0.15 : 0.06),
+                    color: Colors.black.withValues(alpha: _isHovered ? 0.15 : 0.06),
                     blurRadius: _isHovered ? 12 : 6,
                     offset: Offset(0, _isHovered ? 6 : 3),
                   ),
                 ],
               ),
-              transform: Matrix4.identity()..scale(_isHovered ? 1.03 : 1.0),
+              transform: Matrix4.diagonal3Values(
+                _isHovered ? 1.03 : 1.0,
+                _isHovered ? 1.03 : 1.0,
+                1.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
