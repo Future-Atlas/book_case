@@ -105,6 +105,7 @@ class BookListController extends ChangeNotifier {
     notifyListeners();
 
     final lowerQuery = query.toLowerCase();
+    var noProgressStreak = 0;
 
     try {
       while (searchResults.length < 10 && hasMoreSearch) {
@@ -124,6 +125,7 @@ class BookListController extends ChangeNotifier {
           break;
         }
 
+        final beforeLength = searchResults.length;
         for (final book in batch) {
           if (_searchResultIds.contains(book.id)) continue;
           if (!_matchesQuery(book, lowerQuery)) continue;
@@ -131,7 +133,14 @@ class BookListController extends ChangeNotifier {
           searchResults.add(book);
         }
 
-        if (batch.length < 100) {
+        if (searchResults.length == beforeLength) {
+          noProgressStreak += 1;
+        } else {
+          noProgressStreak = 0;
+        }
+
+        // 連続して増分がない場合は、同一データの循環を避けるため探索を終了する。
+        if (noProgressStreak >= 3) {
           hasMoreSearch = false;
           break;
         }
