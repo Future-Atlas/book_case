@@ -17,6 +17,9 @@ class BookListController extends ChangeNotifier {
   int searchPage = 1;
   List<Book> searchResults = [];
   final Set<String> _searchResultIds = <String>{};
+  List<String> _searchVariants = [];
+  int _searchVariantIndex = 0;
+  int _searchVariantPage = 1;
 
   // ジャンルごとに「リスト」「現在のページ」「まだ続きがあるか」を独立して管理
   List<Book> recommendedBooks = [];
@@ -63,6 +66,9 @@ class BookListController extends ChangeNotifier {
       isSearching = false;
       hasMoreSearch = true;
       searchPage = 1;
+      _searchVariants = [];
+      _searchVariantIndex = 0;
+      _searchVariantPage = 1;
       searchResults = [];
       _searchResultIds.clear();
       notifyListeners();
@@ -81,6 +87,95 @@ class BookListController extends ChangeNotifier {
     return input
         .toLowerCase()
         .replaceAll(RegExp(r'[^0-9a-zぁ-んァ-ヶ一-龥]+'), '');
+  }
+
+  List<String> _buildSearchVariants(String rawQuery) {
+    final query = rawQuery.trim();
+    if (query.isEmpty) return const [];
+
+    final variants = <String>[];
+
+    void addVariant(String value) {
+      final v = value.trim();
+      if (v.isEmpty) return;
+      if (v.length < 2) return;
+      if (!variants.contains(v)) {
+        variants.add(v);
+      }
+    }
+
+    final compact = query.replaceAll(RegExp(r'[\s\u3000・･]+'), '');
+    final spacedFromDot = query.replaceAll(RegExp(r'[・･]+'), ' ');
+    final noDot = query.replaceAll(RegExp(r'[・･]+'), '');
+
+    addVariant(query);
+    addVariant(compact);
+    addVariant(spacedFromDot);
+    addVariant(noDot);
+
+    final splitTokens = spacedFromDot
+        .split(RegExp(r'[\s\u3000]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    if (splitTokens.length >= 2) {
+      addVariant(splitTokens.join(' '));
+      addVariant(splitTokens.join('・'));
+      for (final token in splitTokens) {
+        addVariant(token);
+      }
+    }
+
+    if (compact.length >= 6) {
+      final mid = compact.length ~/ 2;
+      addVariant(compact.substring(0, mid));
+      addVariant(compact.substring(mid));
+
+      final tailLength = compact.length >= 8 ? 8 : compact.length;
+      addVariant(compact.substring(compact.length - tailLength));
+    }
+
+    return variants;
+  }
+
+  int _scoreBook(Book book, String rawQuery) {
+    final query = _normalizeForSearch(rawQuery);
+    if (query.isEmpty) return 0;
+
+    final normalizedTitle = _normalizeForSearch(book.title);
+    final normalizedAuthor = _normalizeForSearch(book.author);
+    final normalizedDescription = _normalizeForSearch(book.description);
+
+    var score = 0;
+
+    if (normalizedTitle == query) score += 500;
+    if (normalizedTitle.startsWith(query)) score += 300;
+    if (normalizedTitle.contains(query)) score += 200;
+    if (normalizedAuthor.contains(query)) score += 120;
+    if (normalizedDescription.contains(query)) score += 60;
+
+    final tokens = rawQuery
+        .split(RegExp(r'[\s\u3000・･]+'))
+        .map(_normalizeForSearch)
+        .where((token) => token.isNotEmpty)
+        .toList();
+
+    for (final token in tokens) {
+      if (normalizedTitle.contains(token)) score += 40;
+      if (normalizedAuthor.contains(token)) score += 24;
+      if (normalizedDescription.contains(token)) score += 10;
+    }
+
+    return score;
+  }
+
+  void _sortSearchResults(String rawQuery) {
+    searchResults.sort((a, b) {
+      final scoreDiff = _scoreBook(b, rawQuery) - _scoreBook(a, rawQuery);
+      if (scoreDiff != 0) return scoreDiff;
+      return a.title.compareTo(b.title);
+    });
   }
 
   bool _matchesQuery(Book book, String rawQuery) {
@@ -114,9 +209,14 @@ class BookListController extends ChangeNotifier {
       return;
     }
 
+    final targetCount = reset ? 10 : searchResults.length + 10;
+
     if (reset) {
       hasMoreSearch = true;
       searchPage = 1;
+      _searchVariants = _buildSearchVariants(query);
+      _searchVariantIndex = 0;
+      _searchVariantPage = 1;
       searchResults = [];
       _searchResultIds.clear();
     } else if (!hasMoreSearch || isSearching) {
@@ -126,31 +226,40 @@ class BookListController extends ChangeNotifier {
     isSearching = true;
     notifyListeners();
 
-    const maxPagesPerSearch = 20;
-    var fetchedPages = 0;
+    const maxRequestsPerRun = 12;
+    const maxPagesPerVariant = 6;
+    var requestCount = 0;
 
     try {
-      while (searchResults.length < 10 && hasMoreSearch) {
+      while (searchResults.length < targetCount && hasMoreSearch) {
         if (query != searchQuery.trim()) {
           return;
         }
 
-        if (fetchedPages >= maxPagesPerSearch) {
+        if (_searchVariantIndex >= _searchVariants.length) {
           hasMoreSearch = false;
           break;
         }
 
+        if (requestCount >= maxRequestsPerRun) {
+          break;
+        }
+
+        final activeVariant = _searchVariants[_searchVariantIndex];
+
         final batch = await _repository.searchBooks(
-          query,
-          page: searchPage,
+          activeVariant,
+          page: _searchVariantPage,
           count: 100,
         );
         searchPage += 1;
-        fetchedPages += 1;
+        _searchVariantPage += 1;
+        requestCount += 1;
 
         if (batch.isEmpty) {
-          hasMoreSearch = false;
-          break;
+          _searchVariantIndex += 1;
+          _searchVariantPage = 1;
+          continue;
         }
 
         for (final book in batch) {
@@ -159,6 +268,17 @@ class BookListController extends ChangeNotifier {
           _searchResultIds.add(book.id);
           searchResults.add(book);
         }
+
+        _sortSearchResults(query);
+
+        if (_searchVariantPage > maxPagesPerVariant) {
+          _searchVariantIndex += 1;
+          _searchVariantPage = 1;
+        }
+      }
+
+      if (_searchVariantIndex >= _searchVariants.length) {
+        hasMoreSearch = false;
       }
     } finally {
       if (query == searchQuery.trim()) {
