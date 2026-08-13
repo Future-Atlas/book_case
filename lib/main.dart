@@ -153,10 +153,46 @@ class MainNavigationShell extends StatefulWidget {
 }
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
+  static const Set<String> _transientQueryKeys = {
+    'code',
+    'state',
+    'error',
+    'error_code',
+    'error_description',
+    'provider_token',
+    'refresh_token',
+    'token_type',
+    'expires_in',
+    'privacy_password_recovery',
+  };
+
   late int _currentScreenIndex;
   late bool _openPrivacyPasswordRecovery;
   String? _adminCheckedUserId;
   bool _isAdmin = false;
+
+  String _currentAppPathFromUri(Uri uri) {
+    if (uri.fragment.startsWith('/')) {
+      return uri.fragment;
+    }
+    return uri.path;
+  }
+
+  bool _hasTransientQuery(Uri uri) {
+    for (final key in uri.queryParameters.keys) {
+      if (_transientQueryKeys.contains(key)) return true;
+    }
+    return false;
+  }
+
+  Map<String, String> _sanitizedQuery(Uri uri) {
+    final sanitized = <String, String>{};
+    uri.queryParameters.forEach((key, value) {
+      if (_transientQueryKeys.contains(key)) return;
+      sanitized[key] = value;
+    });
+    return sanitized;
+  }
 
   int _screenIndexFromPath(String path) {
     switch (path) {
@@ -192,9 +228,26 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   void _syncBrowserUrlForScreen(int index, {bool replace = false}) {
     final targetPath = _pathForScreenIndex(index);
-    if (Uri.base.path == targetPath) return;
+    final currentUri = Uri.base;
+    final currentAppPath = _currentAppPathFromUri(currentUri);
+    final hasTransientQuery = _hasTransientQuery(currentUri);
+    if (currentAppPath == targetPath && !hasTransientQuery) return;
+
+    final sanitizedQuery = _sanitizedQuery(currentUri);
+
+    final targetUri = currentUri.fragment.startsWith('/')
+        ? Uri(
+            path: currentUri.path.isEmpty ? '/' : currentUri.path,
+            queryParameters: sanitizedQuery.isEmpty ? null : sanitizedQuery,
+            fragment: targetPath,
+          )
+        : Uri(
+            path: targetPath,
+            queryParameters: sanitizedQuery.isEmpty ? null : sanitizedQuery,
+          );
+
     SystemNavigator.routeInformationUpdated(
-      uri: Uri(path: targetPath),
+      uri: targetUri,
       replace: replace,
     );
   }
@@ -213,7 +266,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     super.initState();
     _openPrivacyPasswordRecovery =
         Uri.base.queryParameters['privacy_password_recovery'] == '1';
-    _currentScreenIndex = _screenIndexFromPath(Uri.base.path);
+    _currentScreenIndex = _screenIndexFromPath(_currentAppPathFromUri(Uri.base));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncBrowserUrlForScreen(_currentScreenIndex, replace: true);
