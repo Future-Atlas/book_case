@@ -1138,13 +1138,24 @@ class SupabaseService extends ChangeNotifier {
             .from('posts')
             .select('*, profiles(username, avatar_url)')
             .order('created_at', ascending: false);
-        final posts = (response as List)
-            .map((json) => Post.fromJson(json))
-            .toList();
+        final data = response as List<dynamic>;
+        final posts = _parsePostsSafely(data);
         final enriched = await _enrichPostsWithBookMetadata(posts);
         return _filterPostsForCurrentViewer(enriched);
       } catch (e) {
-        debugPrint('Error fetching timeline posts in Supabase: $e');
+        debugPrint('Error fetching timeline posts with profile join: $e');
+        try {
+          // Fallback: if relation join fails due RLS/schema mismatch, still show posts.
+          final fallback = await _client!
+              .from('posts')
+              .select('*')
+              .order('created_at', ascending: false);
+          final posts = _parsePostsSafely(fallback as List<dynamic>);
+          final enriched = await _enrichPostsWithBookMetadata(posts);
+          return _filterPostsForCurrentViewer(enriched);
+        } catch (fallbackError) {
+          debugPrint('Error fetching timeline posts fallback: $fallbackError');
+        }
       }
     }
     return [];
@@ -1241,13 +1252,38 @@ class SupabaseService extends ChangeNotifier {
 
       // 2. 返ってきた生データを、正しくPostモデルの形に変換する
       final List<dynamic> data = response as List<dynamic>;
-      final posts = data.map((json) => Post.fromJson(json)).toList();
+      final posts = _parsePostsSafely(data);
       final enriched = await _enrichPostsWithBookMetadata(posts);
       return _filterPostsForCurrentViewer(enriched);
     } catch (e) {
-      debugPrint('fetchUserPostsでエラーが発生しました: $e');
-      return [];
+      debugPrint('fetchUserPostsで結合取得エラーが発生しました: $e');
+      try {
+        final fallback = await _client!
+            .from('posts')
+            .select('*')
+            .eq('profile_id', uid)
+            .order('created_at', ascending: false);
+        final posts = _parsePostsSafely(fallback as List<dynamic>);
+        final enriched = await _enrichPostsWithBookMetadata(posts);
+        return _filterPostsForCurrentViewer(enriched);
+      } catch (fallbackError) {
+        debugPrint('fetchUserPostsフォールバック取得エラー: $fallbackError');
+        return [];
+      }
     }
+  }
+
+  List<Post> _parsePostsSafely(List<dynamic> data) {
+    final posts = <Post>[];
+    for (final raw in data) {
+      if (raw is! Map<String, dynamic>) continue;
+      try {
+        posts.add(Post.fromJson(raw));
+      } catch (e) {
+        debugPrint('Skipping malformed post row: $e');
+      }
+    }
+    return posts;
   }
 
   Future<List<Post>> _enrichPostsWithBookMetadata(List<Post> posts) async {
