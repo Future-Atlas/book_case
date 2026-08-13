@@ -1136,7 +1136,9 @@ class SupabaseService extends ChangeNotifier {
       try {
         final response = await _client!
             .from('posts')
-            .select('*, profiles(username, avatar_url)')
+            .select(
+              '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url)',
+            )
             .order('created_at', ascending: false);
         final data = response as List<dynamic>;
         final posts = _parsePostsSafely(data);
@@ -1246,7 +1248,9 @@ class SupabaseService extends ChangeNotifier {
       // 1. Supabaseからは「レビューデータ」と「本のID（book_id）」だけを取得する
       final response = await _client!
           .from('posts')
-          .select('*, profiles(username, avatar_url)')
+          .select(
+            '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url)',
+          )
           .eq('profile_id', uid)
           .order('created_at', ascending: false);
 
