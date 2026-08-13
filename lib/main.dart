@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
@@ -118,7 +119,22 @@ class MyApp extends StatelessWidget {
         dividerColor: const Color(0xFF2A3447),
       ),
       themeMode: ThemeMode.system, // Dynamically follow device preference
-      routes: {'/login': (context) => const AuthScreen()},
+      routes: {
+        '/login': (context) => const AuthScreen(),
+        '/terms': (context) => const TermsScreen(),
+        '/privacy': (context) => const PrivacyPolicyScreen(),
+        '/community-guidelines': (context) => const CommunityGuidelinesScreen(),
+        '/infringement-policy': (context) => const InfringementPolicyScreen(),
+        '/external-transmission': (context) => const ExternalTransmissionScreen(),
+        '/contact': (context) => const ContactScreen(),
+      },
+      onUnknownRoute: (_) => MaterialPageRoute<void>(
+        builder: (_) => const AccountSuspensionGate(
+          child: LegalConsentGate(
+            child: ProfileOnboardingGate(child: MainNavigationShell()),
+          ),
+        ),
+      ),
 
       home: const AccountSuspensionGate(
         child: LegalConsentGate(
@@ -142,12 +158,66 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   String? _adminCheckedUserId;
   bool _isAdmin = false;
 
+  int _screenIndexFromPath(String path) {
+    switch (path) {
+      case '/mypage':
+      case '/profile':
+      case '/user':
+        return 1;
+      case '/settings':
+        return 2;
+      case '/help':
+        return 3;
+      case '/moderation':
+        return 4;
+      default:
+        return _openPrivacyPasswordRecovery ? 2 : 0;
+    }
+  }
+
+  String _pathForScreenIndex(int index) {
+    switch (index) {
+      case 1:
+        return '/mypage';
+      case 2:
+        return '/settings';
+      case 3:
+        return '/help';
+      case 4:
+        return '/moderation';
+      default:
+        return '/';
+    }
+  }
+
+  void _syncBrowserUrlForScreen(int index, {bool replace = false}) {
+    final targetPath = _pathForScreenIndex(index);
+    if (Uri.base.path == targetPath) return;
+    SystemNavigator.routeInformationUpdated(
+      uri: Uri(path: targetPath),
+      replace: replace,
+    );
+  }
+
+  void _setCurrentScreenIndex(int index, {bool replaceUrl = false}) {
+    if (_currentScreenIndex != index) {
+      setState(() {
+        _currentScreenIndex = index;
+      });
+    }
+    _syncBrowserUrlForScreen(index, replace: replaceUrl);
+  }
+
   @override
   void initState() {
     super.initState();
     _openPrivacyPasswordRecovery =
         Uri.base.queryParameters['privacy_password_recovery'] == '1';
-    _currentScreenIndex = _openPrivacyPasswordRecovery ? 2 : 0;
+    _currentScreenIndex = _screenIndexFromPath(Uri.base.path);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncBrowserUrlForScreen(_currentScreenIndex, replace: true);
+    });
   }
 
   Future<void> _checkAdministratorAccess(
@@ -170,15 +240,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
     await service.ensureCurrentUserProfile();
     if (!mounted) return;
-    setState(() {
-      _currentScreenIndex = 1;
-    });
+    _setCurrentScreenIndex(1);
   }
 
   void _goToBookList() {
-    setState(() {
-      _currentScreenIndex = 0;
-    });
+    _setCurrentScreenIndex(0);
   }
 
   Future<void> _onMenuAction(_HeaderMenuAction action) async {
@@ -190,13 +256,13 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         await _goToProfile();
         break;
       case _HeaderMenuAction.settings:
-        setState(() => _currentScreenIndex = 2);
+        _setCurrentScreenIndex(2);
         break;
       case _HeaderMenuAction.help:
-        setState(() => _currentScreenIndex = 3);
+        _setCurrentScreenIndex(3);
         break;
       case _HeaderMenuAction.moderation:
-        if (_isAdmin) setState(() => _currentScreenIndex = 4);
+        if (_isAdmin) _setCurrentScreenIndex(4);
         break;
       case _HeaderMenuAction.logout:
         final service = Provider.of<SupabaseService>(context, listen: false);
