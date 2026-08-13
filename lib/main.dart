@@ -171,9 +171,27 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   String? _adminCheckedUserId;
   bool _isAdmin = false;
 
+  Uri _normalizedFragmentUri(String fragment) {
+    var value = fragment;
+    if (value.startsWith('/#/')) {
+      value = value.substring(2);
+    }
+    if (value == '/#' || value == '/#/') {
+      value = '/';
+    }
+    if (value.isEmpty) {
+      value = '/';
+    }
+    if (!value.startsWith('/')) {
+      value = '/$value';
+    }
+    return Uri.parse(value);
+  }
+
   String _currentAppPathFromUri(Uri uri) {
-    if (uri.fragment.startsWith('/')) {
-      return uri.fragment;
+    final fragment = uri.fragment;
+    if (fragment.startsWith('/')) {
+      return _normalizedFragmentUri(fragment).path;
     }
     return uri.path;
   }
@@ -182,12 +200,27 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     for (final key in uri.queryParameters.keys) {
       if (_transientQueryKeys.contains(key)) return true;
     }
+    if (uri.fragment.startsWith('/')) {
+      for (final key in _normalizedFragmentUri(uri.fragment).queryParameters.keys) {
+        if (_transientQueryKeys.contains(key)) return true;
+      }
+    }
     return false;
   }
 
   Map<String, String> _sanitizedQuery(Uri uri) {
     final sanitized = <String, String>{};
     uri.queryParameters.forEach((key, value) {
+      if (_transientQueryKeys.contains(key)) return;
+      sanitized[key] = value;
+    });
+    return sanitized;
+  }
+
+  Map<String, String> _sanitizedFragmentQuery(Uri uri) {
+    final sanitized = <String, String>{};
+    if (!uri.fragment.startsWith('/')) return sanitized;
+    _normalizedFragmentUri(uri.fragment).queryParameters.forEach((key, value) {
       if (_transientQueryKeys.contains(key)) return;
       sanitized[key] = value;
     });
@@ -234,12 +267,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     if (currentAppPath == targetPath && !hasTransientQuery) return;
 
     final sanitizedQuery = _sanitizedQuery(currentUri);
+    final sanitizedFragmentQuery = _sanitizedFragmentQuery(currentUri);
 
     final targetUri = currentUri.fragment.startsWith('/')
         ? Uri(
             path: currentUri.path.isEmpty ? '/' : currentUri.path,
             queryParameters: sanitizedQuery.isEmpty ? null : sanitizedQuery,
-            fragment: targetPath,
+            fragment: Uri(
+              path: targetPath,
+              queryParameters: sanitizedFragmentQuery.isEmpty
+                  ? null
+                  : sanitizedFragmentQuery,
+            ).toString(),
           )
         : Uri(
             path: targetPath,
@@ -264,9 +303,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   @override
   void initState() {
     super.initState();
+    final currentUri = Uri.base;
+    final fragmentQuery = currentUri.fragment.startsWith('/')
+        ? _normalizedFragmentUri(currentUri.fragment).queryParameters
+        : const <String, String>{};
     _openPrivacyPasswordRecovery =
-        Uri.base.queryParameters['privacy_password_recovery'] == '1';
-    _currentScreenIndex = _screenIndexFromPath(_currentAppPathFromUri(Uri.base));
+        (currentUri.queryParameters['privacy_password_recovery'] == '1') ||
+        (fragmentQuery['privacy_password_recovery'] == '1');
+    _currentScreenIndex = _screenIndexFromPath(_currentAppPathFromUri(currentUri));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncBrowserUrlForScreen(_currentScreenIndex, replace: true);
