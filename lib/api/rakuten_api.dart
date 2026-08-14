@@ -14,6 +14,7 @@ class RakutenApi {
 
   static const String _appId = String.fromEnvironment('RAKUTEN_APP_ID');
   static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
+  static final Map<String, Book?> _bookByIdCache = <String, Book?>{};
 
   static Future<http.Response?> _getWithRateLimitRetry(
     Uri uri, {
@@ -49,6 +50,11 @@ class RakutenApi {
     }
 
     final trimmed = bookId.trim();
+    final cacheKey = trimmed.replaceAll('-', '');
+    if (_bookByIdCache.containsKey(cacheKey)) {
+      return _bookByIdCache[cacheKey];
+    }
+
     final isbnLike = RegExp(r'^[0-9Xx-]{10,17}$').hasMatch(trimmed);
 
     final queryParam = isbnLike
@@ -59,8 +65,11 @@ class RakutenApi {
         '$_bookBaseUrl?format=json&hits=1&applicationId=$_appId&accessKey=$_accessKey&$queryParam';
 
     try {
-      final response = await http.get(Uri.parse(urlString));
-      if (response.statusCode != 200) return null;
+      final response = await _getWithRateLimitRetry(Uri.parse(urlString));
+      if (response == null || response.statusCode != 200) {
+        _bookByIdCache[cacheKey] = null;
+        return null;
+      }
 
       final json = jsonDecode(utf8.decode(response.bodyBytes));
       final items = json['Items'] as List<dynamic>? ?? [];
@@ -88,7 +97,7 @@ class RakutenApi {
           ? rawReviewAverage.toDouble()
           : double.tryParse(rawReviewAverage?.toString() ?? '') ?? 0.0;
 
-      return Book(
+      final result = Book(
         id: isbn.isNotEmpty ? isbn : trimmed,
         title: title,
         author: author,
@@ -99,7 +108,10 @@ class RakutenApi {
         ratingAvg: parsedReviewAverage,
         description: description,
       );
+      _bookByIdCache[cacheKey] = result;
+      return result;
     } catch (_) {
+      _bookByIdCache[cacheKey] = null;
       return null;
     }
   }
