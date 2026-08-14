@@ -17,9 +17,6 @@ class BookListController extends ChangeNotifier {
   int searchPage = 1;
   List<Book> searchResults = [];
   final Set<String> _searchResultIds = <String>{};
-  List<String> _searchVariants = [];
-  int _searchVariantIndex = 0;
-  int _searchVariantPage = 1;
 
   // ジャンルごとに「リスト」「現在のページ」「まだ続きがあるか」を独立して管理
   List<Book> recommendedBooks = [];
@@ -66,9 +63,6 @@ class BookListController extends ChangeNotifier {
       isSearching = false;
       hasMoreSearch = true;
       searchPage = 1;
-      _searchVariants = [];
-      _searchVariantIndex = 0;
-      _searchVariantPage = 1;
       searchResults = [];
       _searchResultIds.clear();
       notifyListeners();
@@ -79,7 +73,7 @@ class BookListController extends ChangeNotifier {
     notifyListeners();
 
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      _searchUntilTen(reset: true);
+      _searchBooks(reset: true);
     });
   }
 
@@ -87,56 +81,6 @@ class BookListController extends ChangeNotifier {
     return input
         .toLowerCase()
         .replaceAll(RegExp(r'[^0-9a-zぁ-んァ-ヶ一-龥]+'), '');
-  }
-
-  List<String> _buildSearchVariants(String rawQuery) {
-    final query = rawQuery.trim();
-    if (query.isEmpty) return const [];
-
-    final variants = <String>[];
-
-    void addVariant(String value) {
-      final v = value.trim();
-      if (v.isEmpty) return;
-      if (v.length < 2) return;
-      if (!variants.contains(v)) {
-        variants.add(v);
-      }
-    }
-
-    final compact = query.replaceAll(RegExp(r'[\s\u3000・･]+'), '');
-    final spacedFromDot = query.replaceAll(RegExp(r'[・･]+'), ' ');
-    final noDot = query.replaceAll(RegExp(r'[・･]+'), '');
-
-    addVariant(query);
-    addVariant(compact);
-    addVariant(spacedFromDot);
-    addVariant(noDot);
-
-    final splitTokens = spacedFromDot
-        .split(RegExp(r'[\s\u3000]+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    if (splitTokens.length >= 2) {
-      addVariant(splitTokens.join(' '));
-      addVariant(splitTokens.join('・'));
-      for (final token in splitTokens) {
-        addVariant(token);
-      }
-    }
-
-    if (compact.length >= 6) {
-      final mid = compact.length ~/ 2;
-      addVariant(compact.substring(0, mid));
-      addVariant(compact.substring(mid));
-
-      final tailLength = compact.length >= 8 ? 8 : compact.length;
-      addVariant(compact.substring(compact.length - tailLength));
-    }
-
-    return variants;
   }
 
   int _scoreBook(Book book, String rawQuery) {
@@ -178,30 +122,7 @@ class BookListController extends ChangeNotifier {
     });
   }
 
-  bool _matchesQuery(Book book, String rawQuery) {
-    final normalizedQuery = _normalizeForSearch(rawQuery);
-    if (normalizedQuery.isEmpty) return false;
-
-    final tokens = rawQuery
-        .toLowerCase()
-        .split(RegExp(r'[\s\u3000]+'))
-        .map(_normalizeForSearch)
-        .where((token) => token.isNotEmpty)
-        .toList();
-
-    final target = _normalizeForSearch(
-      '${book.title} ${book.author} ${book.description}',
-    );
-
-    if (tokens.isEmpty) {
-      return target.contains(normalizedQuery);
-    }
-
-    // 複数語検索は全トークン一致（AND）にしてノイズを抑える。
-    return tokens.every(target.contains);
-  }
-
-  Future<void> _searchUntilTen({required bool reset}) async {
+  Future<void> _searchBooks({required bool reset}) async {
     final query = searchQuery.trim();
     if (query.isEmpty) {
       isSearching = false;
@@ -209,14 +130,9 @@ class BookListController extends ChangeNotifier {
       return;
     }
 
-    final targetCount = reset ? 10 : searchResults.length + 10;
-
     if (reset) {
       hasMoreSearch = true;
       searchPage = 1;
-      _searchVariants = _buildSearchVariants(query);
-      _searchVariantIndex = 0;
-      _searchVariantPage = 1;
       searchResults = [];
       _searchResultIds.clear();
     } else if (!hasMoreSearch || isSearching) {
@@ -226,60 +142,26 @@ class BookListController extends ChangeNotifier {
     isSearching = true;
     notifyListeners();
 
-    const maxRequestsPerRun = 12;
-    const maxPagesPerVariant = 6;
-    var requestCount = 0;
-
     try {
-      while (searchResults.length < targetCount && hasMoreSearch) {
-        if (query != searchQuery.trim()) {
-          return;
-        }
+      final requestedPage = searchPage;
+      final batch = await _repository.searchBooks(
+        query,
+        page: requestedPage,
+        count: 30,
+      );
 
-        if (_searchVariantIndex >= _searchVariants.length) {
-          hasMoreSearch = false;
-          break;
-        }
+      // 入力中に別の検索が始まった場合は、古い結果を画面へ反映しない。
+      if (query != searchQuery.trim()) return;
 
-        if (requestCount >= maxRequestsPerRun) {
-          break;
-        }
-
-        final activeVariant = _searchVariants[_searchVariantIndex];
-
-        final batch = await _repository.searchBooks(
-          activeVariant,
-          page: _searchVariantPage,
-          count: 100,
-        );
-        searchPage += 1;
-        _searchVariantPage += 1;
-        requestCount += 1;
-
-        if (batch.isEmpty) {
-          _searchVariantIndex += 1;
-          _searchVariantPage = 1;
-          continue;
-        }
-
-        for (final book in batch) {
-          if (_searchResultIds.contains(book.id)) continue;
-          if (!_matchesQuery(book, query)) continue;
-          _searchResultIds.add(book.id);
+      for (final book in batch) {
+        if (_searchResultIds.add(book.id)) {
           searchResults.add(book);
         }
-
-        _sortSearchResults(query);
-
-        if (_searchVariantPage > maxPagesPerVariant) {
-          _searchVariantIndex += 1;
-          _searchVariantPage = 1;
-        }
       }
 
-      if (_searchVariantIndex >= _searchVariants.length) {
-        hasMoreSearch = false;
-      }
+      _sortSearchResults(query);
+      searchPage = requestedPage + 1;
+      hasMoreSearch = batch.length >= 30;
     } finally {
       if (query == searchQuery.trim()) {
         isSearching = false;
@@ -290,7 +172,7 @@ class BookListController extends ChangeNotifier {
 
   Future<void> loadMoreSearchResults() async {
     if (searchQuery.isEmpty) return;
-    await _searchUntilTen(reset: false);
+    await _searchBooks(reset: false);
     notifyListeners();
   }
 

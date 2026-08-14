@@ -120,6 +120,7 @@ class RakutenApi {
     required String selectedGenre,
     int page = 1,
     int count = 10,
+    bool keywordSearch = false,
   }) async {
     if (_appId.isEmpty || _accessKey.isEmpty) {
       print('💡 [RakutenApi] APIキーが未設定のため通信をスキップします。');
@@ -132,7 +133,11 @@ class RakutenApi {
     String urlString = '';
 
     // 💡 選択されたタブ・ジャンルによって、叩くAPIとパラメータを完全に切り替える
-    if (selectedGenre.contains('English') || selectedGenre.contains('洋書')) {
+    if (keywordSearch) {
+      // ホーム画面のジャンル取得とは分離し、入力された語で楽天APIを直接検索する。
+      urlString =
+          '$_bookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=001&keyword=${Uri.encodeComponent(selectedGenre.trim())}';
+    } else if (selectedGenre.contains('English') || selectedGenre.contains('洋書')) {
       // ⭕ 洋書検索APIを呼び出す（必須条件：booksGenreId=005を指定）
       urlString =
           '$_foreignBookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=005';
@@ -232,5 +237,20 @@ class RakutenApi {
       print('❌ [RakutenApi] エラー発生: $e');
       return [];
     }
+  }
+
+  /// 検索欄に入力されたキーワードで楽天ブックスを直接検索する。
+  /// ホーム画面ですでに取得した本の一覧やキャッシュは検索対象にしない。
+  static Future<List<Book>> searchByKeyword({
+    required String keyword,
+    int page = 1,
+    int count = 30,
+  }) {
+    return searchBySelectedGenre(
+      selectedGenre: keyword,
+      page: page,
+      count: count,
+      keywordSearch: true,
+    );
   }
 }
