@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
+import 'services/theme_service.dart';
 import 'screens/book_list_screen.dart';
 import 'screens/user_profile_screen.dart';
 import 'screens/auth_screen.dart';
@@ -22,6 +23,7 @@ import 'screens/account_suspension_gate.dart';
 enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 
 final supabaseService = SupabaseService();
+final themeService = ThemeService();
 
 // 💡 パッケージを使わず、環境変数（JSON）から直接安全に引き抜く
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -30,6 +32,8 @@ const supabaseRedirectUrl = String.fromEnvironment('SUPABASE_REDIRECT_URL');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await themeService.initialize();
 
   // Initialize Supabase service
   await supabaseService.initialize(
@@ -42,6 +46,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider<SupabaseService>.value(value: supabaseService),
+        ChangeNotifierProvider<ThemeService>.value(value: themeService),
       ],
       child: const MyApp(),
     ),
@@ -53,6 +58,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = context.watch<ThemeService>().isDarkMode;
+
     return MaterialApp(
       title: 'BookCase',
       debugShowCheckedModeBanner: false,
@@ -86,23 +93,25 @@ class MyApp extends StatelessWidget {
               ),
             ),
         dividerColor: const Color(0xFFE9ECEF),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFF8F9FA),
+          foregroundColor: Colors.black,
+        ),
       ),
 
       // Premium Dark Theme Design System
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(
-          0xFF0B0F19,
-        ), // Dark Navy HSL(224, 40%, 7%)
+        scaffoldBackgroundColor: Colors.black,
         primaryColor: const Color(0xFFFF3B30),
-        cardColor: const Color(0xFF161F30), // Card Blue-Gray HSL(219, 37%, 14%)
+        cardColor: const Color(0xFF121212),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFFF3B30),
           brightness: Brightness.dark,
           primary: const Color(0xFFFF3B30),
           secondary: const Color(0xFF4EA8DE),
-          surface: const Color(0xFF0B0F19),
+          surface: Colors.black,
         ),
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
             .copyWith(
@@ -117,15 +126,20 @@ class MyApp extends StatelessWidget {
               ),
             ),
         dividerColor: const Color(0xFF2A3447),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
       ),
-      themeMode: ThemeMode.system, // Dynamically follow device preference
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       routes: {
         '/login': (context) => const AuthScreen(),
         '/terms': (context) => const TermsScreen(),
         '/privacy': (context) => const PrivacyPolicyScreen(),
         '/community-guidelines': (context) => const CommunityGuidelinesScreen(),
         '/infringement-policy': (context) => const InfringementPolicyScreen(),
-        '/external-transmission': (context) => const ExternalTransmissionScreen(),
+        '/external-transmission': (context) =>
+            const ExternalTransmissionScreen(),
         '/contact': (context) => const ContactScreen(),
       },
       onUnknownRoute: (_) => MaterialPageRoute<void>(
@@ -201,7 +215,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       if (_transientQueryKeys.contains(key)) return true;
     }
     if (uri.fragment.startsWith('/')) {
-      for (final key in _normalizedFragmentUri(uri.fragment).queryParameters.keys) {
+      for (final key in _normalizedFragmentUri(
+        uri.fragment,
+      ).queryParameters.keys) {
         if (_transientQueryKeys.contains(key)) return true;
       }
     }
@@ -285,10 +301,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             queryParameters: sanitizedQuery.isEmpty ? null : sanitizedQuery,
           );
 
-    SystemNavigator.routeInformationUpdated(
-      uri: targetUri,
-      replace: replace,
-    );
+    SystemNavigator.routeInformationUpdated(uri: targetUri, replace: replace);
   }
 
   void _setCurrentScreenIndex(int index, {bool replaceUrl = false}) {
@@ -310,7 +323,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     _openPrivacyPasswordRecovery =
         (currentUri.queryParameters['privacy_password_recovery'] == '1') ||
         (fragmentQuery['privacy_password_recovery'] == '1');
-    _currentScreenIndex = _screenIndexFromPath(_currentAppPathFromUri(currentUri));
+    _currentScreenIndex = _screenIndexFromPath(
+      _currentAppPathFromUri(currentUri),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncBrowserUrlForScreen(_currentScreenIndex, replace: true);
@@ -551,9 +566,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                   size: 16,
                                 ),
                                 label: Text(
-                                  service.isAuthenticated
-                                      ? 'プロフィール'
-                                      : 'ログイン',
+                                  service.isAuthenticated ? 'プロフィール' : 'ログイン',
                                   maxLines: 1,
                                   style: const TextStyle(
                                     fontSize: 11,

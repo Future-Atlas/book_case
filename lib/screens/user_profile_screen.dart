@@ -336,13 +336,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               backgroundColor: Colors.transparent,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                icon: const Icon(Icons.arrow_back),
                 onPressed: widget.onBack,
               ),
               actions: _isOwnProfile
                   ? [
                       IconButton(
-                        icon: const Icon(Icons.logout, color: Colors.black87),
+                        icon: const Icon(Icons.logout),
                         onPressed: () async {
                           final service = Provider.of<SupabaseService>(
                             context,
@@ -357,11 +357,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   : null,
               title: const Text(
                 'マイプロフィール',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               centerTitle: true,
             )
@@ -581,10 +577,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       children: [
         Text(
           count,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 2),
@@ -679,21 +675,22 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildTabBar() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: Colors.black87,
+          color: colorScheme.onSurface,
           borderRadius: BorderRadius.circular(12),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.grey[600],
+        labelColor: colorScheme.surface,
+        unselectedLabelColor: colorScheme.onSurfaceVariant,
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         unselectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w500,

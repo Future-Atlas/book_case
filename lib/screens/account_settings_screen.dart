@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
+import '../services/theme_service.dart';
 import 'community_guidelines_screen.dart';
 import 'contact_screen.dart';
 import 'external_transmission_screen.dart';
@@ -115,7 +116,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const _SectionTitle('設定'),
+            const _SectionTitle('ユーザー設定'),
             _SettingsCard(
               children: [
                 ListTile(
@@ -140,6 +141,20 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   title: const Text('ブロックしているアカウント'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _push(const _BlockedAccountsScreen()),
+                ),
+                const Divider(height: 1),
+                Consumer<ThemeService>(
+                  builder: (context, themeService, _) => ListTile(
+                    contentPadding: const EdgeInsets.only(left: 40, right: 16),
+                    leading: const Icon(Icons.dark_mode_outlined),
+                    title: const Text('ダークモード'),
+                    trailing: Switch(
+                      value: themeService.isDarkMode,
+                      onChanged: themeService.setDarkMode,
+                    ),
+                    onTap: () =>
+                        themeService.setDarkMode(!themeService.isDarkMode),
+                  ),
                 ),
               ],
             ),

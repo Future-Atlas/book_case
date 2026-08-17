@@ -140,6 +140,8 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     return Consumer<SupabaseService>(
       builder: (context, service, _) {
+        final theme = Theme.of(context);
+        final isDarkMode = theme.brightness == Brightness.dark;
         if (service.isAuthenticated) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && Navigator.of(context).canPop()) {
@@ -149,7 +151,7 @@ class _AuthScreenState extends State<AuthScreen> {
         }
 
         return Scaffold(
-          backgroundColor: const Color(0xFFEAEAEA),
+          backgroundColor: theme.scaffoldBackgroundColor,
           body: SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -157,8 +159,8 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: Column(
                   children: [
                     RichText(
-                      text: const TextSpan(
-                        style: TextStyle(
+                      text: TextSpan(
+                        style: const TextStyle(
                           fontSize: 52,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -2,
@@ -170,7 +172,9 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           TextSpan(
                             text: 'marium',
-                            style: TextStyle(color: Colors.black),
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
                           ),
                         ],
                       ),
@@ -215,12 +219,15 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ],
                     const SizedBox(height: 18),
-                    const SizedBox(
+                    SizedBox(
                       width: 280,
                       child: Text(
                         '現在利用できるログイン方法はXです。Googleログインは近日追加予定です。',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),

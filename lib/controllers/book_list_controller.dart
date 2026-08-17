@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../models/book.dart';
@@ -17,6 +18,14 @@ class BookListController extends ChangeNotifier {
   int searchPage = 1;
   List<Book> searchResults = [];
   final Set<String> _searchResultIds = <String>{};
+  int _visibleSearchResultCount = 10;
+
+  List<Book> get visibleSearchResults => searchResults
+      .take(math.min(_visibleSearchResultCount, searchResults.length))
+      .toList(growable: false);
+
+  bool get canLoadMoreSearchResults =>
+      _visibleSearchResultCount < searchResults.length || hasMoreSearch;
 
   // ジャンルごとに「リスト」「現在のページ」「まだ続きがあるか」を独立して管理
   List<Book> recommendedBooks = [];
@@ -65,6 +74,7 @@ class BookListController extends ChangeNotifier {
       searchPage = 1;
       searchResults = [];
       _searchResultIds.clear();
+      _visibleSearchResultCount = 10;
       notifyListeners();
       return;
     }
@@ -94,6 +104,7 @@ class BookListController extends ChangeNotifier {
       searchPage = 1;
       searchResults = [];
       _searchResultIds.clear();
+      _visibleSearchResultCount = 10;
     } else if (!hasMoreSearch || isSearching) {
       return;
     }
@@ -130,8 +141,26 @@ class BookListController extends ChangeNotifier {
   }
 
   Future<void> loadMoreSearchResults() async {
-    if (searchQuery.isEmpty) return;
+    if (searchQuery.isEmpty || isSearching) return;
+
+    if (_visibleSearchResultCount < searchResults.length) {
+      _visibleSearchResultCount = math.min(
+        _visibleSearchResultCount + 10,
+        searchResults.length,
+      );
+      notifyListeners();
+      return;
+    }
+
+    if (!hasMoreSearch) return;
+    final previousLength = searchResults.length;
     await _searchBooks(reset: false);
+    if (searchResults.length > previousLength) {
+      _visibleSearchResultCount = math.min(
+        _visibleSearchResultCount + 10,
+        searchResults.length,
+      );
+    }
     notifyListeners();
   }
 

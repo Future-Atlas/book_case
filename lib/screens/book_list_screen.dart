@@ -635,7 +635,7 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchResults() {
-    final results = _controller.searchResults;
+    final results = _controller.visibleSearchResults;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,8 +644,8 @@ class _BookListScreenState extends State<BookListScreen> {
           padding: const EdgeInsets.only(bottom: 16),
           child: Text(
             _controller.isSearching
-                ? '検索中... (${results.length}件)'
-                : '検索結果 (${results.length}件)',
+                ? '検索中... (${results.length}件表示)'
+                : '検索結果 (${results.length}件表示)',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
@@ -667,26 +667,39 @@ class _BookListScreenState extends State<BookListScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.65,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: results.length,
-                itemBuilder: (context, index) {
-                  final book = results[index];
-                  return BookCard(
-                    book: book,
-                    width: double.infinity,
-                    onTap: () => _showBookDetailDialog(book),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final columnCount = width >= 900
+                      ? 5
+                      : width >= 680
+                      ? 4
+                      : width >= 460
+                      ? 3
+                      : 2;
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columnCount,
+                      childAspectRatio: 0.65,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: results.length,
+                    itemBuilder: (context, index) {
+                      final book = results[index];
+                      return BookCard(
+                        book: book,
+                        width: double.infinity,
+                        onTap: () => _showBookDetailDialog(book),
+                      );
+                    },
                   );
                 },
               ),
-              if (!_controller.isSearching && _controller.hasMoreSearch)
+              if (!_controller.isSearching &&
+                  _controller.canLoadMoreSearchResults)
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
                   child: Align(
@@ -694,7 +707,7 @@ class _BookListScreenState extends State<BookListScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _controller.loadMoreSearchResults,
                       icon: const Icon(Icons.expand_more),
-                      label: const Text('さらに検索結果を読み込む'),
+                      label: const Text('さらに読み込む'),
                     ),
                   ),
                 ),
