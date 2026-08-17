@@ -13,6 +13,8 @@ import '../models/social_models.dart';
 import '../models/moderation_models.dart';
 import 'content_safety_service.dart';
 
+enum FavoriteToggleResult { added, removed, limitReached, failed }
+
 class SupabaseService extends ChangeNotifier {
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
@@ -1275,12 +1277,17 @@ class SupabaseService extends ChangeNotifier {
   Future<List<Book>> fetchUserFavorites(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        await _client!
+        final response = await _client!
             .from('favorites')
-            .select('book_id')
-            .eq('profile_id', profileId);
-        // Currently returning empty list as Book objects are fetched elsewhere.
-        return [];
+            .select('book_id, created_at')
+            .eq('profile_id', profileId)
+            .order('created_at', ascending: false)
+            .limit(12);
+        final bookIds = (response as List<dynamic>)
+            .map((row) => (row['book_id'] ?? '').toString().trim())
+            .where((id) => id.isNotEmpty)
+            .toList();
+        return _resolveBooksByIds(bookIds);
       } catch (e) {
         debugPrint('Error fetching user favorites in Supabase: $e');
       }
@@ -1821,11 +1828,28 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
-  Future<bool> toggleFavorite(String bookId) async {
+  Future<bool> isBookFavoritedByCurrentUser(String bookId) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty || !_isInitialized || _client == null) return false;
+    try {
+      final response = await _client!
+          .from('favorites')
+          .select('book_id')
+          .eq('profile_id', profileId)
+          .eq('book_id', bookId)
+          .maybeSingle();
+      return response != null;
+    } catch (e) {
+      debugPrint('Error checking favorite in Supabase: $e');
+      return false;
+    }
+  }
+
+  Future<FavoriteToggleResult> toggleFavorite(String bookId) async {
     final profileId = activeProfileId;
     if (profileId.isEmpty) {
       debugPrint('Cannot toggle favorite: no authenticated user.');
-      return false;
+      return FavoriteToggleResult.failed;
     }
     if (_isInitialized && _client != null) {
       try {
@@ -1842,20 +1866,33 @@ class SupabaseService extends ChangeNotifier {
               .delete()
               .eq('profile_id', profileId)
               .eq('book_id', bookId);
+          notifyListeners();
+          return FavoriteToggleResult.removed;
         } else {
+          final existingFavorites = await _client!
+              .from('favorites')
+              .select('book_id')
+              .eq('profile_id', profileId)
+              .limit(12);
+          if ((existingFavorites as List<dynamic>).length >= 12) {
+            return FavoriteToggleResult.limitReached;
+          }
           await _client!.from('favorites').insert({
             'profile_id': profileId,
             'book_id': bookId,
           });
+          notifyListeners();
+          return FavoriteToggleResult.added;
         }
-        notifyListeners();
-        return true;
       } catch (e) {
         debugPrint('Error toggling favorite in Supabase: $e');
+        if (e.toString().contains('favorite_limit_reached')) {
+          return FavoriteToggleResult.limitReached;
+        }
       }
     }
     debugPrint('Supabase not initialized – favorite not toggled.');
-    return false;
+    return FavoriteToggleResult.failed;
   }
 
   @override

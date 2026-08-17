@@ -29,6 +29,11 @@ void main() {
     expect(RakutenApi.buildSearchKeywordVariants('プロジェクト・へイル・メアリー'), [
       'プロジェクト・へイル・メアリー',
       'プロジェクトへイルメアリー',
+      'プロジェクト',
+    ]);
+    expect(RakutenApi.buildSearchKeywordVariants('プロジェクトへイル'), [
+      'プロジェクトへイル',
+      'プロジェクト',
     ]);
     expect(RakutenApi.buildSearchKeywordVariants('Andy Weir'), [
       'Andy Weir',

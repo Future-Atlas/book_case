@@ -20,11 +20,26 @@ class RakutenApi {
     final original = keyword.trim();
     if (original.isEmpty) return const [];
 
-    final compact = original.replaceAll(RegExp(r'[\s\u3000・･]+'), '');
-    return <String>{
-      original,
-      compact,
-    }.where((value) => value.isNotEmpty).toList();
+    final separators = RegExp(r'[\s\u3000・･]+');
+    final compact = original.replaceAll(separators, '');
+    final variants = <String>{original, compact};
+
+    // Rakuten's field-specific search does not always treat a middle dot as
+    // optional. Search the first meaningful title segment as a fallback. For
+    // input without separators, a six-character prefix provides the same
+    // fallback (e.g. プロジェクトへイル -> プロジェクト).
+    final hasMiddleDot = RegExp(r'[・･]').hasMatch(original);
+    final segments = original
+        .split(separators)
+        .where((value) => value.length >= 2)
+        .toList();
+    if (hasMiddleDot && segments.length > 1) {
+      variants.add(segments.first);
+    } else if (compact.length > 6 && RegExp(r'[ぁ-んァ-ヶ一-龥]').hasMatch(compact)) {
+      variants.add(compact.substring(0, 6));
+    }
+
+    return variants.where((value) => value.isNotEmpty).toList();
   }
 
   static Future<http.Response?> _getWithRateLimitRetry(

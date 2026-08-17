@@ -71,12 +71,12 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(
           0xFFF8F9FA,
         ), // Off-white HSL(210, 20%, 98%)
-        primaryColor: const Color(0xFFFF3B30), // Brand Red
+        primaryColor: const Color(0xFFD00303), // Brand Red
         cardColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF3B30),
+          seedColor: const Color(0xFFD00303),
           brightness: Brightness.light,
-          primary: const Color(0xFFFF3B30),
+          primary: const Color(0xFFD00303),
           secondary: const Color(0xFF264653), // Slate blue
           surface: const Color(0xFFF8F9FA),
         ),
@@ -104,12 +104,12 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
-        primaryColor: const Color(0xFFFF3B30),
+        primaryColor: const Color(0xFFD00303),
         cardColor: const Color(0xFF121212),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF3B30),
+          seedColor: const Color(0xFFD00303),
           brightness: Brightness.dark,
-          primary: const Color(0xFFFF3B30),
+          primary: const Color(0xFFD00303),
           secondary: const Color(0xFF4EA8DE),
           surface: Colors.black,
         ),
@@ -574,7 +574,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFF3B30),
+                                  backgroundColor: const Color(0xFFD00303),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,

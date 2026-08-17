@@ -139,6 +139,7 @@ class _BookListScreenState extends State<BookListScreen> {
         final hasCover = book.coverUrl.trim().isNotEmpty;
         final service = Provider.of<SupabaseService>(context, listen: false);
         final isReadFuture = service.isBookReadByCurrentUser(bookId: book.id);
+        final isFavoriteFuture = service.isBookFavoritedByCurrentUser(book.id);
 
         return Dialog(
           backgroundColor: const Color(0xFFE6E6E6),
@@ -240,6 +241,91 @@ class _BookListScreenState extends State<BookListScreen> {
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                            FutureBuilder<bool>(
+                              future: isFavoriteFuture,
+                              builder: (context, snapshot) {
+                                final isFavorite = snapshot.data ?? false;
+                                final isLoading =
+                                    snapshot.connectionState ==
+                                    ConnectionState.waiting;
+                                return Align(
+                                  alignment: Alignment.center,
+                                  child: OutlinedButton.icon(
+                                    onPressed: isLoading
+                                        ? null
+                                        : () async {
+                                            if (!service.isAuthenticated) {
+                                              Navigator.of(context).pop();
+                                              final authenticated =
+                                                  await _ensureAuthenticated();
+                                              if (authenticated && mounted) {
+                                                _showBookDetailDialog(book);
+                                              }
+                                              return;
+                                            }
+
+                                            final result = await service
+                                                .toggleFavorite(book.id);
+                                            if (!mounted) return;
+                                            if (result ==
+                                                FavoriteToggleResult
+                                                    .limitReached) {
+                                              ScaffoldMessenger.of(
+                                                this.context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            if (result ==
+                                                FavoriteToggleResult.failed) {
+                                              ScaffoldMessenger.of(
+                                                this.context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'お気に入りを更新できませんでした。',
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
+
+                                            if (context.mounted) {
+                                              Navigator.of(context).pop();
+                                            }
+                                            ScaffoldMessenger.of(
+                                              this.context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  result ==
+                                                          FavoriteToggleResult
+                                                              .added
+                                                      ? 'お気に入りに登録しました。'
+                                                      : 'お気に入りから解除しました。',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                    icon: Icon(
+                                      isFavorite
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: const Color(0xFFD00303),
+                                    ),
+                                    label: Text(
+                                      isFavorite ? 'お気に入り解除' : 'お気に入りに登録',
                                     ),
                                   ),
                                 );
@@ -365,10 +451,10 @@ class _BookListScreenState extends State<BookListScreen> {
           color: Theme.of(context).scaffoldBackgroundColor,
           child: RefreshIndicator(
             onRefresh: () => _controller.loadData(context),
-            color: const Color(0xFFFF3B30),
+            color: const Color(0xFFD00303),
             child: _controller.isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
+                    child: CircularProgressIndicator(color: Color(0xFFD00303)),
                   )
                 : SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -499,7 +585,7 @@ class _BookListScreenState extends State<BookListScreen> {
         decoration: InputDecoration(
           hintText: '本を検索 (作品名、著者、ジャンル)...',
           hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFFFF3B30)),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFFD00303)),
           suffixIcon: _controller.searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
@@ -561,14 +647,14 @@ class _BookListScreenState extends State<BookListScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF3B30).withValues(alpha: 0.12),
+                color: const Color(0xFFD00303).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: const Text(
                 '取得できませんでした',
                 style: TextStyle(
                   fontSize: 10,
-                  color: Color(0xFFFF3B30),
+                  color: Color(0xFFD00303),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -595,7 +681,7 @@ class _BookListScreenState extends State<BookListScreen> {
           color: Theme.of(context).cardColor.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFFFF3B30).withValues(alpha: 0.25),
+            color: const Color(0xFFD00303).withValues(alpha: 0.25),
           ),
         ),
         child: Column(
@@ -603,7 +689,7 @@ class _BookListScreenState extends State<BookListScreen> {
           children: [
             const Icon(
               Icons.wifi_off_rounded,
-              color: Color(0xFFFF3B30),
+              color: Color(0xFFD00303),
               size: 22,
             ),
             const SizedBox(height: 8),
@@ -638,8 +724,15 @@ class _BookListScreenState extends State<BookListScreen> {
               tooltip: '前の9冊に戻る',
               onPressed: onLoadPrevious,
             ),
-          for (final book in bookList)
-            BookCard(book: book, onTap: () => _showBookDetailDialog(book)),
+          for (var index = 0; index < bookList.length; index++)
+            BookCard(
+              book: bookList[index],
+              marginRight:
+                  index == bookList.length - 1 && (hasMore || isLoadingMore)
+                  ? 0
+                  : 16,
+              onTap: () => _showBookDetailDialog(bookList[index]),
+            ),
           if (hasMore || isLoadingMore)
             _buildCarouselPageButton(
               direction: AxisDirection.right,
@@ -659,15 +752,15 @@ class _BookListScreenState extends State<BookListScreen> {
     bool isLoading = false,
   }) {
     return SizedBox(
-      width: 48,
+      width: 32,
       child: Center(
         child: Tooltip(
           message: tooltip,
           child: InkResponse(
             onTap: onPressed,
-            radius: 32,
+            radius: 28,
             child: SizedBox(
-              width: 48,
+              width: 32,
               height: 72,
               child: Center(
                 child: isLoading
@@ -676,15 +769,19 @@ class _BookListScreenState extends State<BookListScreen> {
                         height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Color(0xFFFF3B30),
+                          color: Color(0xFFD00303),
                         ),
                       )
-                    : Icon(
-                        direction == AxisDirection.right
-                            ? Icons.arrow_right_rounded
-                            : Icons.arrow_left_rounded,
-                        size: 58,
-                        color: const Color(0xFFFF3B30),
+                    : OverflowBox(
+                        maxWidth: 58,
+                        maxHeight: 72,
+                        child: Icon(
+                          direction == AxisDirection.right
+                              ? Icons.arrow_right_rounded
+                              : Icons.arrow_left_rounded,
+                          size: 58,
+                          color: const Color(0xFFD00303),
+                        ),
                       ),
               ),
             ),

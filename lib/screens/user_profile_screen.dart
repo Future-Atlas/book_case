@@ -324,7 +324,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD00303),
+            ),
             child: const Text('削除する'),
           ),
         ],
@@ -406,7 +408,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
+              child: CircularProgressIndicator(color: Color(0xFFD00303)),
             )
           : _profile == null
           ? const Center(child: Text('プロフィールの読み込みに失敗しました。')) // ⭕ データ未取得時の安全ガード
@@ -435,7 +437,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             '本棚はありません。',
                             showDescription: true,
                           ),
-                          _buildGridTab(_favorites, 'お気に入りの本はありません。'),
+                          _buildFavoritesTab(),
                         ],
                       ),
                     ),
@@ -792,6 +794,31 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
+  Widget _buildFavoritesTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          child: Text(
+            '${_favorites.length}冊/12冊',
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Expanded(
+          child: _favorites.isEmpty
+              ? _buildEmptyState('お気に入りの本はありません。')
+              : _buildGridTab(_favorites, 'お気に入りの本はありません。'),
+        ),
+      ],
+    );
+  }
+
   // Future-Atlas側のフッター検索案は、必要になったとき再利用できるよう保持する。
   // 現在の画面では、常時表示の右下＋ボタンから検索画面を開く。
   // ignore: unused_element
@@ -879,7 +906,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget _buildSearchResultContent() {
     if (_isSearchingBooks) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFFFF3B30)),
+        child: CircularProgressIndicator(color: Color(0xFFD00303)),
       );
     }
 
