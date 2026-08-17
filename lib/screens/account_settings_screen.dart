@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user_profile.dart';
@@ -207,7 +208,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('Sharemarium'),
-                  subtitle: Text('バージョン 1.0.0+1'),
+                  subtitle: Text('バージョン 1.1.0+2'),
                 ),
               ],
             ),
@@ -245,8 +246,10 @@ class _PublicAccountSettingsScreenState
   final _usernameController = TextEditingController();
   final _userIdController = TextEditingController();
   bool _isPrivate = false;
+  String _avatarUrl = '';
   bool _loading = true;
   bool _saving = false;
+  bool _updatingAvatar = false;
 
   @override
   void didChangeDependencies() {
@@ -263,6 +266,7 @@ class _PublicAccountSettingsScreenState
     _usernameController.text = data?['username']?.toString() ?? '';
     _userIdController.text = data?['user_id']?.toString() ?? '';
     setState(() {
+      _avatarUrl = data?['avatar_url']?.toString() ?? '';
       _isPrivate = data?['is_private'] == true;
       _loading = false;
     });
@@ -291,6 +295,66 @@ class _PublicAccountSettingsScreenState
     ).showSnackBar(SnackBar(content: Text(error ?? 'アカウント設定を保存しました。')));
   }
 
+  Future<void> _chooseAvatar() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('画像は5MB以下にしてください。')));
+      return;
+    }
+
+    final mimeType = picked.mimeType ?? _mimeTypeFromName(picked.name);
+    setState(() => _updatingAvatar = true);
+    final url = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).uploadProfileAvatar(bytes: bytes, mimeType: mimeType);
+    if (!mounted) return;
+    setState(() {
+      _updatingAvatar = false;
+      if (url != null) _avatarUrl = url;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(url == null ? '画像を保存できませんでした。' : 'プロフィール画像を更新しました。'),
+      ),
+    );
+  }
+
+  String _mimeTypeFromName(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  Future<void> _removeAvatar() async {
+    setState(() => _updatingAvatar = true);
+    final removed = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).removeProfileAvatar();
+    if (!mounted) return;
+    setState(() {
+      _updatingAvatar = false;
+      if (removed) _avatarUrl = '';
+    });
+    if (!removed) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('プロフィール画像を削除できませんでした。')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -306,6 +370,58 @@ class _PublicAccountSettingsScreenState
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
+                      Center(
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 52,
+                              backgroundImage: _avatarUrl.isEmpty
+                                  ? null
+                                  : NetworkImage(_avatarUrl),
+                              child: _avatarUrl.isEmpty
+                                  ? const Icon(Icons.person, size: 52)
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: _updatingAvatar
+                                      ? null
+                                      : _chooseAvatar,
+                                  icon: _updatingAvatar
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.photo_camera_outlined),
+                                  label: Text(
+                                    _avatarUrl.isEmpty ? '画像を設定' : '画像を変更',
+                                  ),
+                                ),
+                                if (_avatarUrl.isNotEmpty)
+                                  TextButton(
+                                    onPressed: _updatingAvatar
+                                        ? null
+                                        : _removeAvatar,
+                                    child: const Text('画像を削除'),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'JPEG・PNG・WebP／5MB以下',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       TextFormField(
                         controller: _usernameController,
                         maxLength: 30,

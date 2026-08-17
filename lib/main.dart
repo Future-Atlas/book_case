@@ -67,6 +67,7 @@ class MyApp extends StatelessWidget {
       // Premium Light Theme Design System
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: GoogleFonts.notoSansJp().fontFamily,
         brightness: Brightness.light,
         scaffoldBackgroundColor: const Color(
           0xFFF8F9FA,
@@ -80,15 +81,15 @@ class MyApp extends StatelessWidget {
           secondary: const Color(0xFF264653), // Slate blue
           surface: const Color(0xFFF8F9FA),
         ),
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme)
+        textTheme: GoogleFonts.notoSansJpTextTheme(ThemeData.light().textTheme)
             .copyWith(
               titleLarge: TextStyle(
-                fontFamily: GoogleFonts.outfit().fontFamily,
+                fontFamily: GoogleFonts.notoSansJp().fontFamily,
                 fontWeight: FontWeight.w900,
                 color: const Color(0xFF212529),
               ),
               bodyMedium: TextStyle(
-                fontFamily: GoogleFonts.outfit().fontFamily,
+                fontFamily: GoogleFonts.notoSansJp().fontFamily,
                 color: const Color(0xFF495057),
               ),
             ),
@@ -102,6 +103,7 @@ class MyApp extends StatelessWidget {
       // Premium Dark Theme Design System
       darkTheme: ThemeData(
         useMaterial3: true,
+        fontFamily: GoogleFonts.notoSansJp().fontFamily,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
         primaryColor: const Color(0xFFD00303),
@@ -113,15 +115,15 @@ class MyApp extends StatelessWidget {
           secondary: const Color(0xFF4EA8DE),
           surface: Colors.black,
         ),
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme)
+        textTheme: GoogleFonts.notoSansJpTextTheme(ThemeData.dark().textTheme)
             .copyWith(
               titleLarge: TextStyle(
-                fontFamily: GoogleFonts.outfit().fontFamily,
+                fontFamily: GoogleFonts.notoSansJp().fontFamily,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
               ),
               bodyMedium: TextStyle(
-                fontFamily: GoogleFonts.outfit().fontFamily,
+                fontFamily: GoogleFonts.notoSansJp().fontFamily,
                 color: const Color(0xFFCED4DA),
               ),
             ),

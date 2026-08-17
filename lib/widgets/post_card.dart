@@ -9,6 +9,8 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onUserTap;
   final Future<void> Function(PostReactionType reaction)? onReaction;
   final VoidCallback? onReport;
+  final VoidCallback? onFavorite;
+  final String favoriteLabel;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool concealSpoiler;
@@ -20,6 +22,8 @@ class PostCard extends StatefulWidget {
     this.onUserTap,
     this.onReaction,
     this.onReport,
+    this.onFavorite,
+    this.favoriteLabel = 'お気に入りに追加／解除',
     this.onEdit,
     this.onDelete,
     this.concealSpoiler = true,
@@ -41,6 +45,7 @@ class _PostCardState extends State<PostCard> {
   Future<void> Function(PostReactionType reaction)? get onReaction =>
       widget.onReaction;
   VoidCallback? get onReport => widget.onReport;
+  VoidCallback? get onFavorite => widget.onFavorite;
   VoidCallback? get onEdit => widget.onEdit;
   VoidCallback? get onDelete => widget.onDelete;
 
@@ -346,7 +351,9 @@ class _PostCardState extends State<PostCard> {
                             const SizedBox(width: 4),
                           ],
                           const Spacer(),
-                          if (onEdit != null || onDelete != null)
+                          if (onFavorite != null ||
+                              onEdit != null ||
+                              onDelete != null)
                             PopupMenuButton<String>(
                               tooltip: '投稿メニュー',
                               icon: Icon(
@@ -357,10 +364,25 @@ class _PostCardState extends State<PostCard> {
                               padding: EdgeInsets.zero,
                               position: PopupMenuPosition.under,
                               onSelected: (value) {
+                                if (value == 'favorite') onFavorite?.call();
                                 if (value == 'edit') onEdit?.call();
                                 if (value == 'delete') onDelete?.call();
                               },
                               itemBuilder: (context) => [
+                                if (onFavorite != null)
+                                  PopupMenuItem<String>(
+                                    value: 'favorite',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.favorite_border,
+                                          size: 19,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(widget.favoriteLabel),
+                                      ],
+                                    ),
+                                  ),
                                 if (onEdit != null)
                                   const PopupMenuItem<String>(
                                     value: 'edit',

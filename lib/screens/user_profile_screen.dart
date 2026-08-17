@@ -190,6 +190,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final favs = canLoadContent
         ? await service.fetchUserFavorites(uid)
         : <Book>[];
+    final postedBookIds = posts.map((post) => post.bookId).toSet();
+    final visibleFavorites = favs
+        .where((book) => postedBookIds.contains(book.id))
+        .toList(growable: false);
 
     if (mounted) {
       setState(() {
@@ -197,7 +201,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         _relationship = relationship;
         _userPosts = posts;
         _collections = colls;
-        _favorites = favs;
+        _favorites = visibleFavorites;
         _isLoading = false;
       });
     }
@@ -308,6 +312,55 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     await showPostReportDialog(context: context, postId: postId);
   }
 
+  void _showFavoriteResult(FavoriteToggleResult result) {
+    final message = switch (result) {
+      FavoriteToggleResult.added => 'お気に入りに登録しました。',
+      FavoriteToggleResult.removed => 'お気に入りから解除しました。',
+      FavoriteToggleResult.limitReached => 'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
+      FavoriteToggleResult.requiresRead => '読了（投稿）した本のみお気に入りに追加できます。',
+      FavoriteToggleResult.failed => 'お気に入りを更新できませんでした。',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  bool _isFavorited(String bookId) =>
+      _favorites.any((book) => book.id == bookId);
+
+  Future<void> _toggleFavorite(String bookId) async {
+    if (!_isOwnProfile) return;
+    final result = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).toggleFavorite(bookId);
+    if (!mounted) return;
+    _showFavoriteResult(result);
+    if (result == FavoriteToggleResult.added ||
+        result == FavoriteToggleResult.removed) {
+      await _loadProfileData();
+    }
+  }
+
+  Future<void> _openBookshelfActions(Book book) async {
+    if (!_isOwnProfile) return;
+    final isFavorite = _isFavorited(book.id);
+    final shouldToggle = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: ListTile(
+          leading: Icon(
+            isFavorite ? Icons.favorite : Icons.favorite_border,
+            color: const Color(0xFFD00303),
+          ),
+          title: Text(isFavorite ? 'お気に入りから解除' : 'お気に入りに追加'),
+          onTap: () => Navigator.of(sheetContext).pop(true),
+        ),
+      ),
+    );
+    if (shouldToggle == true && mounted) await _toggleFavorite(book.id);
+  }
+
   Future<void> _deletePost(Post post) async {
     if (!_isOwnProfile) return;
     final confirmed = await showDialog<bool>(
@@ -316,7 +369,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         title: const Text('投稿を削除しますか？'),
         content: Text(
           '「${post.bookTitle}」の投稿を削除します。\n'
-          'この本への投稿がほかにない場合、本棚からも削除されます。',
+          'この本への投稿がほかにない場合、My 本棚からも削除されます。',
         ),
         actions: [
           TextButton(
@@ -435,36 +488,35 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           : Container(
               width: double.infinity,
               color: Theme.of(context).scaffoldBackgroundColor,
-              child: Column(
-                children: [
-                  // Profile Header Card
-                  _buildProfileHeader(),
-
-                  const SizedBox(height: 16),
-
-                  if (_canViewProfileContent) ...[
-                    // Custom Tab Bar with premium design
-                    _buildTabBar(),
-
-                    // Tab View Contents
-                    Expanded(
-                      child: TabBarView(
+              child: NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        _buildProfileHeader(),
+                        const SizedBox(height: 16),
+                        if (_canViewProfileContent) _buildTabBar(),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ],
+                body: _canViewProfileContent
+                    ? TabBarView(
                         controller: _tabController,
                         children: [
                           _buildPostsTab(),
                           _buildGridTab(
                             _collections,
-                            '本棚はありません。',
+                            'My 本棚はありません。',
                             showDescription: true,
                             compactThreeColumn: true,
+                            enableFavoriteAction: true,
                           ),
                           _buildFavoritesTab(),
                         ],
-                      ),
-                    ),
-                  ] else
-                    Expanded(child: _buildPrivateOrBlockedState()),
-                ],
+                      )
+                    : _buildPrivateOrBlockedState(),
               ),
             ),
     );
@@ -716,7 +768,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             if (!blocked) ...[
               const SizedBox(height: 8),
               const Text(
-                'フォローリクエストが承認されると、投稿・本棚・お気に入りを確認できます。',
+                'フォローリクエストが承認されると、投稿・My 本棚・お気に入りを確認できます。',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -750,7 +802,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         ),
         tabs: const [
           Tab(text: '投稿'),
-          Tab(text: '本棚'),
+          Tab(text: 'My 本棚'),
           Tab(text: 'お気に入り'),
         ],
       ),
@@ -778,6 +830,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               : (reaction) => _toggleReaction(post.id, reaction),
           onDelete: _isOwnProfile ? () => _deletePost(post) : null,
           onEdit: _isOwnProfile ? () => _editPost(post) : null,
+          onFavorite: _isOwnProfile ? () => _toggleFavorite(post.bookId) : null,
+          favoriteLabel: _isFavorited(post.bookId) ? 'お気に入りから解除' : 'お気に入りに追加',
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
         );
       },
@@ -789,6 +843,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     String emptyMessage, {
     bool showDescription = false,
     bool compactThreeColumn = false,
+    bool enableFavoriteAction = false,
   }) {
     if (booksList.isEmpty) {
       return _buildEmptyState(emptyMessage);
@@ -823,6 +878,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               coverHeightRatio: showDescription ? (2 / 3) : (1 / 3),
               showDescription: showDescription,
               descriptionMaxLines: 3,
+              onTap: enableFavoriteAction
+                  ? () => _openBookshelfActions(book)
+                  : null,
             );
           },
         );
@@ -849,9 +907,100 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         Expanded(
           child: _favorites.isEmpty
               ? _buildEmptyState('お気に入りの本はありません。')
-              : _buildGridTab(_favorites, 'お気に入りの本はありません。'),
+              : _buildFavoriteBooksGrid(),
         ),
       ],
+    );
+  }
+
+  Widget _buildFavoriteBooksGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactPadding = constraints.maxWidth * 0.125;
+        final horizontalPadding = compactPadding < 16 ? 16.0 : compactPadding;
+        return GridView.builder(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 16,
+          ),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 0.62,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: _favorites.length,
+          itemBuilder: (context, index) {
+            final book = _favorites[index];
+            final matchingPosts = _userPosts.where(
+              (post) => post.bookId == book.id,
+            );
+            final rating = matchingPosts.isEmpty
+                ? 0.0
+                : matchingPosts.first.rating;
+            return GestureDetector(
+              onTap: _isOwnProfile ? () => _openBookshelfActions(book) : null,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF00E5FF)
+                        : const Color(0xFF00BFFF),
+                    width: 2,
+                  ),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      book.coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[300],
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.book, size: 36),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.84),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 5,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 15,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

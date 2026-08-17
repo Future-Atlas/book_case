@@ -43,7 +43,7 @@ Future<bool> showPostComposerDialog({
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            title: Text(isEditing ? '投稿を編集' : '読了した本を投稿'),
+            title: isEditing ? const Text('投稿を編集') : null,
             content: SizedBox(
               width: dialogWidth,
               child: SingleChildScrollView(

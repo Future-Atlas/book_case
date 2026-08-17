@@ -109,6 +109,26 @@ class _BookListScreenState extends State<BookListScreen> {
     await showPostReportDialog(context: context, postId: postId);
   }
 
+  void _showFavoriteResult(FavoriteToggleResult result) {
+    final message = switch (result) {
+      FavoriteToggleResult.added => 'お気に入りに登録しました。',
+      FavoriteToggleResult.removed => 'お気に入りから解除しました。',
+      FavoriteToggleResult.limitReached => 'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
+      FavoriteToggleResult.requiresRead => '読了（投稿）した本のみお気に入りに追加できます。',
+      FavoriteToggleResult.failed => 'お気に入りを更新できませんでした。',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _toggleFavoriteFromPost(Post post) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final result = await service.toggleFavorite(post.bookId);
+    if (!mounted) return;
+    _showFavoriteResult(result);
+  }
+
   Future<void> _deletePost(Post post) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     if (post.profileId != service.activeProfileId) return;
@@ -118,7 +138,7 @@ class _BookListScreenState extends State<BookListScreen> {
         title: const Text('投稿を削除しますか？'),
         content: Text(
           '「${post.bookTitle}」の投稿を削除します。\n'
-          'この本への投稿がほかにない場合、本棚からも削除されます。',
+          'この本への投稿がほかにない場合、My 本棚からも削除されます。',
         ),
         actions: [
           TextButton(
@@ -230,30 +250,39 @@ class _BookListScreenState extends State<BookListScreen> {
                               future: isReadFuture,
                               builder: (context, snapshot) {
                                 final isRead = snapshot.data ?? false;
+                                final isChecking =
+                                    snapshot.connectionState ==
+                                    ConnectionState.waiting;
                                 return Align(
                                   alignment: Alignment.topCenter,
                                   child: SizedBox(
                                     width: 190,
                                     height: 64,
                                     child: ElevatedButton(
-                                      onPressed: () async {
-                                        if (!mounted) return;
-                                        Navigator.of(this.context).pop();
-                                        _showPostComposerDialog(book);
-                                      },
+                                      onPressed: isRead || isChecking
+                                          ? null
+                                          : () async {
+                                              if (!mounted) return;
+                                              Navigator.of(this.context).pop();
+                                              _showPostComposerDialog(book);
+                                            },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.black,
                                         foregroundColor: const Color(
                                           0xFFFF1F1F,
                                         ),
+                                        disabledBackgroundColor: Colors.black,
+                                        disabledForegroundColor: isRead
+                                            ? const Color(0xFF00BFFF)
+                                            : Colors.grey,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
                                             18,
                                           ),
                                         ),
                                       ),
-                                      child: Text(
-                                        isRead ? '投稿する' : '読了',
+                                      child: const Text(
+                                        '読了',
                                         style: TextStyle(
                                           fontSize: 52 / 2,
                                           fontWeight: FontWeight.bold,
@@ -291,50 +320,16 @@ class _BookListScreenState extends State<BookListScreen> {
                                             final result = await service
                                                 .toggleFavorite(book.id);
                                             if (!mounted) return;
-                                            if (result ==
-                                                FavoriteToggleResult
-                                                    .limitReached) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
-                                                  ),
-                                                ),
-                                              );
-                                              return;
-                                            }
-                                            if (result ==
-                                                FavoriteToggleResult.failed) {
-                                              ScaffoldMessenger.of(
-                                                this.context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'お気に入りを更新できませんでした。',
-                                                  ),
-                                                ),
-                                              );
-                                              return;
-                                            }
-
-                                            if (context.mounted) {
+                                            if (context.mounted &&
+                                                (result ==
+                                                        FavoriteToggleResult
+                                                            .added ||
+                                                    result ==
+                                                        FavoriteToggleResult
+                                                            .removed)) {
                                               Navigator.of(context).pop();
                                             }
-                                            ScaffoldMessenger.of(
-                                              this.context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  result ==
-                                                          FavoriteToggleResult
-                                                              .added
-                                                      ? 'お気に入りに登録しました。'
-                                                      : 'お気に入りから解除しました。',
-                                                ),
-                                              ),
-                                            );
+                                            _showFavoriteResult(result);
                                           },
                                     icon: Icon(
                                       isFavorite
@@ -949,6 +944,9 @@ class _BookListScreenState extends State<BookListScreen> {
               onEdit: post.profileId == currentProfileId
                   ? () => _editPost(post)
                   : null,
+              onFavorite: post.profileId == currentProfileId
+                  ? () => _toggleFavoriteFromPost(post)
+                  : null,
               onReport: post.profileId == currentProfileId
                   ? null
                   : () => _reportPost(post.id),
@@ -989,20 +987,31 @@ class _CarouselTrianglePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path();
-    if (direction == AxisDirection.right) {
-      path
-        ..moveTo(0, 0)
-        ..lineTo(size.width, size.height / 2)
-        ..lineTo(0, size.height);
-    } else {
-      path
-        ..moveTo(size.width, 0)
-        ..lineTo(0, size.height / 2)
-        ..lineTo(size.width, size.height);
+    if (direction == AxisDirection.left) {
+      canvas
+        ..save()
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
     }
-    path.close();
+
+    const radius = 3.5;
+    final path = Path();
+    path
+      ..moveTo(radius, 0)
+      ..lineTo(size.width - radius, size.height / 2 - radius)
+      ..quadraticBezierTo(
+        size.width,
+        size.height / 2,
+        size.width - radius,
+        size.height / 2 + radius,
+      )
+      ..lineTo(radius, size.height - radius)
+      ..quadraticBezierTo(0, size.height, 0, size.height - radius)
+      ..lineTo(0, radius)
+      ..quadraticBezierTo(0, 0, radius, 0)
+      ..close();
     canvas.drawPath(path, Paint()..color = const Color(0xFFD00303));
+    if (direction == AxisDirection.left) canvas.restore();
   }
 
   @override

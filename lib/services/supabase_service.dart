@@ -13,7 +13,7 @@ import '../models/social_models.dart';
 import '../models/moderation_models.dart';
 import 'content_safety_service.dart';
 
-enum FavoriteToggleResult { added, removed, limitReached, failed }
+enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
 
 class SupabaseService extends ChangeNotifier {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -561,7 +561,7 @@ class SupabaseService extends ChangeNotifier {
     try {
       final profile = await _client!
           .from('profiles')
-          .select('username, user_id, is_private')
+          .select('username, user_id, avatar_url, is_private')
           .eq('id', profileId)
           .single();
       final details = await fetchCurrentAccountDetails();
@@ -597,6 +597,72 @@ class SupabaseService extends ChangeNotifier {
       return e.message;
     } catch (e) {
       return 'アカウント設定を保存できませんでした。';
+    }
+  }
+
+  Future<String?> uploadProfileAvatar({
+    required Uint8List bytes,
+    required String mimeType,
+  }) async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return null;
+    if (bytes.isEmpty || bytes.lengthInBytes > 5 * 1024 * 1024) return null;
+
+    const allowedTypes = {'image/jpeg', 'image/png', 'image/webp'};
+    final normalizedType = mimeType.toLowerCase();
+    if (!allowedTypes.contains(normalizedType)) return null;
+    final extension = switch (normalizedType) {
+      'image/png' => 'png',
+      'image/webp' => 'webp',
+      _ => 'jpg',
+    };
+    final path = '$profileId/avatar.$extension';
+
+    try {
+      final bucket = _client!.storage.from('avatars');
+      await bucket.uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(
+          upsert: true,
+          contentType: normalizedType,
+          cacheControl: '3600',
+        ),
+      );
+      final publicUrl = bucket.getPublicUrl(path);
+      final versionedUrl =
+          '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+      await _client!
+          .from('profiles')
+          .update({'avatar_url': versionedUrl})
+          .eq('id', profileId);
+      notifyListeners();
+      return versionedUrl;
+    } catch (e) {
+      debugPrint('Error uploading profile avatar: $e');
+      return null;
+    }
+  }
+
+  Future<bool> removeProfileAvatar() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return false;
+    try {
+      final bucket = _client!.storage.from('avatars');
+      await bucket.remove([
+        '$profileId/avatar.jpg',
+        '$profileId/avatar.png',
+        '$profileId/avatar.webp',
+      ]);
+      await _client!
+          .from('profiles')
+          .update({'avatar_url': ''})
+          .eq('id', profileId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error removing profile avatar: $e');
+      return false;
     }
   }
 
@@ -1773,6 +1839,10 @@ class SupabaseService extends ChangeNotifier {
       debugPrint('Cannot create post: no authenticated user.');
       return false;
     }
+    if (await isBookReadByCurrentUser(bookId: book.id)) {
+      debugPrint('Cannot create post: this user already posted this book.');
+      return false;
+    }
     final isAgeRestricted =
         ContentSafetyService.isAdultBook(book) ||
         ContentSafetyService.containsAdultContentTerms([comment]);
@@ -1914,6 +1984,15 @@ class SupabaseService extends ChangeNotifier {
           notifyListeners();
           return FavoriteToggleResult.removed;
         } else {
+          final postRows = await _client!
+              .from('posts')
+              .select('id')
+              .eq('profile_id', profileId)
+              .eq('book_id', bookId)
+              .limit(1);
+          if ((postRows as List<dynamic>).isEmpty) {
+            return FavoriteToggleResult.requiresRead;
+          }
           final existingFavorites = await _client!
               .from('favorites')
               .select('book_id')
@@ -1933,6 +2012,9 @@ class SupabaseService extends ChangeNotifier {
         debugPrint('Error toggling favorite in Supabase: $e');
         if (e.toString().contains('favorite_limit_reached')) {
           return FavoriteToggleResult.limitReached;
+        }
+        if (e.toString().contains('favorite_requires_post')) {
+          return FavoriteToggleResult.requiresRead;
         }
       }
     }
