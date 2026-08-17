@@ -62,7 +62,9 @@ class _BookCardState extends State<BookCard> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: _isHovered ? 0.15 : 0.06),
+                    color: Colors.black.withValues(
+                      alpha: _isHovered ? 0.15 : 0.06,
+                    ),
                     blurRadius: _isHovered ? 12 : 6,
                     offset: Offset(0, _isHovered ? 6 : 3),
                   ),
@@ -120,7 +122,7 @@ class _BookCardState extends State<BookCard> {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -143,7 +145,7 @@ class _BookCardState extends State<BookCard> {
                               color: Colors.grey[600],
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 1),
                           Row(
                             children: [
                               const Icon(

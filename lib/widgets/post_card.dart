@@ -48,7 +48,9 @@ class _PostCardState extends State<PostCard> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
     final primaryTextColor = colorScheme.onSurface;
     final secondaryTextColor = colorScheme.onSurface.withValues(alpha: 0.72);
     final tertiaryTextColor = colorScheme.onSurface.withValues(alpha: 0.58);
@@ -56,8 +58,11 @@ class _PostCardState extends State<PostCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: isDarkMode
+            ? Border.all(color: const Color(0xFFFFFFFF), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
