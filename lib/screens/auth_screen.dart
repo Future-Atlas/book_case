@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_screen.dart';
+import 'external_transmission_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -22,6 +23,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<bool> _showTermsDialog() async {
     var agreedTerms = false;
     var agreedPrivacy = false;
+    var confirmedExternalTransmission = false;
     final agreed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -38,7 +40,7 @@ class _AuthScreenState extends State<AuthScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '続けるには以下の両方に同意してください。',
+                '続けるには利用規約とプライバシーポリシーへの同意、外部送信内容の確認が必要です。',
                 style: TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 14),
@@ -49,6 +51,18 @@ class _AuthScreenState extends State<AuthScreen> {
                 onOpen: () => Navigator.of(
                   dialogContext,
                 ).push(MaterialPageRoute(builder: (_) => const TermsScreen())),
+              ),
+              _AgreementRow(
+                value: confirmedExternalTransmission,
+                label: '外部送信に関する公表事項',
+                actionText: 'を確認した',
+                onChanged: (value) =>
+                    setDialogState(() => confirmedExternalTransmission = value),
+                onOpen: () => Navigator.of(dialogContext).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ExternalTransmissionScreen(),
+                  ),
+                ),
               ),
               _AgreementRow(
                 value: agreedPrivacy,
@@ -69,7 +83,8 @@ class _AuthScreenState extends State<AuthScreen> {
               child: const Text('キャンセル'),
             ),
             FilledButton(
-              onPressed: agreedTerms && agreedPrivacy
+              onPressed:
+                  agreedTerms && agreedPrivacy && confirmedExternalTransmission
                   ? () => Navigator.of(dialogContext).pop(true)
                   : null,
               child: const Text('同意して続ける'),
@@ -203,7 +218,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(
                       width: 280,
                       child: Text(
-                        '現在利用できるログイン方法はXのみです。Xの認証画面へ移動してログインします。',
+                        '現在利用できるログイン方法はXです。Googleログインは近日追加予定です。',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.black54),
                       ),
@@ -232,12 +247,14 @@ class _AgreementRow extends StatelessWidget {
     required this.label,
     required this.onChanged,
     required this.onOpen,
+    this.actionText = 'に同意する',
   });
 
   final bool value;
   final String label;
   final ValueChanged<bool> onChanged;
   final VoidCallback onOpen;
+  final String actionText;
 
   @override
   Widget build(BuildContext context) {
@@ -263,7 +280,7 @@ class _AgreementRow extends StatelessWidget {
                   ),
                   recognizer: TapGestureRecognizer()..onTap = onOpen,
                 ),
-                const TextSpan(text: ' に同意する'),
+                TextSpan(text: ' $actionText'),
               ],
             ),
           ),

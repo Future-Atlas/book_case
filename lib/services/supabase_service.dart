@@ -6,12 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../api/rakuten_api.dart';
 import '../models/book.dart';
+import 'legal_document_versions.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
 import '../models/moderation_models.dart';
 import 'content_safety_service.dart';
-import 'legal_document_versions.dart';
 
 class SupabaseService extends ChangeNotifier {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -386,6 +386,48 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> requiresGuardianConsent() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) return false;
+    try {
+      final details = await _client!
+          .from('account_details')
+          .select(
+            'birth_date, guardian_consent_declared_at, guardian_consent_terms_version',
+          )
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      final birthDate = DateTime.tryParse(
+        details?['birth_date']?.toString() ?? '',
+      );
+      if (birthDate == null || ContentSafetyService.isAtLeast18(birthDate)) {
+        return false;
+      }
+      return details?['guardian_consent_declared_at'] == null ||
+          details?['guardian_consent_terms_version'] !=
+              LegalDocumentVersions.terms;
+    } catch (e) {
+      debugPrint('Error checking guardian consent: $e');
+      return true;
+    }
+  }
+
+  Future<String?> declareGuardianConsent() async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+    try {
+      await _client!.rpc(
+        'declare_guardian_consent',
+        params: {'p_terms_version': LegalDocumentVersions.terms},
+      );
+      return null;
+    } catch (e) {
+      debugPrint('Error recording guardian consent declaration: $e');
+      return '保護者の同意確認を保存できませんでした。データベース更新後に再試行してください。';
+    }
+  }
+
   Future<String?> initializePrivacyPassword(String password) async {
     if (!_isInitialized || _client == null || !isAuthenticated) {
       return 'ログイン状態を確認できませんでした。';
@@ -430,6 +472,7 @@ class SupabaseService extends ChangeNotifier {
     required String username,
     required String userId,
     required String privacyPassword,
+    required bool guardianConsentDeclared,
   }) async {
     final profileId = activeProfileId;
     if (!_isInitialized || _client == null || profileId.isEmpty) {
@@ -447,6 +490,8 @@ class SupabaseService extends ChangeNotifier {
           'p_username': username.trim(),
           'p_user_id': userId.trim().toLowerCase(),
           'p_privacy_password': privacyPassword,
+          'p_guardian_consent': guardianConsentDeclared,
+          'p_terms_version': LegalDocumentVersions.terms,
         },
       );
       _cachedRegistrationUserId = profileId;
@@ -460,6 +505,9 @@ class SupabaseService extends ChangeNotifier {
       }
       if (e.code == '23505') {
         return 'このユーザーIDはすでに使用されています。';
+      }
+      if (e.message.contains('GUARDIAN_CONSENT_REQUIRED')) {
+        return '18歳未満の方は、保護者の同意が必要です。';
       }
       if (e.code == '23514') {
         return '入力内容を確認してください。';

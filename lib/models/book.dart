@@ -9,6 +9,7 @@ class Book {
   final String isbn;
   final String coverUrl;
   final double ratingAvg;
+  final int reviewCount;
   final String genre;
   final String description;
 
@@ -21,6 +22,7 @@ class Book {
     required this.isbn,
     required this.coverUrl,
     this.ratingAvg = 0.0,
+    this.reviewCount = 0,
     this.genre = '',
     this.description = '',
   });
@@ -53,6 +55,14 @@ class Book {
     final pubDate = json['salesDate'] ?? '';
     final isbn = json['isbn'] ?? '';
     final coverUrl = json['largeImageUrl'] ?? '';
+    final rawReviewAverage = json['reviewAverage'];
+    final ratingAvg = rawReviewAverage is num
+        ? rawReviewAverage.toDouble()
+        : double.tryParse(rawReviewAverage?.toString() ?? '') ?? 0.0;
+    final rawReviewCount = json['reviewCount'];
+    final reviewCount = rawReviewCount is num
+        ? rawReviewCount.toInt()
+        : int.tryParse(rawReviewCount?.toString() ?? '') ?? 0;
     final id = isbn.isNotEmpty ? isbn : UniqueKey().toString();
     return Book(
       id: id,
@@ -62,6 +72,8 @@ class Book {
       pubDate: pubDate,
       isbn: isbn,
       coverUrl: coverUrl,
+      ratingAvg: ratingAvg,
+      reviewCount: reviewCount,
       genre: '',
       description: '',
     );
@@ -76,6 +88,7 @@ class Book {
     String? isbn,
     String? coverUrl,
     double? ratingAvg,
+    int? reviewCount,
     String? genre,
     String? description,
   }) {
@@ -88,6 +101,7 @@ class Book {
       isbn: isbn ?? this.isbn,
       coverUrl: coverUrl ?? this.coverUrl,
       ratingAvg: ratingAvg ?? this.ratingAvg,
+      reviewCount: reviewCount ?? this.reviewCount,
       genre: genre ?? this.genre,
       description: description ?? this.description,
     );

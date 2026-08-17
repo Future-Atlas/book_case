@@ -96,6 +96,10 @@ class RakutenApi {
       final parsedReviewAverage = rawReviewAverage is num
           ? rawReviewAverage.toDouble()
           : double.tryParse(rawReviewAverage?.toString() ?? '') ?? 0.0;
+      final rawReviewCount = bookData['reviewCount'];
+      final parsedReviewCount = rawReviewCount is num
+          ? rawReviewCount.toInt()
+          : int.tryParse(rawReviewCount?.toString() ?? '') ?? 0;
 
       final result = Book(
         id: isbn.isNotEmpty ? isbn : trimmed,
@@ -106,6 +110,7 @@ class RakutenApi {
         isbn: isbn,
         coverUrl: coverUrl,
         ratingAvg: parsedReviewAverage,
+        reviewCount: parsedReviewCount,
         description: description,
       );
       _bookByIdCache[cacheKey] = result;
@@ -121,6 +126,8 @@ class RakutenApi {
     int page = 1,
     int count = 10,
     bool keywordSearch = false,
+    String? sort,
+    String? searchField,
   }) async {
     if (_appId.isEmpty || _accessKey.isEmpty) {
       print('💡 [RakutenApi] APIキーが未設定のため通信をスキップします。');
@@ -134,13 +141,19 @@ class RakutenApi {
 
     // 💡 選択されたタブ・ジャンルによって、叩くAPIとパラメータを完全に切り替える
     if (keywordSearch) {
-      // ホーム画面のジャンル取得とは分離し、入力された語で楽天APIを直接検索する。
+      // ホーム画面の取得とは分離し、楽天APIが正式に受け付ける
+      // title / author / publisherName のいずれかを指定して検索する。
+      const allowedFields = {'title', 'author', 'publisherName'};
+      final field = allowedFields.contains(searchField)
+          ? searchField!
+          : 'title';
       urlString =
-          '$_bookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=001&keyword=${Uri.encodeComponent(selectedGenre.trim())}';
-    } else if (selectedGenre.contains('English') || selectedGenre.contains('洋書')) {
+          '$_bookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=001&$field=${Uri.encodeComponent(selectedGenre.trim())}&sort=${Uri.encodeComponent(sort ?? 'reviewCount')}';
+    } else if (selectedGenre.contains('English') ||
+        selectedGenre.contains('洋書')) {
       // ⭕ 洋書検索APIを呼び出す（必須条件：booksGenreId=005を指定）
       urlString =
-          '$_foreignBookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=005';
+          '$_foreignBookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=005&sort=${Uri.encodeComponent(sort ?? 'reviewCount')}';
     } else {
       // ⭕ 通常の書籍検索API（日本語の本）を呼び出す
       String genreId = '001';
@@ -148,13 +161,14 @@ class RakutenApi {
 
       if (selectedGenre.contains('話題の本') || selectedGenre.contains('おすすめ')) {
         genreId = '001004'; // 小説・エッセイ
+        sort ??= '-releaseDate';
       } else if (selectedGenre.contains('ビジネス') ||
           selectedGenre.contains('経済')) {
         genreId = '001006'; // ビジネス・経済・就職
       } else if (selectedGenre.contains('ベストセラー') ||
           selectedGenre.contains('人気作品')) {
         genreId = '001';
-        keyword = 'ベストセラー';
+        sort ??= 'reviewCount';
       } else {
         keyword = selectedGenre;
       }
@@ -164,6 +178,9 @@ class RakutenApi {
 
       if (keyword.isNotEmpty) {
         urlString += '&keyword=${Uri.encodeComponent(keyword)}';
+      }
+      if (sort != null && sort.isNotEmpty) {
+        urlString += '&sort=${Uri.encodeComponent(sort)}';
       }
     }
 
@@ -212,6 +229,10 @@ class RakutenApi {
         final parsedReviewAverage = rawReviewAverage is num
             ? rawReviewAverage.toDouble()
             : double.tryParse(rawReviewAverage?.toString() ?? '') ?? 0.0;
+        final rawReviewCount = bookData['reviewCount'];
+        final parsedReviewCount = rawReviewCount is num
+            ? rawReviewCount.toInt()
+            : int.tryParse(rawReviewCount?.toString() ?? '') ?? 0;
 
         books.add(
           Book(
@@ -225,6 +246,7 @@ class RakutenApi {
             isbn: isbn,
             coverUrl: coverUrl,
             ratingAvg: parsedReviewAverage,
+            reviewCount: parsedReviewCount,
             genre: selectedGenre,
             description: description,
           ),
@@ -245,12 +267,29 @@ class RakutenApi {
     required String keyword,
     int page = 1,
     int count = 30,
-  }) {
-    return searchBySelectedGenre(
-      selectedGenre: keyword,
-      page: page,
-      count: count,
-      keywordSearch: true,
-    );
+  }) async {
+    final normalizedLength = keyword
+        .trim()
+        .replaceAll(RegExp(r'[\s\u3000]+'), '')
+        .length;
+    final fields = normalizedLength < 8
+        ? const ['author', 'publisherName', 'title']
+        : const ['title', 'author', 'publisherName'];
+    final merged = <String, Book>{};
+
+    for (final field in fields) {
+      final books = await searchBySelectedGenre(
+        selectedGenre: keyword,
+        page: page,
+        count: 30,
+        keywordSearch: true,
+        searchField: field,
+        sort: 'standard',
+      );
+      for (final book in books) {
+        merged.putIfAbsent(book.id, () => book);
+      }
+    }
+    return merged.values.toList();
   }
 }

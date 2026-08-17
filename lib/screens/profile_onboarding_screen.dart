@@ -3,8 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/supabase_service.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_screen.dart';
 
-enum _OnboardingRequirement { complete, profile, privacyPassword }
+enum _OnboardingRequirement {
+  complete,
+  profile,
+  privacyPassword,
+  guardianConsent,
+}
 
 class ProfileOnboardingGate extends StatefulWidget {
   const ProfileOnboardingGate({super.key, required this.child});
@@ -24,9 +31,12 @@ class _ProfileOnboardingGateState extends State<ProfileOnboardingGate> {
       forceRefresh: true,
     );
     if (!hasProfile) return _OnboardingRequirement.profile;
-    return await service.hasPrivacyPassword()
-        ? _OnboardingRequirement.complete
-        : _OnboardingRequirement.privacyPassword;
+    if (!await service.hasPrivacyPassword()) {
+      return _OnboardingRequirement.privacyPassword;
+    }
+    return await service.requiresGuardianConsent()
+        ? _OnboardingRequirement.guardianConsent
+        : _OnboardingRequirement.complete;
   }
 
   void _refresh(SupabaseService service) {
@@ -66,10 +76,122 @@ class _ProfileOnboardingGateState extends State<ProfileOnboardingGate> {
                 return ProfileOnboardingScreen(
                   onCompleted: () => _refresh(service),
                 );
+              case _OnboardingRequirement.guardianConsent:
+                return GuardianConsentScreen(
+                  onCompleted: () => _refresh(service),
+                );
             }
           },
         );
       },
+    );
+  }
+}
+
+class GuardianConsentScreen extends StatefulWidget {
+  const GuardianConsentScreen({super.key, required this.onCompleted});
+
+  final VoidCallback onCompleted;
+
+  @override
+  State<GuardianConsentScreen> createState() => _GuardianConsentScreenState();
+}
+
+class _GuardianConsentScreenState extends State<GuardianConsentScreen> {
+  bool _declared = false;
+  bool _saving = false;
+
+  Future<void> _save() async {
+    if (!_declared) return;
+    setState(() => _saving = true);
+    final error = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).declareGuardianConsent();
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    widget.onCompleted();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('保護者の同意確認'),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const Text(
+                  '18歳未満の方は、保護者（法定代理人）の同意が必要です。',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const TermsScreen()),
+                      ),
+                      child: const Text('利用規約を確認'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PrivacyPolicyScreen(),
+                        ),
+                      ),
+                      child: const Text('プライバシーポリシーを確認'),
+                    ),
+                  ],
+                ),
+                CheckboxListTile(
+                  value: _declared,
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _declared = value ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: const Color(0xFFFF1F1F),
+                  checkColor: Colors.white,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text(
+                    '保護者に両文書を確認してもらい、本サービスの利用について同意を得ています。',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _saving || !_declared ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF1F1F),
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  child: Text(_saving ? '保存中...' : '確認して続ける'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -212,6 +334,7 @@ class _ProfileOnboardingScreenState extends State<ProfileOnboardingScreen> {
   bool _isSaving = false;
   bool _didPrefill = false;
   bool _obscurePassword = true;
+  bool _guardianConsentDeclared = false;
   String? _userIdError;
 
   static const _reservedUserIds = {
@@ -273,7 +396,23 @@ class _ProfileOnboardingScreenState extends State<ProfileOnboardingScreen> {
       ).showSnackBar(const SnackBar(content: Text('生年月日を選択してください。')));
       return;
     }
+    if (_isMinor(_birthDate!) && !_guardianConsentDeclared) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('18歳未満の方は、保護者の同意を確認してください。')),
+      );
+      return;
+    }
     setState(() => _step = 1);
+  }
+
+  bool _isMinor(DateTime birthDate) {
+    final now = DateTime.now();
+    final eighteenthBirthday = DateTime(
+      birthDate.year + 18,
+      birthDate.month,
+      birthDate.day,
+    );
+    return now.isBefore(eighteenthBirthday);
   }
 
   Future<void> _complete() async {
@@ -297,6 +436,7 @@ class _ProfileOnboardingScreenState extends State<ProfileOnboardingScreen> {
       username: _usernameController.text,
       userId: userId,
       privacyPassword: _passwordController.text,
+      guardianConsentDeclared: _guardianConsentDeclared,
     );
     if (!mounted) return;
     setState(() => _isSaving = false);
@@ -398,6 +538,22 @@ class _ProfileOnboardingScreenState extends State<ProfileOnboardingScreen> {
             ),
           ),
           const SizedBox(height: 18),
+          if (_birthDate != null && _isMinor(_birthDate!)) ...[
+            CheckboxListTile(
+              value: _guardianConsentDeclared,
+              onChanged: (value) =>
+                  setState(() => _guardianConsentDeclared = value ?? false),
+              contentPadding: EdgeInsets.zero,
+              activeColor: const Color(0xFFFF1F1F),
+              checkColor: Colors.white,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text(
+                '保護者（法定代理人）に利用規約とプライバシーポリシーを確認してもらい、同意を得ています。',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           TextFormField(
             controller: _phoneController,
             style: const TextStyle(color: Colors.white),

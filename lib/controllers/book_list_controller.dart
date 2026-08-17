@@ -77,49 +77,8 @@ class BookListController extends ChangeNotifier {
     });
   }
 
-  String _normalizeForSearch(String input) {
-    return input
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^0-9a-zぁ-んァ-ヶ一-龥]+'), '');
-  }
-
-  int _scoreBook(Book book, String rawQuery) {
-    final query = _normalizeForSearch(rawQuery);
-    if (query.isEmpty) return 0;
-
-    final normalizedTitle = _normalizeForSearch(book.title);
-    final normalizedAuthor = _normalizeForSearch(book.author);
-    final normalizedDescription = _normalizeForSearch(book.description);
-
-    var score = 0;
-
-    if (normalizedTitle == query) score += 500;
-    if (normalizedTitle.startsWith(query)) score += 300;
-    if (normalizedTitle.contains(query)) score += 200;
-    if (normalizedAuthor.contains(query)) score += 120;
-    if (normalizedDescription.contains(query)) score += 60;
-
-    final tokens = rawQuery
-        .split(RegExp(r'[\s\u3000・･]+'))
-        .map(_normalizeForSearch)
-        .where((token) => token.isNotEmpty)
-        .toList();
-
-    for (final token in tokens) {
-      if (normalizedTitle.contains(token)) score += 40;
-      if (normalizedAuthor.contains(token)) score += 24;
-      if (normalizedDescription.contains(token)) score += 10;
-    }
-
-    return score;
-  }
-
   void _sortSearchResults(String rawQuery) {
-    searchResults.sort((a, b) {
-      final scoreDiff = _scoreBook(b, rawQuery) - _scoreBook(a, rawQuery);
-      if (scoreDiff != 0) return scoreDiff;
-      return a.title.compareTo(b.title);
-    });
+    searchResults = BookRepository.rankSearchResults(searchResults, rawQuery);
   }
 
   Future<void> _searchBooks({required bool reset}) async {

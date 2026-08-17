@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AdBanner extends StatefulWidget {
-  final String sectionLabel;
-  const AdBanner({super.key, required this.sectionLabel});
+  const AdBanner({super.key});
 
   @override
   State<AdBanner> createState() => _AdBannerState();
@@ -34,10 +33,12 @@ class _AdBannerState extends State<AdBanner> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFFB703).withValues(alpha: _isHovered ? 0.35 : 0.15),
+              color: const Color(
+                0xFFFFB703,
+              ).withValues(alpha: _isHovered ? 0.35 : 0.15),
               blurRadius: _isHovered ? 16 : 8,
               offset: Offset(0, _isHovered ? 6 : 3),
-            )
+            ),
           ],
         ),
         transform: Matrix4.diagonal3Values(
@@ -78,23 +79,6 @@ class _AdBannerState extends State<AdBanner> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        widget.sectionLabel,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
                     const Text(
                       'スポンサー広告掲載エリア',
                       style: TextStyle(
@@ -114,4 +98,3 @@ class _AdBannerState extends State<AdBanner> {
     );
   }
 }
-

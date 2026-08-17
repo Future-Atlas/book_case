@@ -144,72 +144,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         .toList();
   }
 
-  String _normalizeForFuzzy(String value) {
-    return value.toLowerCase().replaceAll(
-      RegExp(r'[\s　\-_/・,.;:()\[\]{}]'),
-      '',
-    );
-  }
-
-  double _bigramJaccard(String a, String b) {
-    if (a.isEmpty || b.isEmpty) return 0;
-    if (a.length == 1 || b.length == 1) return a == b ? 1 : 0;
-
-    Set<String> toBigrams(String s) {
-      final grams = <String>{};
-      for (var i = 0; i < s.length - 1; i++) {
-        grams.add(s.substring(i, i + 2));
-      }
-      return grams;
-    }
-
-    final aSet = toBigrams(a);
-    final bSet = toBigrams(b);
-    final intersection = aSet.intersection(bSet).length.toDouble();
-    final union = aSet.union(bSet).length.toDouble();
-    if (union == 0) return 0;
-    return intersection / union;
-  }
-
-  double _scoreBookForQuery(Book book, String query) {
-    final q = _normalizeForFuzzy(query);
-    final title = _normalizeForFuzzy(book.title);
-    final author = _normalizeForFuzzy(book.author);
-    final combined = '$title$author';
-
-    var score = 0.0;
-    if (title.contains(q)) score += 3.0;
-    if (author.contains(q)) score += 2.0;
-    if (combined.contains(q)) score += 1.5;
-
-    final tokens = _tokenizeQuery(
-      query,
-    ).map(_normalizeForFuzzy).where((t) => t.isNotEmpty).toList();
-    for (final token in tokens) {
-      if (title.contains(token)) score += 1.2;
-      if (author.contains(token)) score += 0.8;
-      score += _bigramJaccard(token, title) * 0.9;
-      score += _bigramJaccard(token, author) * 0.7;
-    }
-
-    score += _bigramJaccard(q, title) * 1.4;
-    score += _bigramJaccard(q, combined) * 1.0;
-    return score;
-  }
-
   List<Book> _rankBooksByFuzzyScore(List<Book> books, String query) {
     final byId = <String, Book>{};
     for (final book in books) {
       byId[book.id] = book;
     }
-
-    final scored = byId.values
-        .map((book) => (book: book, score: _scoreBookForQuery(book, query)))
-        .where((row) => row.score > 0.25)
-        .toList();
-
-    scored.sort((a, b) => b.score.compareTo(a.score));
-    return scored.map((row) => row.book).take(20).toList();
+    return BookRepository.rankSearchResults(
+      byId.values,
+      query,
+    ).take(20).toList();
   }
 
   Future<void> _loadProfileData() async {

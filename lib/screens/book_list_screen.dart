@@ -372,32 +372,31 @@ class _BookListScreenState extends State<BookListScreen> {
                               else ...[
                                 _buildGenreSection(
                                   title: 'おすすめの本',
-                                  sectionCode: 'Section 3',
                                   bookList: _controller.recommendedBooks,
                                   onLoadMore: _controller.loadMoreRecommended,
                                   isLoadingMore:
                                       _controller.isLoadingMoreRecommended,
                                   hasMore: _controller.hasMoreRecommended,
                                 ),
-                                const AdBanner(sectionLabel: 'Section 2'),
+                                const AdBanner(),
                                 _buildGenreSection(
                                   title: '洋書',
-                                  sectionCode: 'Section 4',
                                   bookList: _controller.westernBooks,
                                   onLoadMore: _controller.loadMoreWestern,
-                                  isLoadingMore: _controller.isLoadingMoreWestern,
+                                  isLoadingMore:
+                                      _controller.isLoadingMoreWestern,
                                   hasMore: _controller.hasMoreWestern,
                                 ),
                                 _buildGenreSection(
                                   title: '人気作品',
-                                  sectionCode: 'Section 6',
                                   bookList: _controller.popularBooks,
                                   onLoadMore: _controller.loadMorePopular,
-                                  isLoadingMore: _controller.isLoadingMorePopular,
+                                  isLoadingMore:
+                                      _controller.isLoadingMorePopular,
                                   hasMore: _controller.hasMorePopular,
                                 ),
-                                const AdBanner(sectionLabel: 'Section 5'),
-                                _buildSectionHeader('タイムライン', 'Section 5'),
+                                const AdBanner(),
+                                _buildSectionHeader('タイムライン'),
                                 _buildTimeline(),
                               ],
                               _buildFooter(),
@@ -493,7 +492,6 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Widget _buildGenreSection({
     required String title,
-    required String sectionCode,
     required List<Book> bookList,
     required Future<void> Function() onLoadMore,
     required bool isLoadingMore,
@@ -504,7 +502,6 @@ class _BookListScreenState extends State<BookListScreen> {
       children: [
         _buildSectionHeader(
           title,
-          sectionCode,
           failedToLoad: bookList.isEmpty,
           isLoadingMore: isLoadingMore,
           hasMore: hasMore,
@@ -516,8 +513,7 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSectionHeader(
-    String title,
-    String sectionCode, {
+    String title, {
     bool failedToLoad = false,
     bool isLoadingMore = false,
     bool hasMore = true,
@@ -537,25 +533,6 @@ class _BookListScreenState extends State<BookListScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    sectionCode,
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
                 ),
                 if (failedToLoad) ...[
@@ -596,9 +573,7 @@ class _BookListScreenState extends State<BookListScreen> {
                   )
                 : Icon(
                     Icons.chevron_right,
-                    color: hasMore
-                        ? const Color(0xFFFF3B30)
-                        : Colors.grey[400],
+                    color: hasMore ? const Color(0xFFFF3B30) : Colors.grey[400],
                   ),
           ),
         ],
@@ -684,9 +659,7 @@ class _BookListScreenState extends State<BookListScreen> {
             height: 200,
             alignment: Alignment.center,
             child: Text(
-              _controller.isSearching
-                  ? '検索しています...'
-                  : 'お探しの作品が見つかりませんでした。',
+              _controller.isSearching ? '検索しています...' : 'お探しの作品が見つかりませんでした。',
               style: TextStyle(color: Colors.grey[500]),
             ),
           )

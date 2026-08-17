@@ -56,6 +56,7 @@ class _CommunityGuidelinesContent extends StatelessWidget {
 
   static const String _guidelinesText = r'''Sharemarium コミュニティガイドライン
 伊能龍之介（以下「運営者」といいます。）は、読書レビューSNS「Sharemarium」（以下「本サービス」といいます。）を、利用者が安心して読書体験や意見を共有できる場所にするため、本コミュニティガイドラインを定めます。
+本ガイドライン中、コメント、画像、音声、動画、メッセージ、ミュート又は投稿ごとの公開範囲等、現時点で提供していない機能に関する記載は、当該機能が将来提供された場合に限って適用されます。現時点では、文章によるレビュー、リアクション、フォロー、アカウント単位の公開・非公開、投稿の通報及びブロック等を提供しています。
 本ガイドラインは、Sharemarium利用規約の一部を構成します。本ガイドラインに定めのない事項については、利用規約、権利侵害・通報ポリシー及びプライバシーポリシーが適用されます。
 ________________________________________
 1. 基本的な考え方
@@ -388,6 +389,8 @@ ________________________________________
 附則
 制定日
 2026年7月25日
+最終改定日
+2026年8月17日
 運営者
 伊能龍之介''';
 
@@ -416,7 +419,7 @@ ________________________________________
   static List<_GuidelinesBlock> _parseBlocks(String source) {
     final blocks = <_GuidelinesBlock>[];
     var nextLineIsSectionHeading = false;
-    const labels = {'運営者', 'サービス名', 'お問い合わせ方法', '制定日'};
+    const labels = {'運営者', 'サービス名', 'お問い合わせ方法', '制定日', '最終改定日'};
 
     for (final rawLine in source.split('\n')) {
       final line = rawLine.trim();
