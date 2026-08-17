@@ -15,8 +15,8 @@ class BookCard extends StatefulWidget {
     required this.book,
     this.onTap,
     this.width,
-    this.height = 190,
-    this.coverHeightRatio = 0.7,
+    this.height = 202,
+    this.coverHeightRatio = 0.66,
     this.showDescription = false,
     this.descriptionMaxLines = 2,
   });
@@ -54,13 +54,12 @@ class _BookCardState extends State<BookCard> {
             onTap: widget.onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: widget.width ?? 130,
+              width: widget.width ?? 138,
               height: cardHeight,
               margin: const EdgeInsets.only(right: 16, bottom: 8),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF009D5B), width: 2),
+                borderRadius: BorderRadius.circular(2),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(
@@ -68,6 +67,11 @@ class _BookCardState extends State<BookCard> {
                     ),
                     blurRadius: _isHovered ? 12 : 6,
                     offset: Offset(0, _isHovered ? 6 : 3),
+                  ),
+                  const BoxShadow(
+                    color: Color(0xFF009D5B),
+                    blurRadius: 0,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
@@ -82,10 +86,10 @@ class _BookCardState extends State<BookCard> {
                   // Book cover area: occupies configured ratio of card height.
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(12),
+                      top: Radius.circular(2),
                     ),
                     child: SizedBox(
-                      width: widget.width ?? 130,
+                      width: widget.width ?? 138,
                       height: coverHeight,
                       child: Hero(
                         tag: 'book-cover-${widget.book.id}',

@@ -1,4 +1,5 @@
 import 'package:flutter_application_1/models/book.dart';
+import 'package:flutter_application_1/api/rakuten_api.dart';
 import 'package:flutter_application_1/repositories/book_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,6 +25,17 @@ Book _book({
 }
 
 void main() {
+  test('楽天検索ではスペースと中点を除いた検索語も生成する', () {
+    expect(RakutenApi.buildSearchKeywordVariants('プロジェクト・へイル・メアリー'), [
+      'プロジェクト・へイル・メアリー',
+      'プロジェクトへイルメアリー',
+    ]);
+    expect(RakutenApi.buildSearchKeywordVariants('Andy Weir'), [
+      'Andy Weir',
+      'AndyWeir',
+    ]);
+  });
+
   group('検索入力の分類', () {
     test('社で終わる場合は出版社を優先する', () {
       expect(
@@ -96,6 +108,26 @@ void main() {
     ], 'アンディ・ウィアー');
 
     expect(ranked.first.id, 'exact');
+  });
+
+  test('中点の有無が異なるタイトルも完全一致として扱う', () {
+    final ranked = BookRepository.rankSearchResults([
+      _book(
+        id: 'match',
+        title: 'プロジェクト・へイル・メアリー',
+        author: 'アンディ・ウィアー',
+        publisher: '早川書房',
+      ),
+      _book(
+        id: 'partial',
+        title: 'プロジェクトへイルメアリー読本',
+        author: '別の著者',
+        publisher: '別の出版社',
+        reviewCount: 100,
+      ),
+    ], 'プロジェクトへイルメアリー');
+
+    expect(ranked.first.id, 'match');
   });
 
   test('20冊を優先度1に10冊、優先度2に5冊、優先度3に5冊配分する', () {

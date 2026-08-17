@@ -585,7 +585,7 @@ class _BookListScreenState extends State<BookListScreen> {
   Widget _buildBookCarousel(List<Book> bookList) {
     if (bookList.isEmpty) {
       return Container(
-        height: 205,
+        height: 220,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor.withValues(alpha: 0.8),
@@ -622,7 +622,7 @@ class _BookListScreenState extends State<BookListScreen> {
     }
 
     return SizedBox(
-      height: 205,
+      height: 220,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),

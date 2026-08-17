@@ -16,6 +16,17 @@ class RakutenApi {
   static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
   static final Map<String, Book?> _bookByIdCache = <String, Book?>{};
 
+  static List<String> buildSearchKeywordVariants(String keyword) {
+    final original = keyword.trim();
+    if (original.isEmpty) return const [];
+
+    final compact = original.replaceAll(RegExp(r'[\s\u3000・･]+'), '');
+    return <String>{
+      original,
+      compact,
+    }.where((value) => value.isNotEmpty).toList();
+  }
+
   static Future<http.Response?> _getWithRateLimitRetry(
     Uri uri, {
     int maxRetries = 3,
@@ -278,18 +289,21 @@ class RakutenApi {
       fields.addAll(const ['title', 'author', 'publisherName']);
     }
     final merged = <String, Book>{};
+    final keywordVariants = buildSearchKeywordVariants(keyword);
 
     for (final field in fields) {
-      final books = await searchBySelectedGenre(
-        selectedGenre: keyword,
-        page: page,
-        count: count,
-        keywordSearch: true,
-        searchField: field,
-        sort: 'standard',
-      );
-      for (final book in books) {
-        merged.putIfAbsent(book.id, () => book);
+      for (final keywordVariant in keywordVariants) {
+        final books = await searchBySelectedGenre(
+          selectedGenre: keywordVariant,
+          page: page,
+          count: count,
+          keywordSearch: true,
+          searchField: field,
+          sort: 'standard',
+        );
+        for (final book in books) {
+          merged.putIfAbsent(book.id, () => book);
+        }
       }
     }
     return merged.values.toList();
