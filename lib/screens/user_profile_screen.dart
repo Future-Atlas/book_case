@@ -681,14 +681,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       children: [
         Text(
           count,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
+            color: Colors.black,
           ),
         ),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black)),
       ],
     );
   }

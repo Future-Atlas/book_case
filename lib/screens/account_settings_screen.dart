@@ -245,6 +245,7 @@ class _PublicAccountSettingsScreenState
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _userIdController = TextEditingController();
+  final _bioController = TextEditingController();
   bool _isPrivate = false;
   String _avatarUrl = '';
   bool _loading = true;
@@ -265,6 +266,7 @@ class _PublicAccountSettingsScreenState
     if (!mounted) return;
     _usernameController.text = data?['username']?.toString() ?? '';
     _userIdController.text = data?['user_id']?.toString() ?? '';
+    _bioController.text = data?['bio']?.toString() ?? '';
     setState(() {
       _avatarUrl = data?['avatar_url']?.toString() ?? '';
       _isPrivate = data?['is_private'] == true;
@@ -276,6 +278,7 @@ class _PublicAccountSettingsScreenState
   void dispose() {
     _usernameController.dispose();
     _userIdController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
@@ -286,6 +289,7 @@ class _PublicAccountSettingsScreenState
         .updatePublicProfile(
           username: _usernameController.text,
           userId: _userIdController.text,
+          bio: _bioController.text,
           isPrivate: _isPrivate,
         );
     if (!mounted) return;
@@ -401,7 +405,9 @@ class _PublicAccountSettingsScreenState
                                         )
                                       : const Icon(Icons.photo_camera_outlined),
                                   label: Text(
-                                    _avatarUrl.isEmpty ? '画像を設定' : '画像を変更',
+                                    _avatarUrl.isEmpty
+                                        ? 'デバイスから画像を選択'
+                                        : 'デバイスから画像を変更',
                                   ),
                                 ),
                                 if (_avatarUrl.isNotEmpty)
@@ -455,6 +461,20 @@ class _PublicAccountSettingsScreenState
                             ).hasMatch((value ?? '').trim().toLowerCase())
                             ? null
                             : 'ユーザーIDの形式を確認してください。',
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _bioController,
+                        minLines: 4,
+                        maxLines: 7,
+                        maxLength: 300,
+                        decoration: const InputDecoration(
+                          labelText: '自己紹介文',
+                          hintText: '好きな本や読書について入力してください。',
+                          helperText: 'プロフィール上で公開されます。',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       SwitchListTile(

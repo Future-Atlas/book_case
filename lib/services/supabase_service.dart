@@ -561,7 +561,7 @@ class SupabaseService extends ChangeNotifier {
     try {
       final profile = await _client!
           .from('profiles')
-          .select('username, user_id, avatar_url, is_private')
+          .select('username, user_id, avatar_url, bio, is_private')
           .eq('id', profileId)
           .single();
       final details = await fetchCurrentAccountDetails();
@@ -575,6 +575,7 @@ class SupabaseService extends ChangeNotifier {
   Future<String?> updatePublicProfile({
     required String username,
     required String userId,
+    required String bio,
     required bool isPrivate,
   }) async {
     if (!_isInitialized || _client == null || !isAuthenticated) {
@@ -586,6 +587,7 @@ class SupabaseService extends ChangeNotifier {
         params: {
           'p_username': username.trim(),
           'p_user_id': userId.trim().toLowerCase(),
+          'p_bio': bio.trim(),
           'p_is_private': isPrivate,
         },
       );
