@@ -40,12 +40,12 @@ class _BookCardState extends State<BookCard> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
         final hasBoundedHeight =
             constraints.maxHeight.isFinite && constraints.maxHeight > 0;
         final cardHeight = hasBoundedHeight
             ? constraints.maxHeight
             : widget.height;
-        final coverHeight = cardHeight * widget.coverHeightRatio;
 
         return MouseRegion(
           onEnter: (_) => setState(() => _isHovered = true),
@@ -68,120 +68,124 @@ class _BookCardState extends State<BookCard> {
                     blurRadius: _isHovered ? 12 : 6,
                     offset: Offset(0, _isHovered ? 6 : 3),
                   ),
-                  const BoxShadow(
-                    color: Color(0xFF009D5B),
-                    blurRadius: 0,
-                    spreadRadius: 2,
-                  ),
                 ],
               ),
+              foregroundDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(
+                  color: isDarkMode
+                      ? const Color(0xFF00E5FF)
+                      : const Color(0xFF00BFFF),
+                  width: 2,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
               transform: Matrix4.diagonal3Values(
                 _isHovered ? 1.03 : 1.0,
                 _isHovered ? 1.03 : 1.0,
                 1.0,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  // Book cover area: occupies configured ratio of card height.
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(2),
-                    ),
-                    child: SizedBox(
-                      width: widget.width ?? 138,
-                      height: coverHeight,
-                      child: Hero(
-                        tag: 'book-cover-${widget.book.id}',
-                        child: Image.network(
-                          widget.book.coverUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[300],
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.book,
-                                size: 40,
-                                color: Colors.grey,
-                              ),
-                            );
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: Colors.grey[200],
-                              alignment: Alignment.center,
-                              child: const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                  // The cover fills the whole card. Book information is
+                  // overlaid on its lower portion without changing the
+                  // information panel's existing height ratio.
+                  Hero(
+                    tag: 'book-cover-${widget.book.id}',
+                    child: Image.network(
+                      widget.book.coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[300],
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.book,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: Colors.grey[200],
+                          alignment: Alignment.center,
+                          child: const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 1),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.book.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          Text(
-                            widget.book.author,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          if (!widget.showDescription) const Spacer(),
-                          Row(
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: FractionallySizedBox(
+                      widthFactor: 1,
+                      heightFactor: 1 - widget.coverHeightRatio,
+                      child: ColoredBox(
+                        color: Theme.of(context).cardColor,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 4, 8, 1),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                                size: 12,
-                              ),
-                              const SizedBox(width: 2),
                               Text(
-                                widget.book.ratingAvg.toStringAsFixed(1),
+                                widget.book.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
+                              Text(
+                                widget.book.author,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (!widget.showDescription) const Spacer(),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.star,
+                                    color: Colors.amber,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    widget.book.ratingAvg.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (widget.showDescription) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  _displayDescription,
+                                  maxLines: widget.descriptionMaxLines,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[700],
+                                    height: 1.25,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                          if (widget.showDescription) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              _displayDescription,
-                              maxLines: widget.descriptionMaxLines,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey[700],
-                                height: 1.25,
-                              ),
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
                     ),
                   ),

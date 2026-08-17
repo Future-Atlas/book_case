@@ -464,6 +464,7 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchBar() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       height: 50,
@@ -471,7 +472,10 @@ class _BookListScreenState extends State<BookListScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF00BFFF), width: 2),
+        border: Border.all(
+          color: isDarkMode ? const Color(0xFF00E5A8) : const Color(0xFF007B49),
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -639,7 +643,6 @@ class _BookListScreenState extends State<BookListScreen> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
-        padding: const EdgeInsets.only(left: 2, top: 2),
         physics: const BouncingScrollPhysics(),
         itemCount: bookList.length,
         itemBuilder: (context, index) {
