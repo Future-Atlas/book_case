@@ -42,6 +42,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   String? _searchError;
   ProfileRelationship? _relationship;
   bool _isSocialActionInProgress = false;
+  final Set<String> _pendingReactionPostIds = <String>{};
 
   bool get _isOwnProfile => _relationship?.isOwnProfile ?? false;
 
@@ -269,9 +270,37 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
+    if (!_pendingReactionPostIds.add(postId)) return;
+
+    final index = _userPosts.indexWhere((post) => post.id == postId);
+    final previous = index < 0 ? null : _userPosts[index];
+    if (previous != null) {
+      setState(() {
+        final updatedPosts = List<Post>.from(_userPosts);
+        updatedPosts[index] = previous.withToggledReaction(reaction);
+        _userPosts = updatedPosts;
+      });
+    }
+
     final service = Provider.of<SupabaseService>(context, listen: false);
     final success = await service.setPostReaction(postId, reaction);
-    if (success && mounted) await _loadProfileData();
+    _pendingReactionPostIds.remove(postId);
+    if (!mounted) return;
+
+    if (!success && previous != null) {
+      setState(() {
+        final restoreIndex = _userPosts.indexWhere(
+          (post) => post.id == previous.id,
+        );
+        if (restoreIndex < 0) return;
+        final restoredPosts = List<Post>.from(_userPosts);
+        restoredPosts[restoreIndex] = previous;
+        _userPosts = restoredPosts;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('リアクションを更新できませんでした。')));
+    }
   }
 
   Future<void> _reportPost(String postId) async {

@@ -1497,7 +1497,6 @@ class SupabaseService extends ChangeNotifier {
           'reaction_type': reaction.databaseValue,
         }, onConflict: 'post_id,profile_id');
       }
-      notifyListeners();
       return true;
     } catch (e) {
       debugPrint('Error setting post reaction: $e');

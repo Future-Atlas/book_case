@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../repositories/book_repository.dart';
 import '../models/post.dart';
+import '../models/social_models.dart';
 import '../services/supabase_service.dart';
 
 class BookListController extends ChangeNotifier {
@@ -44,6 +45,31 @@ class BookListController extends ChangeNotifier {
 
   BookRepository get _repository =>
       BookRepository(allowAdultContent: _allowAdultContent);
+
+  Post? toggleTimelineReactionOptimistically(
+    String postId,
+    PostReactionType reaction,
+  ) {
+    final index = timelinePosts.indexWhere((post) => post.id == postId);
+    if (index < 0) return null;
+
+    final previous = timelinePosts[index];
+    final updatedPosts = List<Post>.from(timelinePosts);
+    updatedPosts[index] = previous.withToggledReaction(reaction);
+    timelinePosts = updatedPosts;
+    notifyListeners();
+    return previous;
+  }
+
+  void restoreTimelinePost(Post previous) {
+    final index = timelinePosts.indexWhere((post) => post.id == previous.id);
+    if (index < 0) return;
+
+    final restoredPosts = List<Post>.from(timelinePosts);
+    restoredPosts[index] = previous;
+    timelinePosts = restoredPosts;
+    notifyListeners();
+  }
 
   // 初期化
   void initialize(BuildContext context) {

@@ -56,7 +56,7 @@ class _BookCardState extends State<BookCard> {
               duration: const Duration(milliseconds: 200),
               width: widget.width ?? 138,
               height: cardHeight,
-              margin: const EdgeInsets.only(right: 16, bottom: 8),
+              margin: const EdgeInsets.only(right: 16, bottom: 12),
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(2),
@@ -127,7 +127,7 @@ class _BookCardState extends State<BookCard> {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 1),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -150,7 +150,7 @@ class _BookCardState extends State<BookCard> {
                               color: Colors.grey[600],
                             ),
                           ),
-                          const SizedBox(height: 1),
+                          if (!widget.showDescription) const Spacer(),
                           Row(
                             children: [
                               const Icon(

@@ -110,6 +110,7 @@ class Post {
     bool? isSpoiler,
     Map<PostReactionType, int>? reactionCounts,
     PostReactionType? currentUserReaction,
+    bool clearCurrentUserReaction = false,
   }) {
     return Post(
       id: id ?? this.id,
@@ -126,7 +127,36 @@ class Post {
       isAgeRestricted: isAgeRestricted ?? this.isAgeRestricted,
       isSpoiler: isSpoiler ?? this.isSpoiler,
       reactionCounts: reactionCounts ?? this.reactionCounts,
-      currentUserReaction: currentUserReaction ?? this.currentUserReaction,
+      currentUserReaction: clearCurrentUserReaction
+          ? null
+          : currentUserReaction ?? this.currentUserReaction,
+    );
+  }
+
+  /// Returns the state shown immediately after the current user taps a
+  /// reaction. Persisting it to the backend is handled separately.
+  Post withToggledReaction(PostReactionType reaction) {
+    final nextCounts = Map<PostReactionType, int>.from(reactionCounts);
+    final previousReaction = currentUserReaction;
+
+    if (previousReaction != null) {
+      final previousCount = nextCounts[previousReaction] ?? 0;
+      if (previousCount <= 1) {
+        nextCounts.remove(previousReaction);
+      } else {
+        nextCounts[previousReaction] = previousCount - 1;
+      }
+    }
+
+    final nextReaction = previousReaction == reaction ? null : reaction;
+    if (nextReaction != null) {
+      nextCounts[nextReaction] = (nextCounts[nextReaction] ?? 0) + 1;
+    }
+
+    return copyWith(
+      reactionCounts: nextCounts,
+      currentUserReaction: nextReaction,
+      clearCurrentUserReaction: nextReaction == null,
     );
   }
 }

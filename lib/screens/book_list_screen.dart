@@ -21,6 +21,7 @@ class BookListScreen extends StatefulWidget {
 
 class _BookListScreenState extends State<BookListScreen> {
   late final BookListController _controller;
+  final Set<String> _pendingReactionPostIds = <String>{};
 
   @override
   void initState() {
@@ -64,10 +65,22 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
     if (!await _ensureAuthenticated() || !mounted) return;
+    if (!_pendingReactionPostIds.add(postId)) return;
+
+    final previous = _controller.toggleTimelineReactionOptimistically(
+      postId,
+      reaction,
+    );
     final service = Provider.of<SupabaseService>(context, listen: false);
     final success = await service.setPostReaction(postId, reaction);
-    if (success && mounted) {
-      await _controller.loadData(context);
+    _pendingReactionPostIds.remove(postId);
+    if (!mounted) return;
+
+    if (!success && previous != null) {
+      _controller.restoreTimelinePost(previous);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('リアクションを更新できませんでした。')));
     }
   }
 
@@ -625,6 +638,8 @@ class _BookListScreenState extends State<BookListScreen> {
       height: 220,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(left: 2, top: 2),
         physics: const BouncingScrollPhysics(),
         itemCount: bookList.length,
         itemBuilder: (context, index) {
@@ -680,6 +695,7 @@ class _BookListScreenState extends State<BookListScreen> {
                       : 2;
                   return GridView.builder(
                     shrinkWrap: true,
+                    clipBehavior: Clip.none,
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columnCount,
