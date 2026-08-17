@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../models/book.dart';
@@ -18,14 +17,10 @@ class BookListController extends ChangeNotifier {
   int searchPage = 1;
   List<Book> searchResults = [];
   final Set<String> _searchResultIds = <String>{};
-  int _visibleSearchResultCount = 10;
 
-  List<Book> get visibleSearchResults => searchResults
-      .take(math.min(_visibleSearchResultCount, searchResults.length))
-      .toList(growable: false);
+  List<Book> get visibleSearchResults => searchResults;
 
-  bool get canLoadMoreSearchResults =>
-      _visibleSearchResultCount < searchResults.length || hasMoreSearch;
+  bool get canLoadMoreSearchResults => hasMoreSearch;
 
   // ジャンルごとに「リスト」「現在のページ」「まだ続きがあるか」を独立して管理
   List<Book> recommendedBooks = [];
@@ -74,7 +69,6 @@ class BookListController extends ChangeNotifier {
       searchPage = 1;
       searchResults = [];
       _searchResultIds.clear();
-      _visibleSearchResultCount = 10;
       notifyListeners();
       return;
     }
@@ -85,10 +79,6 @@ class BookListController extends ChangeNotifier {
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
       _searchBooks(reset: true);
     });
-  }
-
-  void _sortSearchResults(String rawQuery) {
-    searchResults = BookRepository.rankSearchResults(searchResults, rawQuery);
   }
 
   Future<void> _searchBooks({required bool reset}) async {
@@ -104,7 +94,6 @@ class BookListController extends ChangeNotifier {
       searchPage = 1;
       searchResults = [];
       _searchResultIds.clear();
-      _visibleSearchResultCount = 10;
     } else if (!hasMoreSearch || isSearching) {
       return;
     }
@@ -117,7 +106,7 @@ class BookListController extends ChangeNotifier {
       final batch = await _repository.searchBooks(
         query,
         page: requestedPage,
-        count: 30,
+        count: 20,
       );
 
       // 入力中に別の検索が始まった場合は、古い結果を画面へ反映しない。
@@ -129,9 +118,8 @@ class BookListController extends ChangeNotifier {
         }
       }
 
-      _sortSearchResults(query);
       searchPage = requestedPage + 1;
-      hasMoreSearch = batch.length >= 30;
+      hasMoreSearch = batch.length >= 20;
     } finally {
       if (query == searchQuery.trim()) {
         isSearching = false;
@@ -142,26 +130,8 @@ class BookListController extends ChangeNotifier {
 
   Future<void> loadMoreSearchResults() async {
     if (searchQuery.isEmpty || isSearching) return;
-
-    if (_visibleSearchResultCount < searchResults.length) {
-      _visibleSearchResultCount = math.min(
-        _visibleSearchResultCount + 10,
-        searchResults.length,
-      );
-      notifyListeners();
-      return;
-    }
-
     if (!hasMoreSearch) return;
-    final previousLength = searchResults.length;
     await _searchBooks(reset: false);
-    if (searchResults.length > previousLength) {
-      _visibleSearchResultCount = math.min(
-        _visibleSearchResultCount + 10,
-        searchResults.length,
-      );
-    }
-    notifyListeners();
   }
 
   Future<void> _loadData(BuildContext context) async {

@@ -266,22 +266,24 @@ class RakutenApi {
   static Future<List<Book>> searchByKeyword({
     required String keyword,
     int page = 1,
-    int count = 30,
+    int count = 20,
+    List<String>? searchFields,
   }) async {
-    final normalizedLength = keyword
-        .trim()
-        .replaceAll(RegExp(r'[\s\u3000]+'), '')
-        .length;
-    final fields = normalizedLength < 8
-        ? const ['author', 'publisherName', 'title']
-        : const ['title', 'author', 'publisherName'];
+    const allowedFields = {'title', 'author', 'publisherName'};
+    final fields = (searchFields ?? const <String>[])
+        .where(allowedFields.contains)
+        .toSet()
+        .toList();
+    if (fields.isEmpty) {
+      fields.addAll(const ['title', 'author', 'publisherName']);
+    }
     final merged = <String, Book>{};
 
     for (final field in fields) {
       final books = await searchBySelectedGenre(
         selectedGenre: keyword,
         page: page,
-        count: 30,
+        count: count,
         keywordSearch: true,
         searchField: field,
         sort: 'standard',
