@@ -663,31 +663,29 @@ class _BookListScreenState extends State<BookListScreen> {
       child: Center(
         child: Tooltip(
           message: tooltip,
-          child: Material(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: InkWell(
-              onTap: onPressed,
-              child: SizedBox(
-                width: 36,
-                height: 64,
-                child: Center(
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFFFF3B30),
-                          ),
-                        )
-                      : Icon(
-                          direction == AxisDirection.right
-                              ? Icons.arrow_right_rounded
-                              : Icons.arrow_left_rounded,
-                          size: 40,
-                          color: const Color(0xFFFF3B30),
+          child: InkResponse(
+            onTap: onPressed,
+            radius: 32,
+            child: SizedBox(
+              width: 48,
+              height: 72,
+              child: Center(
+                child: isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFFF3B30),
                         ),
-                ),
+                      )
+                    : Icon(
+                        direction == AxisDirection.right
+                            ? Icons.arrow_right_rounded
+                            : Icons.arrow_left_rounded,
+                        size: 58,
+                        color: const Color(0xFFFF3B30),
+                      ),
               ),
             ),
           ),
@@ -803,7 +801,7 @@ class _BookListScreenState extends State<BookListScreen> {
       padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.zero,
         border: Border.all(
           color: isDarkMode
               ? Colors.white.withValues(alpha: 0.45)

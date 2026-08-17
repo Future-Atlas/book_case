@@ -195,7 +195,7 @@ class BookListController extends ChangeNotifier {
         page: recommendedPage,
       );
       _recommendedPageCache[recommendedPage] = recommendedBooks;
-      _recommendedReachedEnd = recommendedBooks.length < 9;
+      _recommendedReachedEnd = recommendedBooks.isEmpty;
       hasMoreRecommended = !_recommendedReachedEnd;
     } catch (e) {
       print('おすすめ本の取得でエラーが発生しました: $e');
@@ -209,7 +209,7 @@ class BookListController extends ChangeNotifier {
         page: westernPage,
       );
       _westernPageCache[westernPage] = westernBooks;
-      _westernReachedEnd = westernBooks.length < 9;
+      _westernReachedEnd = westernBooks.isEmpty;
       hasMoreWestern = !_westernReachedEnd;
     } catch (e) {
       print('洋書の取得でエラーが発生しました: $e');
@@ -223,7 +223,7 @@ class BookListController extends ChangeNotifier {
         page: popularPage,
       );
       _popularPageCache[popularPage] = popularBooks;
-      _popularReachedEnd = popularBooks.length < 9;
+      _popularReachedEnd = popularBooks.isEmpty;
       hasMorePopular = !_popularReachedEnd;
     } catch (e) {
       print('人気作品の取得でエラーが発生しました: $e');
@@ -274,7 +274,7 @@ class BookListController extends ChangeNotifier {
         _recommendedPageCache[nextPage] = newBooks;
         recommendedBooks = newBooks;
         recommendedPage = nextPage;
-        _recommendedReachedEnd = newBooks.length < 9;
+        _recommendedReachedEnd = false;
         hasMoreRecommended = !_recommendedReachedEnd;
       }
     } catch (e) {
@@ -327,7 +327,7 @@ class BookListController extends ChangeNotifier {
         _westernPageCache[nextPage] = newBooks;
         westernBooks = newBooks;
         westernPage = nextPage;
-        _westernReachedEnd = newBooks.length < 9;
+        _westernReachedEnd = false;
         hasMoreWestern = !_westernReachedEnd;
       }
     } catch (e) {
@@ -380,7 +380,7 @@ class BookListController extends ChangeNotifier {
         _popularPageCache[nextPage] = newBooks;
         popularBooks = newBooks;
         popularPage = nextPage;
-        _popularReachedEnd = newBooks.length < 9;
+        _popularReachedEnd = false;
         hasMorePopular = !_popularReachedEnd;
       }
     } catch (e) {
