@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
 
@@ -8,6 +9,7 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onUserTap;
   final Future<void> Function(PostReactionType reaction)? onReaction;
   final VoidCallback? onReport;
+  final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool concealSpoiler;
 
@@ -18,6 +20,7 @@ class PostCard extends StatefulWidget {
     this.onUserTap,
     this.onReaction,
     this.onReport,
+    this.onEdit,
     this.onDelete,
     this.concealSpoiler = true,
   });
@@ -28,6 +31,9 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   bool _spoilerRevealed = false;
+  bool _spoilerManuallyHidden = false;
+  bool _wasVisible = true;
+  ScrollPosition? _scrollPosition;
 
   Post get post => widget.post;
   bool get showUserInfo => widget.showUserInfo;
@@ -35,7 +41,20 @@ class _PostCardState extends State<PostCard> {
   Future<void> Function(PostReactionType reaction)? get onReaction =>
       widget.onReaction;
   VoidCallback? get onReport => widget.onReport;
+  VoidCallback? get onEdit => widget.onEdit;
   VoidCallback? get onDelete => widget.onDelete;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextPosition = Scrollable.maybeOf(context)?.position;
+    if (!identical(_scrollPosition, nextPosition)) {
+      _scrollPosition?.removeListener(_handleScroll);
+      _scrollPosition = nextPosition;
+      _scrollPosition?.addListener(_handleScroll);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateVisibility());
+  }
 
   @override
   void didUpdateWidget(covariant PostCard oldWidget) {
@@ -43,7 +62,41 @@ class _PostCardState extends State<PostCard> {
     if (oldWidget.post.id != widget.post.id ||
         oldWidget.concealSpoiler != widget.concealSpoiler) {
       _spoilerRevealed = false;
+      _spoilerManuallyHidden = false;
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollPosition?.removeListener(_handleScroll);
+    super.dispose();
+  }
+
+  void _handleScroll() => _updateVisibility();
+
+  void _updateVisibility() {
+    if (!mounted || !post.hasSpoiler) return;
+    final item = context.findRenderObject();
+    if (item is! RenderBox || !item.attached) return;
+    final abstractViewport = RenderAbstractViewport.maybeOf(item);
+    if (abstractViewport == null || abstractViewport is! RenderBox) return;
+    final viewport = abstractViewport as RenderBox;
+    if (!viewport.attached) return;
+
+    final itemOffset = item.localToGlobal(Offset.zero, ancestor: viewport);
+    final isVisible =
+        itemOffset.dy < viewport.size.height &&
+        itemOffset.dy + item.size.height > 0;
+
+    if (isVisible && !_wasVisible) {
+      if (_spoilerRevealed || _spoilerManuallyHidden) {
+        setState(() {
+          _spoilerRevealed = false;
+          _spoilerManuallyHidden = false;
+        });
+      }
+    }
+    _wasVisible = isVisible;
   }
 
   @override
@@ -54,6 +107,10 @@ class _PostCardState extends State<PostCard> {
     final primaryTextColor = colorScheme.onSurface;
     final secondaryTextColor = colorScheme.onSurface.withValues(alpha: 0.72);
     final tertiaryTextColor = colorScheme.onSurface.withValues(alpha: 0.58);
+    final spoilerIsHidden =
+        post.hasSpoiler &&
+        ((widget.concealSpoiler && !_spoilerRevealed) ||
+            _spoilerManuallyHidden);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -191,12 +248,13 @@ class _PostCardState extends State<PostCard> {
                         ),
                         const SizedBox(height: 4),
                       ],
-                      if (post.hasSpoiler &&
-                          widget.concealSpoiler &&
-                          !_spoilerRevealed)
+                      if (spoilerIsHidden)
                         TextButton(
                           onPressed: () {
-                            setState(() => _spoilerRevealed = true);
+                            setState(() {
+                              _spoilerRevealed = true;
+                              _spoilerManuallyHidden = false;
+                            });
                           },
                           style: TextButton.styleFrom(
                             foregroundColor: primaryTextColor,
@@ -206,7 +264,7 @@ class _PostCardState extends State<PostCard> {
                             alignment: Alignment.centerLeft,
                           ),
                           child: const Text(
-                            '＜投稿を見る＞',
+                            '感想を読む',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -214,7 +272,7 @@ class _PostCardState extends State<PostCard> {
                             ),
                           ),
                         )
-                      else
+                      else ...[
                         Text(
                           post.reviewText,
                           style: TextStyle(
@@ -223,16 +281,57 @@ class _PostCardState extends State<PostCard> {
                             height: 1.5,
                           ),
                         ),
+                        if (post.hasSpoiler)
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _spoilerRevealed = false;
+                                _spoilerManuallyHidden = true;
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: primaryTextColor,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 32),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              alignment: Alignment.centerLeft,
+                            ),
+                            child: const Text(
+                              '感想を隠す',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                      ],
 
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.bottomRight,
-                        child: Text(
-                          _formatDate(post.createdAt),
-                          style: TextStyle(
-                            color: tertiaryTextColor,
-                            fontSize: 10,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (post.isEdited) ...[
+                              Text(
+                                '編集済み',
+                                style: TextStyle(
+                                  color: tertiaryTextColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(
+                              _formatDate(post.createdAt),
+                              style: TextStyle(
+                                color: tertiaryTextColor,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -247,7 +346,7 @@ class _PostCardState extends State<PostCard> {
                             const SizedBox(width: 4),
                           ],
                           const Spacer(),
-                          if (onDelete != null)
+                          if (onEdit != null || onDelete != null)
                             PopupMenuButton<String>(
                               tooltip: '投稿メニュー',
                               icon: Icon(
@@ -258,26 +357,39 @@ class _PostCardState extends State<PostCard> {
                               padding: EdgeInsets.zero,
                               position: PopupMenuPosition.under,
                               onSelected: (value) {
-                                if (value == 'delete') onDelete!();
+                                if (value == 'edit') onEdit?.call();
+                                if (value == 'delete') onDelete?.call();
                               },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem<String>(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.red,
-                                        size: 19,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        '投稿削除',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
+                              itemBuilder: (context) => [
+                                if (onEdit != null)
+                                  const PopupMenuItem<String>(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit_outlined, size: 19),
+                                        SizedBox(width: 8),
+                                        Text('編集'),
+                                      ],
+                                    ),
                                   ),
-                                ),
+                                if (onDelete != null)
+                                  const PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                          size: 19,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          '投稿削除',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           if (onReport != null)

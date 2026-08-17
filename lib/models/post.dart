@@ -7,6 +7,7 @@ class Post {
   final double rating;
   final String comment;
   final DateTime createdAt;
+  final DateTime? editedAt;
 
   // Joined fields
   final String username;
@@ -21,6 +22,7 @@ class Post {
 
   int get reactionsCount => reactionCounts.values.fold(0, (a, b) => a + b);
   bool get reactedByCurrentUser => currentUserReaction != null;
+  bool get isEdited => editedAt != null;
   bool get hasSpoiler => isSpoiler || comment.trimLeft().startsWith('[ネタバレあり]');
 
   String get reviewText {
@@ -40,6 +42,7 @@ class Post {
     required this.rating,
     required this.comment,
     required this.createdAt,
+    this.editedAt,
     required this.username,
     required this.userAvatarUrl,
     required this.bookTitle,
@@ -66,6 +69,9 @@ class Post {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
+      editedAt: json['edited_at'] != null
+          ? DateTime.tryParse(json['edited_at'].toString())
+          : null,
       username: profile?['username'] ?? '匿名ユーザー',
       userAvatarUrl: profile?['avatar_url'] ?? '',
       bookTitle: json['book_title'] ?? book?['title'] ?? '',
@@ -91,6 +97,7 @@ class Post {
       'is_age_restricted': isAgeRestricted,
       'is_spoiler': isSpoiler,
       'created_at': createdAt.toIso8601String(),
+      'edited_at': editedAt?.toIso8601String(),
     };
   }
 
@@ -101,6 +108,7 @@ class Post {
     double? rating,
     String? comment,
     DateTime? createdAt,
+    DateTime? editedAt,
     String? username,
     String? userAvatarUrl,
     String? bookTitle,
@@ -119,6 +127,7 @@ class Post {
       rating: rating ?? this.rating,
       comment: comment ?? this.comment,
       createdAt: createdAt ?? this.createdAt,
+      editedAt: editedAt ?? this.editedAt,
       username: username ?? this.username,
       userAvatarUrl: userAvatarUrl ?? this.userAvatarUrl,
       bookTitle: bookTitle ?? this.bookTitle,

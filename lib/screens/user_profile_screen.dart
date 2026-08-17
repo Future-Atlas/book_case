@@ -7,6 +7,7 @@ import '../models/post.dart';
 import '../models/social_models.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
+import '../widgets/post_composer_dialog.dart';
 import 'profile_book_search_screen.dart';
 import 'report_post_dialog.dart';
 import '../repositories/book_repository.dart';
@@ -350,6 +351,25 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     ).showSnackBar(const SnackBar(content: Text('投稿を削除しました。')));
   }
 
+  Future<void> _editPost(Post post) async {
+    if (!_isOwnProfile) return;
+    final book = Book(
+      id: post.bookId,
+      title: post.bookTitle,
+      author: post.bookAuthor,
+      publisher: '',
+      pubDate: '',
+      isbn: post.bookId,
+      coverUrl: post.bookCoverUrl,
+    );
+    final edited = await showPostComposerDialog(
+      context: context,
+      book: book,
+      existingPost: post,
+    );
+    if (edited && mounted) await _loadProfileData();
+  }
+
   Future<void> _openBookSearch() async {
     final posted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const ProfileBookSearchScreen()),
@@ -436,6 +456,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             _collections,
                             '本棚はありません。',
                             showDescription: true,
+                            compactThreeColumn: true,
                           ),
                           _buildFavoritesTab(),
                         ],
@@ -756,6 +777,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),
           onDelete: _isOwnProfile ? () => _deletePost(post) : null,
+          onEdit: _isOwnProfile ? () => _editPost(post) : null,
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
         );
       },
@@ -766,29 +788,43 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     List<Book> booksList,
     String emptyMessage, {
     bool showDescription = false,
+    bool compactThreeColumn = false,
   }) {
     if (booksList.isEmpty) {
       return _buildEmptyState(emptyMessage);
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.62,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: booksList.length,
-      itemBuilder: (context, index) {
-        final book = booksList[index];
-        return BookCard(
-          book: book,
-          width: double.infinity,
-          height: 140,
-          coverHeightRatio: showDescription ? (2 / 3) : (1 / 3),
-          showDescription: showDescription,
-          descriptionMaxLines: 3,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Keep three books per row, but size each card approximately like a
+        // four-column grid so the bookshelf has comfortable side whitespace.
+        final compactPadding = constraints.maxWidth * 0.125;
+        final horizontalPadding = compactThreeColumn
+            ? (compactPadding < 16 ? 16.0 : compactPadding)
+            : 16.0;
+        return GridView.builder(
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 16,
+          ),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 0.62,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: booksList.length,
+          itemBuilder: (context, index) {
+            final book = booksList[index];
+            return BookCard(
+              book: book,
+              width: double.infinity,
+              height: 140,
+              coverHeightRatio: showDescription ? (2 / 3) : (1 / 3),
+              showDescription: showDescription,
+              descriptionMaxLines: 3,
+            );
+          },
         );
       },
     );

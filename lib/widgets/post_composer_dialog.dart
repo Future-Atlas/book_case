@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/book.dart';
+import '../models/post.dart';
 import '../services/content_safety_service.dart';
 import '../services/supabase_service.dart';
 
 Future<bool> showPostComposerDialog({
   required BuildContext context,
   required Book book,
+  Post? existingPost,
 }) async {
   final service = Provider.of<SupabaseService>(context, listen: false);
   if (ContentSafetyService.isAdultBook(book) &&
@@ -21,23 +23,29 @@ Future<bool> showPostComposerDialog({
   }
   if (!context.mounted) return false;
 
-  double rating = 5.0;
-  bool isSpoiler = false;
+  final isEditing = existingPost != null;
+  double rating = existingPost?.rating ?? 5.0;
+  bool isSpoiler = existingPost?.hasSpoiler ?? false;
   bool isSubmitting = false;
-  final commentController = TextEditingController();
+  final commentController = TextEditingController(
+    text: existingPost?.reviewText ?? '',
+  );
 
   final posted = await showDialog<bool>(
     context: context,
     builder: (dialogContext) {
       return StatefulBuilder(
         builder: (context, setDialogState) {
+          final availableWidth = MediaQuery.sizeOf(dialogContext).width;
+          final dialogWidth = (availableWidth - 80).clamp(280.0, 620.0);
           return AlertDialog(
             backgroundColor: const Color(0xFFE9E9E9),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            content: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 620),
+            title: Text(isEditing ? '投稿を編集' : '読了した本を投稿'),
+            content: SizedBox(
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -150,11 +158,16 @@ Future<bool> showPostComposerDialog({
                     ),
                     const SizedBox(height: 14),
                     Container(
+                      width: double.infinity,
+                      height: 140,
                       color: const Color(0xFFD2D2D2),
                       padding: const EdgeInsets.all(10),
                       child: TextField(
                         controller: commentController,
-                        maxLines: 5,
+                        expands: true,
+                        minLines: null,
+                        maxLines: null,
+                        textAlignVertical: TextAlignVertical.top,
                         style: const TextStyle(color: Colors.black87),
                         decoration: const InputDecoration(
                           hintText: '感想を書いてください',
@@ -195,12 +208,19 @@ Future<bool> showPostComposerDialog({
                         }
 
                         setDialogState(() => isSubmitting = true);
-                        final success = await service.createPost(
-                          book: book,
-                          rating: rating,
-                          comment: review,
-                          isSpoiler: isSpoiler,
-                        );
+                        final success = isEditing
+                            ? await service.updateOwnPost(
+                                post: existingPost,
+                                rating: rating,
+                                comment: review,
+                                isSpoiler: isSpoiler,
+                              )
+                            : await service.createPost(
+                                book: book,
+                                rating: rating,
+                                comment: review,
+                                isSpoiler: isSpoiler,
+                              );
 
                         if (!dialogContext.mounted) return;
                         if (success) {
@@ -209,7 +229,7 @@ Future<bool> showPostComposerDialog({
                           setDialogState(() => isSubmitting = false);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('投稿できませんでした。もう一度お試しください。'),
+                              content: Text('保存できませんでした。もう一度お試しください。'),
                             ),
                           );
                         }
@@ -223,7 +243,7 @@ Future<bool> showPostComposerDialog({
                           color: Colors.white,
                         ),
                       )
-                    : const Text('投稿する'),
+                    : Text(isEditing ? '保存する' : '投稿する'),
               ),
             ],
           );
@@ -234,9 +254,9 @@ Future<bool> showPostComposerDialog({
 
   commentController.dispose();
   if (posted == true && context.mounted) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('レビューを投稿しました')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(isEditing ? '投稿を編集しました' : 'レビューを投稿しました')),
+    );
   }
   return posted ?? false;
 }

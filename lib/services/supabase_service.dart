@@ -1828,6 +1828,51 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateOwnPost({
+    required Post post,
+    required double rating,
+    required String comment,
+    required bool isSpoiler,
+  }) async {
+    final profileId = activeProfileId;
+    if (profileId.isEmpty ||
+        post.profileId != profileId ||
+        !_isInitialized ||
+        _client == null) {
+      return false;
+    }
+
+    final trimmedComment = comment.trim();
+    if (trimmedComment.isEmpty || rating < 1 || rating > 5) return false;
+
+    final isAgeRestricted =
+        post.isAgeRestricted ||
+        ContentSafetyService.containsAdultContentTerms([trimmedComment]);
+    if (isAgeRestricted && !await canViewAdultContent()) return false;
+
+    try {
+      final editedAt = DateTime.now().toUtc().toIso8601String();
+      final updatedRows = await _client!
+          .from('posts')
+          .update({
+            'rating': rating,
+            'comment': trimmedComment,
+            'is_spoiler': isSpoiler,
+            'is_age_restricted': isAgeRestricted,
+            'edited_at': editedAt,
+          })
+          .eq('id', post.id)
+          .eq('profile_id', profileId)
+          .select('id');
+      final updated = (updatedRows as List<dynamic>).isNotEmpty;
+      if (updated) notifyListeners();
+      return updated;
+    } catch (e) {
+      debugPrint('Error updating own post in Supabase: $e');
+      return false;
+    }
+  }
+
   Future<bool> isBookFavoritedByCurrentUser(String bookId) async {
     final profileId = activeProfileId;
     if (profileId.isEmpty || !_isInitialized || _client == null) return false;

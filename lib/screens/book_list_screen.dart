@@ -45,6 +45,24 @@ class _BookListScreenState extends State<BookListScreen> {
     }
   }
 
+  Future<void> _editPost(Post post) async {
+    final book = Book(
+      id: post.bookId,
+      title: post.bookTitle,
+      author: post.bookAuthor,
+      publisher: '',
+      pubDate: '',
+      isbn: post.bookId,
+      coverUrl: post.bookCoverUrl,
+    );
+    final edited = await showPostComposerDialog(
+      context: context,
+      book: book,
+      existingPost: post,
+    );
+    if (edited && mounted) await _controller.loadData(context);
+  }
+
   Future<bool> _ensureAuthenticated() async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     if (service.isAuthenticated) return true;
@@ -732,7 +750,7 @@ class _BookListScreenState extends State<BookListScreen> {
               itemCount: bookList.length,
               itemBuilder: (context, index) => BookCard(
                 book: bookList[index],
-                marginRight: index == bookList.length - 1 ? 0 : 16,
+                marginRight: index == bookList.length - 1 ? 0 : 12,
                 onTap: () => _showBookDetailDialog(bookList[index]),
               ),
             ),
@@ -756,7 +774,7 @@ class _BookListScreenState extends State<BookListScreen> {
     bool isLoading = false,
   }) {
     return SizedBox(
-      width: 22,
+      width: 28,
       child: Center(
         child: Tooltip(
           message: tooltip,
@@ -764,7 +782,7 @@ class _BookListScreenState extends State<BookListScreen> {
             onTap: onPressed,
             radius: 28,
             child: SizedBox(
-              width: 22,
+              width: 28,
               height: 72,
               child: Center(
                 child: isLoading
@@ -776,16 +794,9 @@ class _BookListScreenState extends State<BookListScreen> {
                           color: Color(0xFFD00303),
                         ),
                       )
-                    : OverflowBox(
-                        maxWidth: 58,
-                        maxHeight: 72,
-                        child: Icon(
-                          direction == AxisDirection.right
-                              ? Icons.arrow_right_rounded
-                              : Icons.arrow_left_rounded,
-                          size: 58,
-                          color: const Color(0xFFD00303),
-                        ),
+                    : CustomPaint(
+                        size: const Size(22, 42),
+                        painter: _CarouselTrianglePainter(direction),
                       ),
               ),
             ),
@@ -935,6 +946,9 @@ class _BookListScreenState extends State<BookListScreen> {
               onDelete: post.profileId == currentProfileId
                   ? () => _deletePost(post)
                   : null,
+              onEdit: post.profileId == currentProfileId
+                  ? () => _editPost(post)
+                  : null,
               onReport: post.profileId == currentProfileId
                   ? null
                   : () => _reportPost(post.id),
@@ -966,6 +980,34 @@ class _BookListScreenState extends State<BookListScreen> {
       ),
     );
   }
+}
+
+class _CarouselTrianglePainter extends CustomPainter {
+  const _CarouselTrianglePainter(this.direction);
+
+  final AxisDirection direction;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    if (direction == AxisDirection.right) {
+      path
+        ..moveTo(0, 0)
+        ..lineTo(size.width, size.height / 2)
+        ..lineTo(0, size.height);
+    } else {
+      path
+        ..moveTo(size.width, 0)
+        ..lineTo(0, size.height / 2)
+        ..lineTo(size.width, size.height);
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = const Color(0xFFD00303));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CarouselTrianglePainter oldDelegate) =>
+      oldDelegate.direction != direction;
 }
 
 class _DiagonalRedClipper extends CustomClipper<Path> {
