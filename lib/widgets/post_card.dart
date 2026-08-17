@@ -60,9 +60,10 @@ class _PostCardState extends State<PostCard> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: isDarkMode
-            ? Border.all(color: const Color(0xFFFFFFFF), width: 1.5)
-            : null,
+        border: Border.all(
+          color: isDarkMode ? const Color(0xFFFFFFFF) : Colors.black,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),

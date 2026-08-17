@@ -211,7 +211,7 @@ class BookRepository {
       final rakutenBooks = await RakutenApi.searchBySelectedGenre(
         selectedGenre: genre,
         page: page,
-        count: isRecommended ? 30 : 10,
+        count: isRecommended ? 27 : 9,
       );
       final filtered = _filterForViewer(rakutenBooks);
       if (isRecommended) {
@@ -220,7 +220,7 @@ class BookRepository {
           if (reviews != 0) return reviews;
           return b.ratingAvg.compareTo(a.ratingAvg);
         });
-        return filtered.take(10).toList();
+        return filtered.take(9).toList();
       }
       return filtered;
     } catch (e) {

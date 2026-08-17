@@ -21,6 +21,7 @@ class BookListScreen extends StatefulWidget {
 
 class _BookListScreenState extends State<BookListScreen> {
   late final BookListController _controller;
+  final ScrollController _timelineScrollController = ScrollController();
   final Set<String> _pendingReactionPostIds = <String>{};
 
   @override
@@ -33,6 +34,7 @@ class _BookListScreenState extends State<BookListScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _timelineScrollController.dispose();
     super.dispose();
   }
 
@@ -387,6 +389,10 @@ class _BookListScreenState extends State<BookListScreen> {
                                   title: 'おすすめの本',
                                   bookList: _controller.recommendedBooks,
                                   onLoadMore: _controller.loadMoreRecommended,
+                                  onLoadPrevious:
+                                      _controller.loadPreviousRecommended,
+                                  canLoadPrevious:
+                                      _controller.canLoadPreviousRecommended,
                                   isLoadingMore:
                                       _controller.isLoadingMoreRecommended,
                                   hasMore: _controller.hasMoreRecommended,
@@ -396,6 +402,10 @@ class _BookListScreenState extends State<BookListScreen> {
                                   title: '洋書',
                                   bookList: _controller.westernBooks,
                                   onLoadMore: _controller.loadMoreWestern,
+                                  onLoadPrevious:
+                                      _controller.loadPreviousWestern,
+                                  canLoadPrevious:
+                                      _controller.canLoadPreviousWestern,
                                   isLoadingMore:
                                       _controller.isLoadingMoreWestern,
                                   hasMore: _controller.hasMoreWestern,
@@ -404,6 +414,10 @@ class _BookListScreenState extends State<BookListScreen> {
                                   title: '人気作品',
                                   bookList: _controller.popularBooks,
                                   onLoadMore: _controller.loadMorePopular,
+                                  onLoadPrevious:
+                                      _controller.loadPreviousPopular,
+                                  canLoadPrevious:
+                                      _controller.canLoadPreviousPopular,
                                   isLoadingMore:
                                       _controller.isLoadingMorePopular,
                                   hasMore: _controller.hasMorePopular,
@@ -464,7 +478,6 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchBar() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       height: 50,
@@ -472,10 +485,7 @@ class _BookListScreenState extends State<BookListScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDarkMode ? const Color(0xFF00E5A8) : const Color(0xFF007B49),
-          width: 2,
-        ),
+        border: Border.all(color: const Color(0xFF009D5B), width: 2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -512,94 +522,71 @@ class _BookListScreenState extends State<BookListScreen> {
     required String title,
     required List<Book> bookList,
     required Future<void> Function() onLoadMore,
+    required VoidCallback onLoadPrevious,
+    required bool canLoadPrevious,
     required bool isLoadingMore,
     required bool hasMore,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(
-          title,
-          failedToLoad: bookList.isEmpty,
+        _buildSectionHeader(title, failedToLoad: bookList.isEmpty),
+        _buildBookCarousel(
+          bookList,
+          onLoadMore: onLoadMore,
+          onLoadPrevious: onLoadPrevious,
+          canLoadPrevious: canLoadPrevious,
           isLoadingMore: isLoadingMore,
           hasMore: hasMore,
-          onNextPage: onLoadMore,
         ),
-        _buildBookCarousel(bookList),
       ],
     );
   }
 
-  Widget _buildSectionHeader(
-    String title, {
-    bool failedToLoad = false,
-    bool isLoadingMore = false,
-    bool hasMore = true,
-    Future<void> Function()? onNextPage,
-  }) {
+  Widget _buildSectionHeader(String title, {bool failedToLoad = false}) {
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Row(
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                if (failedToLoad) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF3B30).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      '取得できませんでした',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFFFF3B30),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.2,
             ),
           ),
-          TextButton(
-            onPressed: (!hasMore || isLoadingMore || onNextPage == null)
-                ? null
-                : () async {
-                    await onNextPage();
-                  },
-            child: isLoadingMore
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    Icons.chevron_right,
-                    color: hasMore ? const Color(0xFFFF3B30) : Colors.grey[400],
-                  ),
-          ),
+          if (failedToLoad) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF3B30).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                '取得できませんでした',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFFFF3B30),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildBookCarousel(List<Book> bookList) {
+  Widget _buildBookCarousel(
+    List<Book> bookList, {
+    required Future<void> Function() onLoadMore,
+    required VoidCallback onLoadPrevious,
+    required bool canLoadPrevious,
+    required bool isLoadingMore,
+    required bool hasMore,
+  }) {
     if (bookList.isEmpty) {
       return Container(
         height: 220,
@@ -640,15 +627,71 @@ class _BookListScreenState extends State<BookListScreen> {
 
     return SizedBox(
       height: 220,
-      child: ListView.builder(
+      child: ListView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         physics: const BouncingScrollPhysics(),
-        itemCount: bookList.length,
-        itemBuilder: (context, index) {
-          final book = bookList[index];
-          return BookCard(book: book, onTap: () => _showBookDetailDialog(book));
-        },
+        children: [
+          if (canLoadPrevious)
+            _buildCarouselPageButton(
+              direction: AxisDirection.left,
+              tooltip: '前の9冊に戻る',
+              onPressed: onLoadPrevious,
+            ),
+          for (final book in bookList)
+            BookCard(book: book, onTap: () => _showBookDetailDialog(book)),
+          if (hasMore || isLoadingMore)
+            _buildCarouselPageButton(
+              direction: AxisDirection.right,
+              tooltip: '次の9冊を読み込む',
+              isLoading: isLoadingMore,
+              onPressed: isLoadingMore ? null : () => onLoadMore(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCarouselPageButton({
+    required AxisDirection direction,
+    required String tooltip,
+    required VoidCallback? onPressed,
+    bool isLoading = false,
+  }) {
+    return SizedBox(
+      width: 48,
+      child: Center(
+        child: Tooltip(
+          message: tooltip,
+          child: Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: InkWell(
+              onTap: onPressed,
+              child: SizedBox(
+                width: 36,
+                height: 64,
+                child: Center(
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFFF3B30),
+                          ),
+                        )
+                      : Icon(
+                          direction == AxisDirection.right
+                              ? Icons.arrow_right_rounded
+                              : Icons.arrow_left_rounded,
+                          size: 40,
+                          color: const Color(0xFFFF3B30),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -750,32 +793,56 @@ class _BookListScreenState extends State<BookListScreen> {
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _controller.timelinePosts.length,
-      itemBuilder: (context, index) {
-        final post = _controller.timelinePosts[index];
-        final currentProfileId = Provider.of<SupabaseService>(
-          context,
-          listen: false,
-        ).activeProfileId;
-        return PostCard(
-          key: ValueKey(post.id),
-          post: post,
-          concealSpoiler: post.profileId != currentProfileId,
-          onUserTap: () => _openUserProfile(post.profileId),
-          onReaction: post.profileId == currentProfileId
-              ? null
-              : (reaction) => _toggleReaction(post.id, reaction),
-          onDelete: post.profileId == currentProfileId
-              ? () => _deletePost(post)
-              : null,
-          onReport: post.profileId == currentProfileId
-              ? null
-              : () => _reportPost(post.id),
-        );
-      },
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final timelineHeight = (MediaQuery.sizeOf(context).height * 0.58)
+        .clamp(420.0, 600.0)
+        .toDouble();
+
+    return Container(
+      height: timelineHeight,
+      padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode
+              ? Colors.white.withValues(alpha: 0.45)
+              : Colors.black,
+          width: 1.5,
+        ),
+      ),
+      child: Scrollbar(
+        controller: _timelineScrollController,
+        thumbVisibility: true,
+        child: ListView.builder(
+          controller: _timelineScrollController,
+          padding: const EdgeInsets.only(right: 8),
+          physics: const ClampingScrollPhysics(),
+          itemCount: _controller.timelinePosts.length,
+          itemBuilder: (context, index) {
+            final post = _controller.timelinePosts[index];
+            final currentProfileId = Provider.of<SupabaseService>(
+              context,
+              listen: false,
+            ).activeProfileId;
+            return PostCard(
+              key: ValueKey(post.id),
+              post: post,
+              concealSpoiler: post.profileId != currentProfileId,
+              onUserTap: () => _openUserProfile(post.profileId),
+              onReaction: post.profileId == currentProfileId
+                  ? null
+                  : (reaction) => _toggleReaction(post.id, reaction),
+              onDelete: post.profileId == currentProfileId
+                  ? () => _deletePost(post)
+                  : null,
+              onReport: post.profileId == currentProfileId
+                  ? null
+                  : () => _reportPost(post.id),
+            );
+          },
+        ),
+      ),
     );
   }
 

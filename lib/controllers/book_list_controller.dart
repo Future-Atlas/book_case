@@ -28,16 +28,25 @@ class BookListController extends ChangeNotifier {
   int recommendedPage = 1;
   bool hasMoreRecommended = true;
   bool isLoadingMoreRecommended = false;
+  final Map<int, List<Book>> _recommendedPageCache = {};
+  bool _recommendedReachedEnd = false;
+  bool get canLoadPreviousRecommended => recommendedPage > 1;
 
   List<Book> westernBooks = [];
   int westernPage = 1;
   bool hasMoreWestern = true;
   bool isLoadingMoreWestern = false;
+  final Map<int, List<Book>> _westernPageCache = {};
+  bool _westernReachedEnd = false;
+  bool get canLoadPreviousWestern => westernPage > 1;
 
   List<Book> popularBooks = [];
   int popularPage = 1;
   bool hasMorePopular = true;
   bool isLoadingMorePopular = false;
+  final Map<int, List<Book>> _popularPageCache = {};
+  bool _popularReachedEnd = false;
+  bool get canLoadPreviousPopular => popularPage > 1;
 
   // タイムライン用
   List<Post> timelinePosts = [];
@@ -173,13 +182,21 @@ class BookListController extends ChangeNotifier {
     hasMoreRecommended = true;
     hasMoreWestern = true;
     hasMorePopular = true;
+    _recommendedPageCache.clear();
+    _westernPageCache.clear();
+    _popularPageCache.clear();
+    _recommendedReachedEnd = false;
+    _westernReachedEnd = false;
+    _popularReachedEnd = false;
 
     try {
       recommendedBooks = await repository.fetchBooksByGenre(
         '話題の本',
         page: recommendedPage,
       );
-      hasMoreRecommended = recommendedBooks.length >= 10;
+      _recommendedPageCache[recommendedPage] = recommendedBooks;
+      _recommendedReachedEnd = recommendedBooks.length < 9;
+      hasMoreRecommended = !_recommendedReachedEnd;
     } catch (e) {
       print('おすすめ本の取得でエラーが発生しました: $e');
       recommendedBooks = [];
@@ -191,7 +208,9 @@ class BookListController extends ChangeNotifier {
         'English',
         page: westernPage,
       );
-      hasMoreWestern = westernBooks.length >= 10;
+      _westernPageCache[westernPage] = westernBooks;
+      _westernReachedEnd = westernBooks.length < 9;
+      hasMoreWestern = !_westernReachedEnd;
     } catch (e) {
       print('洋書の取得でエラーが発生しました: $e');
       westernBooks = [];
@@ -203,7 +222,9 @@ class BookListController extends ChangeNotifier {
         'ベストセラー',
         page: popularPage,
       );
-      hasMorePopular = popularBooks.length >= 10;
+      _popularPageCache[popularPage] = popularBooks;
+      _popularReachedEnd = popularBooks.length < 9;
+      hasMorePopular = !_popularReachedEnd;
     } catch (e) {
       print('人気作品の取得でエラーが発生しました: $e');
       popularBooks = [];
@@ -223,11 +244,22 @@ class BookListController extends ChangeNotifier {
 
   Future<void> loadMoreRecommended() async {
     if (isLoadingMoreRecommended || !hasMoreRecommended) return;
+    final nextPage = recommendedPage + 1;
+    final cachedBooks = _recommendedPageCache[nextPage];
+    if (cachedBooks != null) {
+      recommendedBooks = cachedBooks;
+      recommendedPage = nextPage;
+      hasMoreRecommended =
+          _recommendedPageCache.containsKey(nextPage + 1) ||
+          !_recommendedReachedEnd;
+      notifyListeners();
+      return;
+    }
+
     isLoadingMoreRecommended = true;
     notifyListeners();
 
     try {
-      final nextPage = recommendedPage + 1;
       print('📡 おすすめ本の次のページを取得中... (Page: $nextPage)');
 
       final newBooks = await _repository.fetchBooksByGenre(
@@ -236,11 +268,14 @@ class BookListController extends ChangeNotifier {
       );
 
       if (newBooks.isEmpty) {
+        _recommendedReachedEnd = true;
         hasMoreRecommended = false;
       } else {
+        _recommendedPageCache[nextPage] = newBooks;
         recommendedBooks = newBooks;
         recommendedPage = nextPage;
-        hasMoreRecommended = newBooks.length >= 10;
+        _recommendedReachedEnd = newBooks.length < 9;
+        hasMoreRecommended = !_recommendedReachedEnd;
       }
     } catch (e) {
       print('おすすめ本の追加取得エラー: $e');
@@ -250,13 +285,34 @@ class BookListController extends ChangeNotifier {
     }
   }
 
+  void loadPreviousRecommended() {
+    if (!canLoadPreviousRecommended || isLoadingMoreRecommended) return;
+    final previousPage = recommendedPage - 1;
+    final cachedBooks = _recommendedPageCache[previousPage];
+    if (cachedBooks == null) return;
+    recommendedBooks = cachedBooks;
+    recommendedPage = previousPage;
+    hasMoreRecommended = true;
+    notifyListeners();
+  }
+
   Future<void> loadMoreWestern() async {
     if (isLoadingMoreWestern || !hasMoreWestern) return;
+    final nextPage = westernPage + 1;
+    final cachedBooks = _westernPageCache[nextPage];
+    if (cachedBooks != null) {
+      westernBooks = cachedBooks;
+      westernPage = nextPage;
+      hasMoreWestern =
+          _westernPageCache.containsKey(nextPage + 1) || !_westernReachedEnd;
+      notifyListeners();
+      return;
+    }
+
     isLoadingMoreWestern = true;
     notifyListeners();
 
     try {
-      final nextPage = westernPage + 1;
       print('📡 洋書の次のページを取得中... (Page: $nextPage)');
 
       final newBooks = await _repository.fetchBooksByGenre(
@@ -265,11 +321,14 @@ class BookListController extends ChangeNotifier {
       );
 
       if (newBooks.isEmpty) {
+        _westernReachedEnd = true;
         hasMoreWestern = false;
       } else {
+        _westernPageCache[nextPage] = newBooks;
         westernBooks = newBooks;
         westernPage = nextPage;
-        hasMoreWestern = newBooks.length >= 10;
+        _westernReachedEnd = newBooks.length < 9;
+        hasMoreWestern = !_westernReachedEnd;
       }
     } catch (e) {
       print('洋書の追加取得エラー: $e');
@@ -279,13 +338,34 @@ class BookListController extends ChangeNotifier {
     }
   }
 
+  void loadPreviousWestern() {
+    if (!canLoadPreviousWestern || isLoadingMoreWestern) return;
+    final previousPage = westernPage - 1;
+    final cachedBooks = _westernPageCache[previousPage];
+    if (cachedBooks == null) return;
+    westernBooks = cachedBooks;
+    westernPage = previousPage;
+    hasMoreWestern = true;
+    notifyListeners();
+  }
+
   Future<void> loadMorePopular() async {
     if (isLoadingMorePopular || !hasMorePopular) return;
+    final nextPage = popularPage + 1;
+    final cachedBooks = _popularPageCache[nextPage];
+    if (cachedBooks != null) {
+      popularBooks = cachedBooks;
+      popularPage = nextPage;
+      hasMorePopular =
+          _popularPageCache.containsKey(nextPage + 1) || !_popularReachedEnd;
+      notifyListeners();
+      return;
+    }
+
     isLoadingMorePopular = true;
     notifyListeners();
 
     try {
-      final nextPage = popularPage + 1;
       print('📡 人気作品の次のページを取得中... (Page: $nextPage)');
 
       final newBooks = await _repository.fetchBooksByGenre(
@@ -294,11 +374,14 @@ class BookListController extends ChangeNotifier {
       );
 
       if (newBooks.isEmpty) {
+        _popularReachedEnd = true;
         hasMorePopular = false;
       } else {
+        _popularPageCache[nextPage] = newBooks;
         popularBooks = newBooks;
         popularPage = nextPage;
-        hasMorePopular = newBooks.length >= 10;
+        _popularReachedEnd = newBooks.length < 9;
+        hasMorePopular = !_popularReachedEnd;
       }
     } catch (e) {
       print('人気作品の追加取得エラー: $e');
@@ -306,6 +389,17 @@ class BookListController extends ChangeNotifier {
       isLoadingMorePopular = false;
       notifyListeners();
     }
+  }
+
+  void loadPreviousPopular() {
+    if (!canLoadPreviousPopular || isLoadingMorePopular) return;
+    final previousPage = popularPage - 1;
+    final cachedBooks = _popularPageCache[previousPage];
+    if (cachedBooks == null) return;
+    popularBooks = cachedBooks;
+    popularPage = previousPage;
+    hasMorePopular = true;
+    notifyListeners();
   }
 
   Future<void> loadData(BuildContext context) async => _loadData(context);
