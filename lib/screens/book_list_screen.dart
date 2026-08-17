@@ -711,12 +711,12 @@ class _BookListScreenState extends State<BookListScreen> {
       );
     }
 
+    // Page controls live outside the horizontal list so they remain visible
+    // even when the nine cards fill (or overflow) the available width.
     return SizedBox(
       height: 220,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        physics: const BouncingScrollPhysics(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (canLoadPrevious)
             _buildCarouselPageButton(
@@ -724,15 +724,19 @@ class _BookListScreenState extends State<BookListScreen> {
               tooltip: '前の9冊に戻る',
               onPressed: onLoadPrevious,
             ),
-          for (var index = 0; index < bookList.length; index++)
-            BookCard(
-              book: bookList[index],
-              marginRight:
-                  index == bookList.length - 1 && (hasMore || isLoadingMore)
-                  ? 0
-                  : 16,
-              onTap: () => _showBookDetailDialog(bookList[index]),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              physics: const BouncingScrollPhysics(),
+              itemCount: bookList.length,
+              itemBuilder: (context, index) => BookCard(
+                book: bookList[index],
+                marginRight: index == bookList.length - 1 ? 0 : 16,
+                onTap: () => _showBookDetailDialog(bookList[index]),
+              ),
             ),
+          ),
           if (hasMore || isLoadingMore)
             _buildCarouselPageButton(
               direction: AxisDirection.right,
@@ -752,7 +756,7 @@ class _BookListScreenState extends State<BookListScreen> {
     bool isLoading = false,
   }) {
     return SizedBox(
-      width: 32,
+      width: 22,
       child: Center(
         child: Tooltip(
           message: tooltip,
@@ -760,7 +764,7 @@ class _BookListScreenState extends State<BookListScreen> {
             onTap: onPressed,
             radius: 28,
             child: SizedBox(
-              width: 32,
+              width: 22,
               height: 72,
               child: Center(
                 child: isLoading
