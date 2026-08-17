@@ -60,6 +60,7 @@ class _BookCardState extends State<BookCard> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF009D5B), width: 2),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(
