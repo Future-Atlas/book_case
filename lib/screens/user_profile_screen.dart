@@ -520,7 +520,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           ? const Center(child: Text('プロフィールの読み込みに失敗しました。')) // ⭕ データ未取得時の安全ガード
           : Container(
               width: double.infinity,
-              color: Theme.of(context).scaffoldBackgroundColor,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).scaffoldBackgroundColor
+                  : const Color(0xFFF5F5F5),
               child: NestedScrollView(
                 headerSliverBuilder: (context, innerBoxIsScrolled) => [
                   SliverToBoxAdapter(
@@ -557,6 +559,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Widget _buildProfileHeader() {
     if (_profile == null) return const SizedBox.shrink();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final informationBoxColor = isDarkMode ? null : const Color(0xFFD0D0D0);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -635,7 +639,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
+                          color: informationBoxColor ?? Colors.grey[50],
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -676,7 +680,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: informationBoxColor ?? Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey[200]!, width: 0.5),
               ),
