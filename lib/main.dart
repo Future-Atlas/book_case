@@ -568,7 +568,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                   size: 16,
                                 ),
                                 label: Text(
-                                  service.isAuthenticated ? 'プロフィール' : 'ログイン',
+                                  service.isAuthenticated ? 'マイページ' : 'ログイン',
                                   maxLines: 1,
                                   style: const TextStyle(
                                     fontSize: 11,
