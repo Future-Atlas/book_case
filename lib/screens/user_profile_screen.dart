@@ -10,6 +10,7 @@ import '../widgets/book_card.dart';
 import '../widgets/post_composer_dialog.dart';
 import 'profile_book_search_screen.dart';
 import 'report_post_dialog.dart';
+import 'follow_list_screen.dart';
 import '../repositories/book_repository.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -272,6 +273,38 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       return;
     }
     await _loadProfileData();
+  }
+
+  Future<void> _openFollowList({required bool followers}) async {
+    final profile = _profile;
+    final relationship = _relationship;
+    if (profile == null || relationship == null) return;
+    if (relationship.blockedEitherDirection) return;
+    if (!relationship.isOwnProfile && profile.isPrivate) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('鍵アカウントのフォロー一覧は閲覧できません。')));
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => FollowListScreen(
+          profileId: profile.id,
+          followers: followers,
+          onProfileTap: (selectedProfile) {
+            Navigator.of(routeContext).push(
+              MaterialPageRoute<void>(
+                builder: (context) => UserProfileScreen(
+                  profileId: selectedProfile.id,
+                  onBack: () => Navigator.of(context).pop(),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
@@ -615,10 +648,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             _buildStatColumn(
                               'フォロワー',
                               _profile!.followersCount.toString(),
+                              onTap: () => _openFollowList(followers: true),
                             ),
                             _buildStatColumn(
                               'フォロー',
                               _profile!.followingCount.toString(),
+                              onTap: () => _openFollowList(followers: false),
                             ),
                           ],
                         ),
@@ -676,20 +711,33 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  Widget _buildStatColumn(String label, String count) {
-    return Column(
-      children: [
-        Text(
-          count,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+  Widget _buildStatColumn(String label, String count, {VoidCallback? onTap}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          child: Column(
+            children: [
+              Text(
+                count,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 10, color: Colors.black),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black)),
-      ],
+      ),
     );
   }
 
@@ -737,6 +785,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             onPressed: _isSocialActionInProgress ? null : _toggleFollow,
             icon: Icon(followIcon),
             label: Text(followLabel),
+            style:
+                relationship.followStatus == FollowRelationshipStatus.accepted
+                ? FilledButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: const Color(0xFF00BFFF),
+                    disabledBackgroundColor: Colors.black,
+                    disabledForegroundColor: const Color(0xFF00BFFF),
+                  )
+                : null,
           ),
         ),
         const SizedBox(width: 10),

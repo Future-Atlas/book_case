@@ -966,6 +966,29 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<List<UserProfile>> fetchProfileFollowList({
+    required String profileId,
+    required bool followers,
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return [];
+    try {
+      final response = await _client!.rpc(
+        'get_profile_follow_list',
+        params: {
+          'target_profile': profileId,
+          'list_type': followers ? 'followers' : 'following',
+        },
+      );
+      return (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(UserProfile.fromJson)
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('Error fetching profile follow list: $e');
+      return [];
+    }
+  }
+
   Future<bool> respondToFollowRequest({
     required String requesterProfileId,
     required bool approve,
