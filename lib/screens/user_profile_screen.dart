@@ -1318,9 +1318,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   book.author,
                   style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
+                Text(
+                  book.publisher.trim().isEmpty ? '出版社不明' : book.publisher,
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
-                  height: 220,
+                  height: MediaQuery.sizeOf(context).height < 600 ? 160 : 220,
                   child: Scrollbar(
                     thumbVisibility: true,
                     child: SingleChildScrollView(

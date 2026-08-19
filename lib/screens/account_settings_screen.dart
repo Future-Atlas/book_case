@@ -1,3 +1,7 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -315,12 +319,25 @@ class _PublicAccountSettingsScreenState
       return;
     }
 
+    final croppedBytes = await showDialog<Uint8List>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _AvatarCropDialog(imageBytes: bytes),
+    );
+    if (croppedBytes == null || !mounted) return;
+    if (croppedBytes.lengthInBytes > 5 * 1024 * 1024) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('編集後の画像は5MB以下にしてください。')));
+      return;
+    }
+
     final mimeType = picked.mimeType ?? _mimeTypeFromName(picked.name);
     setState(() => _updatingAvatar = true);
     final url = await Provider.of<SupabaseService>(
       context,
       listen: false,
-    ).uploadProfileAvatar(bytes: bytes, mimeType: mimeType);
+    ).uploadProfileAvatar(bytes: croppedBytes, mimeType: mimeType);
     if (!mounted) return;
     setState(() {
       _updatingAvatar = false;
@@ -443,11 +460,15 @@ class _PublicAccountSettingsScreenState
                       TextFormField(
                         controller: _userIdController,
                         readOnly: true,
+                        canRequestFocus: false,
+                        enableInteractiveSelection: false,
+                        mouseCursor: SystemMouseCursors.basic,
                         maxLength: 20,
                         decoration: const InputDecoration(
                           labelText: 'ユーザーID',
                           prefixText: '@',
-                          helperText: 'ユーザーIDは登録後に変更できません。',
+                          helperText: 'ユーザーIDは変更できません。',
+                          hoverColor: Colors.transparent,
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) =>
@@ -1039,4 +1060,125 @@ class _SettingsCard extends StatelessWidget {
     clipBehavior: Clip.antiAlias,
     child: Column(children: children),
   );
+}
+
+class _AvatarCropDialog extends StatefulWidget {
+  const _AvatarCropDialog({required this.imageBytes});
+
+  final Uint8List imageBytes;
+
+  @override
+  State<_AvatarCropDialog> createState() => _AvatarCropDialogState();
+}
+
+class _AvatarCropDialogState extends State<_AvatarCropDialog> {
+  final CropController _controller = CropController();
+  bool _ready = false;
+  bool _cropping = false;
+
+  void _onCropped(CropResult result) {
+    if (!mounted) return;
+    switch (result) {
+      case CropSuccess(:final croppedImage):
+        Navigator.of(context).pop(croppedImage);
+      case CropFailure():
+        setState(() => _cropping = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('画像を編集できませんでした。もう一度お試しください。')),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final editorSize = math
+        .min(size.width - 48, size.height - 240)
+        .clamp(220.0, 520.0)
+        .toDouble();
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'プロフィール画像を調整',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('画像をドラッグして移動し、ピンチまたはマウスホイールで拡大・縮小できます。'),
+              const SizedBox(height: 16),
+              SizedBox.square(
+                dimension: editorSize,
+                child: ClipRect(
+                  child: Crop(
+                    image: widget.imageBytes,
+                    controller: _controller,
+                    onCropped: _onCropped,
+                    onStatusChanged: (status) {
+                      if (!mounted) return;
+                      setState(() {
+                        _ready = status == CropStatus.ready;
+                        _cropping = status == CropStatus.cropping;
+                      });
+                    },
+                    aspectRatio: 1,
+                    initialRectBuilder: InitialRectBuilder.withSizeAndRatio(
+                      size: 0.88,
+                      aspectRatio: 1,
+                    ),
+                    interactive: true,
+                    fixCropRect: true,
+                    maskColor: Colors.black54,
+                    baseColor: Colors.black,
+                    scrollZoomSensitivity: 0.06,
+                    filterQuality: FilterQuality.high,
+                    progressIndicator: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _cropping
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('キャンセル'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: !_ready || _cropping
+                        ? null
+                        : () {
+                            setState(() => _cropping = true);
+                            _controller.crop();
+                          },
+                    icon: _cropping
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check),
+                    label: const Text('この範囲で保存'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
