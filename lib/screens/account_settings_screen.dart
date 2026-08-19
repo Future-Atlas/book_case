@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -122,8 +121,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               children: [
                 ListTile(
                   leading: const Icon(Icons.manage_accounts_outlined),
-                  title: const Text('アカウント'),
-                  subtitle: const Text('ユーザー名・ユーザーID・鍵アカウント'),
+                  title: const Text('アカウント設定'),
+                  subtitle: const Text('ユーザー名・ユーザーID（変更不可）・鍵アカウント'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _push(const _PublicAccountSettingsScreen()),
                 ),
@@ -362,7 +361,7 @@ class _PublicAccountSettingsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('アカウント')),
+      appBar: AppBar(title: const Text('アカウント設定')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Align(
@@ -443,16 +442,12 @@ class _PublicAccountSettingsScreenState
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _userIdController,
+                        readOnly: true,
                         maxLength: 20,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'[a-zA-Z0-9_]'),
-                          ),
-                        ],
                         decoration: const InputDecoration(
                           labelText: 'ユーザーID',
                           prefixText: '@',
-                          helperText: '半角英小文字・数字・_で3〜20文字。重複はできません。',
+                          helperText: 'ユーザーIDは登録後に変更できません。',
                           border: OutlineInputBorder(),
                         ),
                         validator: (value) =>

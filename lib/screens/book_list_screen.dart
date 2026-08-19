@@ -954,10 +954,14 @@ class _BookListScreenState extends State<BookListScreen> {
         else
           ...results.map(
             (profile) => Card(
+              color: Colors.white,
+              surfaceTintColor: Colors.white,
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 onTap: () => _openUserProfile(profile.id),
                 leading: CircleAvatar(
+                  backgroundColor: Colors.grey.shade200,
+                  foregroundColor: Colors.black87,
                   backgroundImage: profile.avatarUrl.isEmpty
                       ? null
                       : NetworkImage(profile.avatarUrl),
@@ -967,17 +971,23 @@ class _BookListScreenState extends State<BookListScreen> {
                 ),
                 title: Text(
                   profile.username,
+                  style: const TextStyle(color: Colors.black87),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
                   profile.userId.isEmpty ? '' : '@${profile.userId}',
+                  style: const TextStyle(color: Colors.black54),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 trailing: profile.isPrivate
-                    ? const Icon(Icons.lock_outline, size: 18)
-                    : const Icon(Icons.chevron_right),
+                    ? const Icon(
+                        Icons.lock_outline,
+                        size: 18,
+                        color: Colors.black54,
+                      )
+                    : const Icon(Icons.chevron_right, color: Colors.black54),
               ),
             ),
           ),

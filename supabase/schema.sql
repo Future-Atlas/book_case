@@ -2883,3 +2883,192 @@ REVOKE ALL ON FUNCTION public.search_profiles_by_public_identity(TEXT)
     FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.search_profiles_by_public_identity(TEXT)
     TO authenticated;
+
+-- Only completed, real Auth users may appear in public user search.
+CREATE OR REPLACE FUNCTION public.search_profiles_by_public_identity(
+    search_query TEXT
+)
+RETURNS TABLE (
+    id UUID,
+    username TEXT,
+    user_id TEXT,
+    avatar_url TEXT,
+    bio TEXT,
+    followers_count INTEGER,
+    following_count INTEGER,
+    read_count INTEGER,
+    is_private BOOLEAN
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    viewer_id UUID := auth.uid();
+    normalized_query TEXT := lower(regexp_replace(btrim(search_query), '^@', ''));
+BEGIN
+    IF viewer_id IS NULL
+       OR char_length(normalized_query) NOT BETWEEN 1 AND 50 THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT p.id, p.username, p.user_id, p.avatar_url, p.bio,
+           p.followers_count, p.following_count, p.read_count, p.is_private
+    FROM public.profiles AS p
+    WHERE p.is_suspended = false
+      AND EXISTS (
+          SELECT 1 FROM auth.users AS auth_user WHERE auth_user.id = p.id
+      )
+      AND EXISTS (
+          SELECT 1 FROM public.account_details AS details
+          WHERE details.profile_id = p.id
+      )
+      AND NOT public.is_blocked_between(viewer_id, p.id)
+      AND (
+          position(normalized_query IN lower(p.username)) > 0
+          OR position(normalized_query IN lower(p.user_id)) > 0
+      )
+    ORDER BY
+      CASE
+        WHEN lower(p.user_id) = normalized_query THEN 0
+        WHEN lower(p.username) = normalized_query THEN 1
+        WHEN lower(p.user_id) LIKE normalized_query || '%' THEN 2
+        WHEN lower(p.username) LIKE normalized_query || '%' THEN 3
+        ELSE 4
+      END,
+      lower(p.username),
+      p.id
+    LIMIT 50;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.search_profiles_by_public_identity(TEXT)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_profiles_by_public_identity(TEXT)
+    TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_profile_to_auth_metadata()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    UPDATE auth.users
+    SET raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb)
+        || jsonb_build_object(
+            'display_name', NEW.username,
+            'sharemarium_username', NEW.username,
+            'sharemarium_user_id', NEW.user_id
+        ),
+        updated_at = now()
+    WHERE id = NEW.id;
+    RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.sync_profile_to_auth_metadata() FROM PUBLIC;
+
+DROP TRIGGER IF EXISTS sync_profile_to_auth_metadata_trigger
+    ON public.profiles;
+CREATE TRIGGER sync_profile_to_auth_metadata_trigger
+AFTER INSERT OR UPDATE OF username, user_id ON public.profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_profile_to_auth_metadata();
+
+UPDATE auth.users AS auth_user
+SET raw_user_meta_data = coalesce(auth_user.raw_user_meta_data, '{}'::jsonb)
+    || jsonb_build_object(
+        'display_name', profile.username,
+        'sharemarium_username', profile.username,
+        'sharemarium_user_id', profile.user_id
+    ),
+    updated_at = now()
+FROM public.profiles AS profile
+WHERE profile.id = auth_user.id;
+
+-- Public user IDs are selected once during registration and remain immutable.
+CREATE OR REPLACE FUNCTION public.update_public_profile(
+    p_username TEXT,
+    p_user_id TEXT,
+    p_bio TEXT,
+    p_is_private BOOLEAN
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    normalized_user_id TEXT := lower(btrim(p_user_id));
+    normalized_bio TEXT := btrim(COALESCE(p_bio, ''));
+    existing_user_id TEXT;
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+    END IF;
+
+    SELECT profile.user_id
+    INTO existing_user_id
+    FROM public.profiles AS profile
+    WHERE profile.id = auth.uid();
+
+    IF existing_user_id IS NULL THEN
+        RAISE EXCEPTION 'Profile not found' USING ERRCODE = 'P0002';
+    END IF;
+    IF normalized_user_id IS DISTINCT FROM existing_user_id THEN
+        RAISE EXCEPTION 'USER_ID_IMMUTABLE' USING ERRCODE = '23514';
+    END IF;
+    IF char_length(btrim(p_username)) NOT BETWEEN 1 AND 30
+       OR char_length(normalized_bio) > 300 THEN
+        RAISE EXCEPTION 'Invalid profile data' USING ERRCODE = '23514';
+    END IF;
+
+    UPDATE public.profiles
+    SET username = btrim(p_username),
+        bio = normalized_bio,
+        is_private = p_is_private
+    WHERE id = auth.uid();
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.update_public_profile(TEXT, TEXT, TEXT, BOOLEAN)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_public_profile(TEXT, TEXT, TEXT, BOOLEAN)
+    TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.update_public_profile(TEXT, TEXT, BOOLEAN)
+    FROM authenticated;
+REVOKE UPDATE (user_id) ON TABLE public.profiles FROM authenticated;
+
+CREATE OR REPLACE FUNCTION public.enforce_profile_user_id_immutability()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    IF NEW.user_id IS DISTINCT FROM OLD.user_id
+       AND EXISTS (
+           SELECT 1
+           FROM public.account_details AS details
+           WHERE details.profile_id = OLD.id
+       )
+       AND COALESCE(auth.role(), '') <> 'service_role' THEN
+        RAISE EXCEPTION 'USER_ID_IMMUTABLE' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.enforce_profile_user_id_immutability()
+    FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS enforce_profile_user_id_immutability_trigger
+    ON public.profiles;
+CREATE TRIGGER enforce_profile_user_id_immutability_trigger
+BEFORE UPDATE OF user_id ON public.profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_profile_user_id_immutability();

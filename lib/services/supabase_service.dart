@@ -506,7 +506,7 @@ class SupabaseService extends ChangeNotifier {
         return 'この登録情報では利用登録できません。心当たりがない場合は、お問い合わせフォームからご連絡ください。';
       }
       if (e.code == '23505') {
-        return 'このユーザーIDはすでに使用されています。';
+        return '既に使われているユーザーIDのため、使用できません。他のIDを使用してください。';
       }
       if (e.message.contains('GUARDIAN_CONSENT_REQUIRED')) {
         return '18歳未満の方は、保護者の同意が必要です。';
@@ -594,7 +594,12 @@ class SupabaseService extends ChangeNotifier {
       notifyListeners();
       return null;
     } on PostgrestException catch (e) {
-      if (e.code == '23505') return 'このユーザーIDはすでに使用されています。';
+      if (e.message.contains('USER_ID_IMMUTABLE')) {
+        return 'ユーザーIDは登録後に変更できません。';
+      }
+      if (e.code == '23505') {
+        return '既に使われているユーザーIDのため、使用できません。他のIDを使用してください。';
+      }
       if (e.code == '23514') return '入力内容を確認してください。';
       return e.message;
     } catch (e) {

@@ -425,7 +425,7 @@ class _ProfileOnboardingScreenState extends State<ProfileOnboardingScreen> {
       if (!mounted) return;
       setState(() {
         _isSaving = false;
-        _userIdError = 'このユーザーIDはすでに使用されています。';
+        _userIdError = '既に使われているユーザーIDのため、使用できません。他のIDを使用してください。';
       });
       return;
     }
@@ -620,6 +620,11 @@ class _ProfileOnboardingScreenState extends State<ProfileOnboardingScreen> {
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'ユーザー名はいつでも変更できます。\nユーザーIDの変更は出来ません。',
+            style: TextStyle(color: Colors.white70, height: 1.6),
           ),
           const SizedBox(height: 22),
           TextFormField(
