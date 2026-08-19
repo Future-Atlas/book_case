@@ -1,10 +1,10 @@
 class LegalDocumentVersions {
   const LegalDocumentVersions._();
 
-  static const bundle = '2026-08-18.1';
-  static const terms = '2026-08-18.1';
-  static const privacy = '2026-08-18.1';
-  static const communityGuidelines = '2026-08-17.1';
-  static const infringementPolicy = '2026-08-17.1';
-  static const externalTransmission = '2026-08-17.2';
+  static const bundle = '1.1.0';
+  static const terms = '1.1.0';
+  static const privacy = '1.1.0';
+  static const communityGuidelines = '1.0.0';
+  static const infringementPolicy = '1.0.0';
+  static const externalTransmission = '1.1.0';
 }

@@ -267,6 +267,8 @@ class _ModerationScreenState extends State<ModerationScreen> {
               '対象：${report.reportedUsername}'
               '${report.reportedAccountSuspended ? '（停止中）' : ''}',
             ),
+            if (report.reportedUserId.isNotEmpty)
+              Text('ユーザーID：@${report.reportedUserId}'),
             if (report.bookId.isNotEmpty) Text('書籍ID：${report.bookId}'),
             if (report.review.isNotEmpty) ...[
               const SizedBox(height: 8),

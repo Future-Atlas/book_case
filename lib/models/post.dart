@@ -21,6 +21,10 @@ class Post {
   final PostReactionType? currentUserReaction;
 
   int get reactionsCount => reactionCounts.values.fold(0, (a, b) => a + b);
+  double get reactionScore =>
+      (reactionCounts[PostReactionType.like] ?? 0).toDouble() +
+      (reactionCounts[PostReactionType.love] ?? 0) * 2.0 +
+      (reactionCounts[PostReactionType.sad] ?? 0) * 0.5;
   bool get reactedByCurrentUser => currentUserReaction != null;
   bool get isEdited => editedAt != null;
   bool get hasSpoiler => isSpoiler || comment.trimLeft().startsWith('[ネタバレあり]');

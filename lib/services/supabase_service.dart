@@ -989,6 +989,25 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<List<UserProfile>> searchProfiles(String query) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return [];
+    final normalized = query.trim();
+    if (normalized.isEmpty) return [];
+    try {
+      final response = await _client!.rpc(
+        'search_profiles_by_public_identity',
+        params: {'search_query': normalized},
+      );
+      return (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(UserProfile.fromJson)
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('Error searching profiles: $e');
+      return [];
+    }
+  }
+
   Future<bool> respondToFollowRequest({
     required String requesterProfileId,
     required bool approve,
@@ -1284,7 +1303,8 @@ class SupabaseService extends ChangeNotifier {
         final data = response as List<dynamic>;
         final posts = _parsePostsSafely(data);
         final enriched = await _enrichPostsWithBookMetadata(posts);
-        return _filterPostsForCurrentViewer(enriched);
+        final visible = await _filterPostsForCurrentViewer(enriched);
+        return _sortTimelineByReactionScore(visible);
       } catch (e) {
         debugPrint('Error fetching timeline posts with profile join: $e');
         try {
@@ -1295,7 +1315,8 @@ class SupabaseService extends ChangeNotifier {
               .order('created_at', ascending: false);
           final posts = _parsePostsSafely(fallback as List<dynamic>);
           final enriched = await _enrichPostsWithBookMetadata(posts);
-          return _filterPostsForCurrentViewer(enriched);
+          final visible = await _filterPostsForCurrentViewer(enriched);
+          return _sortTimelineByReactionScore(visible);
         } catch (fallbackError) {
           debugPrint('Error fetching timeline posts fallback: $fallbackError');
         }
@@ -1483,6 +1504,18 @@ class SupabaseService extends ChangeNotifier {
               ]);
         })
         .toList(growable: false);
+  }
+
+  List<Post> _sortTimelineByReactionScore(Iterable<Post> posts) {
+    final sorted = List<Post>.of(posts);
+    sorted.sort((first, second) {
+      final scoreComparison = second.reactionScore.compareTo(
+        first.reactionScore,
+      );
+      if (scoreComparison != 0) return scoreComparison;
+      return second.createdAt.compareTo(first.createdAt);
+    });
+    return sorted;
   }
 
   Future<List<Post>> _attachReactionState(List<Post> posts) async {
@@ -1681,7 +1714,7 @@ class SupabaseService extends ChangeNotifier {
             'post_snapshot, '
             'reporter:profiles!moderation_reports_reporter_id_fkey(username), '
             'reported:profiles!moderation_reports_reported_profile_id_fkey('
-            'id, username, is_suspended)',
+            'id, username, user_id, is_suspended)',
           )
           .order('created_at', ascending: false)
           .limit(200);
@@ -1699,6 +1732,7 @@ class SupabaseService extends ChangeNotifier {
               snapshot['profile_id']?.toString() ??
               '',
           reportedUsername: reported?['username']?.toString() ?? '退会済みユーザー',
+          reportedUserId: reported?['user_id']?.toString() ?? '',
           reportedAccountSuspended: reported?['is_suspended'] == true,
           postId: row['post_id']?.toString(),
           bookId: snapshot['book_id']?.toString() ?? '',

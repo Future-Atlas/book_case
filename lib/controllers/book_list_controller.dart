@@ -5,6 +5,7 @@ import '../models/book.dart';
 import '../repositories/book_repository.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
+import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
 
 class BookListController extends ChangeNotifier {
@@ -17,6 +18,8 @@ class BookListController extends ChangeNotifier {
   bool hasMoreSearch = true;
   int searchPage = 1;
   List<Book> searchResults = [];
+  List<UserProfile> userSearchResults = [];
+  bool userSearchMode = false;
   final Set<String> _searchResultIds = <String>{};
 
   List<Book> get visibleSearchResults => searchResults;
@@ -65,6 +68,7 @@ class BookListController extends ChangeNotifier {
     final previous = timelinePosts[index];
     final updatedPosts = List<Post>.from(timelinePosts);
     updatedPosts[index] = previous.withToggledReaction(reaction);
+    _sortTimelinePosts(updatedPosts);
     timelinePosts = updatedPosts;
     notifyListeners();
     return previous;
@@ -76,8 +80,19 @@ class BookListController extends ChangeNotifier {
 
     final restoredPosts = List<Post>.from(timelinePosts);
     restoredPosts[index] = previous;
+    _sortTimelinePosts(restoredPosts);
     timelinePosts = restoredPosts;
     notifyListeners();
+  }
+
+  void _sortTimelinePosts(List<Post> posts) {
+    posts.sort((first, second) {
+      final scoreComparison = second.reactionScore.compareTo(
+        first.reactionScore,
+      );
+      if (scoreComparison != 0) return scoreComparison;
+      return second.createdAt.compareTo(first.createdAt);
+    });
   }
 
   // 初期化
@@ -103,6 +118,7 @@ class BookListController extends ChangeNotifier {
       hasMoreSearch = true;
       searchPage = 1;
       searchResults = [];
+      userSearchResults = [];
       _searchResultIds.clear();
       notifyListeners();
       return;
@@ -112,13 +128,63 @@ class BookListController extends ChangeNotifier {
     notifyListeners();
 
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      _searchBooks(reset: true);
+      if (userSearchMode) {
+        _searchUsers();
+      } else {
+        _searchBooks(reset: true);
+      }
     });
+  }
+
+  void setUserSearchMode(bool enabled) {
+    if (userSearchMode == enabled) return;
+    userSearchMode = enabled;
+    _searchDebounce?.cancel();
+    isSearching = false;
+    hasMoreSearch = true;
+    searchPage = 1;
+    searchResults = [];
+    userSearchResults = [];
+    _searchResultIds.clear();
+    searchQuery = searchController.text.trim();
+    notifyListeners();
+    if (searchQuery.isEmpty) return;
+    isSearching = true;
+    notifyListeners();
+    _searchDebounce = Timer(const Duration(milliseconds: 200), () {
+      if (userSearchMode) {
+        _searchUsers();
+      } else {
+        _searchBooks(reset: true);
+      }
+    });
+  }
+
+  Future<void> _searchUsers() async {
+    final query = searchQuery.trim();
+    if (query.isEmpty || !userSearchMode) {
+      isSearching = false;
+      notifyListeners();
+      return;
+    }
+
+    isSearching = true;
+    notifyListeners();
+    try {
+      final results = await SupabaseService().searchProfiles(query);
+      if (!userSearchMode || query != searchQuery.trim()) return;
+      userSearchResults = results;
+    } finally {
+      if (userSearchMode && query == searchQuery.trim()) {
+        isSearching = false;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> _searchBooks({required bool reset}) async {
     final query = searchQuery.trim();
-    if (query.isEmpty) {
+    if (query.isEmpty || userSearchMode) {
       isSearching = false;
       notifyListeners();
       return;
@@ -145,7 +211,7 @@ class BookListController extends ChangeNotifier {
       );
 
       // 入力中に別の検索が始まった場合は、古い結果を画面へ反映しない。
-      if (query != searchQuery.trim()) return;
+      if (userSearchMode || query != searchQuery.trim()) return;
 
       for (final book in batch) {
         if (_searchResultIds.add(book.id)) {
@@ -156,7 +222,7 @@ class BookListController extends ChangeNotifier {
       searchPage = requestedPage + 1;
       hasMoreSearch = batch.length >= 20;
     } finally {
-      if (query == searchQuery.trim()) {
+      if (!userSearchMode && query == searchQuery.trim()) {
         isSearching = false;
         notifyListeners();
       }
@@ -164,7 +230,7 @@ class BookListController extends ChangeNotifier {
   }
 
   Future<void> loadMoreSearchResults() async {
-    if (searchQuery.isEmpty || isSearching) return;
+    if (userSearchMode || searchQuery.isEmpty || isSearching) return;
     if (!hasMoreSearch) return;
     await _searchBooks(reset: false);
   }

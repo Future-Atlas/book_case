@@ -36,6 +36,7 @@ class ModerationReport {
     required this.reporterUsername,
     required this.reportedProfileId,
     required this.reportedUsername,
+    required this.reportedUserId,
     required this.reportedAccountSuspended,
     required this.postId,
     required this.bookId,
@@ -51,6 +52,7 @@ class ModerationReport {
   final String reporterUsername;
   final String reportedProfileId;
   final String reportedUsername;
+  final String reportedUserId;
   final bool reportedAccountSuspended;
   final String? postId;
   final String bookId;

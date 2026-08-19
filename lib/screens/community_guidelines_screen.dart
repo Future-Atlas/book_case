@@ -391,6 +391,8 @@ ________________________________________
 2026年7月25日
 最終改定日
 2026年8月17日
+バージョン
+1.0.0
 運営者
 伊能龍之介''';
 
@@ -419,7 +421,7 @@ ________________________________________
   static List<_GuidelinesBlock> _parseBlocks(String source) {
     final blocks = <_GuidelinesBlock>[];
     var nextLineIsSectionHeading = false;
-    const labels = {'運営者', 'サービス名', 'お問い合わせ方法', '制定日', '最終改定日'};
+    const labels = {'運営者', 'サービス名', 'お問い合わせ方法', '制定日', '最終改定日', 'バージョン'};
 
     for (final rawLine in source.split('\n')) {
       final line = rawLine.trim();

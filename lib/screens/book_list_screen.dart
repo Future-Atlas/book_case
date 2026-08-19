@@ -83,6 +83,12 @@ class _BookListScreenState extends State<BookListScreen> {
     if (mounted) await _controller.loadData(context);
   }
 
+  Future<void> _setUserSearchMode(bool enabled) async {
+    if (enabled && !await _ensureAuthenticated()) return;
+    if (!mounted) return;
+    _controller.setUserSearchMode(enabled);
+  }
+
   Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
     if (!await _ensureAuthenticated() || !mounted) return;
     if (!_pendingReactionPostIds.add(postId)) return;
@@ -579,7 +585,7 @@ class _BookListScreenState extends State<BookListScreen> {
   Widget _buildSearchBar() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      height: 50,
+      height: 96,
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -593,26 +599,56 @@ class _BookListScreenState extends State<BookListScreen> {
           ),
         ],
       ),
-      child: TextField(
-        controller: _controller.searchController,
-        decoration: InputDecoration(
-          hintText: '本を検索 (作品名、著者、ジャンル)...',
-          hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFFD00303)),
-          suffixIcon: _controller.searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  onPressed: () {
-                    _controller.searchController.clear();
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 42,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text(
+                  'ユーザー検索',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                Switch(
+                  value: _controller.userSearchMode,
+                  onChanged: _setUserSearchMode,
+                ),
+                const SizedBox(width: 6),
+              ],
+            ),
           ),
-        ),
+          const Divider(height: 1),
+          Expanded(
+            child: TextField(
+              controller: _controller.searchController,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: _controller.userSearchMode
+                    ? 'ユーザー名・ユーザーIDで検索'
+                    : '本を検索（作品名、著者、出版社）',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: Icon(
+                  _controller.userSearchMode
+                      ? Icons.person_search
+                      : Icons.search,
+                  color: const Color(0xFFD00303),
+                ),
+                suffixIcon: _controller.searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: _controller.searchController.clear,
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -802,6 +838,7 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildSearchResults() {
+    if (_controller.userSearchMode) return _buildUserSearchResults();
     final results = _controller.visibleSearchResults;
 
     return Column(
@@ -880,6 +917,69 @@ class _BookListScreenState extends State<BookListScreen> {
                   ),
                 ),
             ],
+          ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildUserSearchResults() {
+    final results = _controller.userSearchResults;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            _controller.isSearching
+                ? 'ユーザーを検索中...'
+                : 'ユーザー検索結果（${results.length}件）',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text(
+            'ユーザー名とユーザーIDのみを検索します。',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ),
+        if (_controller.isSearching)
+          const LinearProgressIndicator(minHeight: 2)
+        else if (results.isEmpty)
+          const SizedBox(
+            height: 180,
+            child: Center(child: Text('該当するユーザーが見つかりませんでした。')),
+          )
+        else
+          ...results.map(
+            (profile) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                onTap: () => _openUserProfile(profile.id),
+                leading: CircleAvatar(
+                  backgroundImage: profile.avatarUrl.isEmpty
+                      ? null
+                      : NetworkImage(profile.avatarUrl),
+                  child: profile.avatarUrl.isEmpty
+                      ? const Icon(Icons.person)
+                      : null,
+                ),
+                title: Text(
+                  profile.username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  profile.userId.isEmpty ? '' : '@${profile.userId}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: profile.isPrivate
+                    ? const Icon(Icons.lock_outline, size: 18)
+                    : const Icon(Icons.chevron_right),
+              ),
+            ),
           ),
         const SizedBox(height: 40),
       ],
