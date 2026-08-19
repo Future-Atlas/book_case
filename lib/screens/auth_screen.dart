@@ -119,6 +119,7 @@ class _AuthScreenState extends State<AuthScreen> {
     required Future<String?> Function(SupabaseService service) action,
     Color foreground = Colors.white,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
       width: 220,
       height: 42,
@@ -127,6 +128,10 @@ class _AuthScreenState extends State<AuthScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: background,
           foregroundColor: foreground,
+          side: BorderSide(
+            color: isDarkMode ? Colors.white : Colors.black,
+            width: 1,
+          ),
           shape: const RoundedRectangleBorder(),
           elevation: 0,
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
