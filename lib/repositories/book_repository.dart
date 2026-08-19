@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../models/book.dart';
 import '../api/rakuten_api.dart';
 import '../services/content_safety_service.dart';
@@ -13,6 +15,8 @@ extension BookSearchFieldApiName on BookSearchField {
 }
 
 class BookRepository {
+  static final Random _homeRandom = Random();
+
   BookRepository({this.allowAdultContent = false});
 
   final bool allowAdultContent;
@@ -211,7 +215,7 @@ class BookRepository {
       final rakutenBooks = await RakutenApi.searchBySelectedGenre(
         selectedGenre: genre,
         page: page,
-        count: isRecommended ? 27 : 9,
+        count: 27,
       );
       final filtered = _filterForViewer(rakutenBooks);
       if (isRecommended) {
@@ -220,13 +224,25 @@ class BookRepository {
           if (reviews != 0) return reviews;
           return b.ratingAvg.compareTo(a.ratingAvg);
         });
-        return filtered.take(9).toList();
       }
-      return filtered;
+      return _randomRankedSelection(filtered, count: 9);
     } catch (e) {
       print('❌ [Repository] 楽天ジャンル本の取得でエラーが発生しました: $e');
       return [];
     }
+  }
+
+  /// Selects a different subset for each home visit while preserving the
+  /// ranking order supplied by the existing API and section-specific sort.
+  List<Book> _randomRankedSelection(List<Book> ranked, {required int count}) {
+    if (ranked.length <= count) return List<Book>.from(ranked);
+
+    final selectedIndexes = List<int>.generate(ranked.length, (index) => index)
+      ..shuffle(_homeRandom);
+    selectedIndexes
+      ..removeRange(count, selectedIndexes.length)
+      ..sort();
+    return selectedIndexes.map((index) => ranked[index]).toList();
   }
 
   /// 📌 2. 全件取得（初期表示用など）
