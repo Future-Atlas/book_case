@@ -218,6 +218,9 @@ class _BookListScreenState extends State<BookListScreen> {
                                   ? Image.network(
                                       book.coverUrl,
                                       fit: BoxFit.cover,
+                                      alignment: isNarrow
+                                          ? Alignment.topCenter
+                                          : Alignment.center,
                                       errorBuilder:
                                           (context, error, stackTrace) {
                                             return _buildMissingCoverFallback(
