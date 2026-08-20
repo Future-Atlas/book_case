@@ -785,7 +785,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     };
     final followingBackgroundColor =
         Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFFD3D3D3)
+        ? const Color(0xFFF2F2F2)
         : Colors.black;
 
     return Row(
