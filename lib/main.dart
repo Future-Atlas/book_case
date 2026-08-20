@@ -12,13 +12,13 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/community_guidelines_screen.dart';
 import 'screens/infringement_policy_screen.dart';
 import 'screens/external_transmission_screen.dart';
-import 'screens/legal_consent_screen.dart';
+// import 'screens/legal_consent_screen.dart';
 import 'screens/account_settings_screen.dart';
 import 'screens/contact_screen.dart';
-import 'screens/profile_onboarding_screen.dart';
+// import 'screens/profile_onboarding_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/moderation_screen.dart';
-import 'screens/account_suspension_gate.dart';
+// import 'screens/account_suspension_gate.dart';
 
 enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 
@@ -135,6 +135,8 @@ class MyApp extends StatelessWidget {
       ),
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       routes: {
+        // Temporarily keep auth route defined, but guest browsing is enabled
+        // by disabling gate wrappers below.
         '/login': (context) => const AuthScreen(),
         '/terms': (context) => const TermsScreen(),
         '/privacy': (context) => const PrivacyPolicyScreen(),
@@ -145,18 +147,22 @@ class MyApp extends StatelessWidget {
         '/contact': (context) => const ContactScreen(),
       },
       onUnknownRoute: (_) => MaterialPageRoute<void>(
-        builder: (_) => const AccountSuspensionGate(
-          child: LegalConsentGate(
-            child: ProfileOnboardingGate(child: MainNavigationShell()),
-          ),
-        ),
+        // Auth/onboarding gates are temporarily disabled for public browsing.
+        // builder: (_) => const AccountSuspensionGate(
+        //   child: LegalConsentGate(
+        //     child: ProfileOnboardingGate(child: MainNavigationShell()),
+        //   ),
+        // ),
+        builder: (_) => const MainNavigationShell(),
       ),
 
-      home: const AccountSuspensionGate(
-        child: LegalConsentGate(
-          child: ProfileOnboardingGate(child: MainNavigationShell()),
-        ),
-      ),
+      // Auth/onboarding gates are temporarily disabled for public browsing.
+      // home: const AccountSuspensionGate(
+      //   child: LegalConsentGate(
+      //     child: ProfileOnboardingGate(child: MainNavigationShell()),
+      //   ),
+      // ),
+      home: const MainNavigationShell(),
     );
   }
 }
@@ -344,16 +350,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 
   Future<void> _goToProfile() async {
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    if (!service.isAuthenticated) {
-      final result = await Navigator.of(context).pushNamed('/login');
-      if (result != true && !service.isAuthenticated) {
-        return;
-      }
-    }
-
-    await service.ensureCurrentUserProfile();
-    if (!mounted) return;
+    // Temporarily disable login requirement for browsing.
+    // final service = Provider.of<SupabaseService>(context, listen: false);
+    // if (!service.isAuthenticated) {
+    //   final result = await Navigator.of(context).pushNamed('/login');
+    //   if (result != true && !service.isAuthenticated) {
+    //     return;
+    //   }
+    // }
+    //
+    // await service.ensureCurrentUserProfile();
+    // if (!mounted) return;
     _setCurrentScreenIndex(1);
   }
 

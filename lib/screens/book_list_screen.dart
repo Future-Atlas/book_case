@@ -64,10 +64,12 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Future<bool> _ensureAuthenticated() async {
-    final service = Provider.of<SupabaseService>(context, listen: false);
-    if (service.isAuthenticated) return true;
-    final result = await Navigator.of(context).pushNamed('/login');
-    return mounted && (result == true || service.isAuthenticated);
+    // Temporarily disable auth requirement for public browsing.
+    // final service = Provider.of<SupabaseService>(context, listen: false);
+    // if (service.isAuthenticated) return true;
+    // final result = await Navigator.of(context).pushNamed('/login');
+    // return mounted && (result == true || service.isAuthenticated);
+    return true;
   }
 
   Future<void> _openUserProfile(String profileId) async {
