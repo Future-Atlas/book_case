@@ -6,7 +6,7 @@ import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
 import 'screens/book_list_screen.dart';
 import 'screens/user_profile_screen.dart';
-import 'screens/auth_screen.dart';
+// import 'screens/auth_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/community_guidelines_screen.dart';
@@ -135,9 +135,8 @@ class MyApp extends StatelessWidget {
       ),
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       routes: {
-        // Temporarily keep auth route defined, but guest browsing is enabled
-        // by disabling gate wrappers below.
-        '/login': (context) => const AuthScreen(),
+        // Auth route is temporarily disabled for public browsing mode.
+        // '/login': (context) => const AuthScreen(),
         '/terms': (context) => const TermsScreen(),
         '/privacy': (context) => const PrivacyPolicyScreen(),
         '/community-guidelines': (context) => const CommunityGuidelinesScreen(),
@@ -344,9 +343,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     SupabaseService service,
     String userId,
   ) async {
-    final isAdmin = await service.isCurrentUserAdmin();
-    if (!mounted || service.activeProfileId != userId) return;
-    setState(() => _isAdmin = isAdmin);
+    // Temporarily disable auth/admin checks for public browsing mode.
+    // final isAdmin = await service.isCurrentUserAdmin();
+    // if (!mounted || service.activeProfileId != userId) return;
+    // setState(() => _isAdmin = isAdmin);
+    if (!mounted) return;
+    setState(() => _isAdmin = false);
   }
 
   Future<void> _goToProfile() async {
@@ -386,13 +388,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         if (_isAdmin) _setCurrentScreenIndex(4);
         break;
       case _HeaderMenuAction.logout:
-        final service = Provider.of<SupabaseService>(context, listen: false);
-        await service.signOut();
-        if (!mounted) return;
+        // Temporarily disable logout action for public browsing mode.
+        // final service = Provider.of<SupabaseService>(context, listen: false);
+        // await service.signOut();
+        // if (!mounted) return;
         _goToBookList();
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('ログアウトしました。')));
+        ).showSnackBar(const SnackBar(content: Text('公開閲覧モードです。')));
         break;
     }
   }
@@ -416,30 +419,31 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     return Consumer<SupabaseService>(
       builder: (context, service, _) {
-        final currentUserId = service.activeProfileId;
-        if (_adminCheckedUserId != currentUserId) {
-          _adminCheckedUserId = currentUserId;
-          _isAdmin = false;
-          if (currentUserId.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (_) => _checkAdministratorAccess(service, currentUserId),
-            );
-          }
-        }
+        // Temporarily disable auth/admin-driven UI branching.
+        // final currentUserId = service.activeProfileId;
+        // if (_adminCheckedUserId != currentUserId) {
+        //   _adminCheckedUserId = currentUserId;
+        //   _isAdmin = false;
+        //   if (currentUserId.isNotEmpty) {
+        //     WidgetsBinding.instance.addPostFrameCallback(
+        //       (_) => _checkAdministratorAccess(service, currentUserId),
+        //     );
+        //   }
+        // }
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
-        final headerSideWidth = service.isAuthenticated ? 146.0 : 104.0;
+        final headerSideWidth = 104.0;
 
-        // If auth is lost while on profile, force navigation back to list.
-        if (!service.isAuthenticated &&
-            (_currentScreenIndex == 1 || _currentScreenIndex == 4)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _goToBookList();
-            }
-          });
-        }
+        // Temporarily disable auth-loss redirect behavior.
+        // if (!service.isAuthenticated &&
+        //     (_currentScreenIndex == 1 || _currentScreenIndex == 4)) {
+        //   WidgetsBinding.instance.addPostFrameCallback((_) {
+        //     if (mounted) {
+        //       _goToBookList();
+        //     }
+        //   });
+        // }
 
         return Scaffold(
           body: SafeArea(
@@ -523,16 +527,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                     ),
                                   ),
                                 ),
-                              PopupMenuItem(
-                                value: _HeaderMenuAction.logout,
-                                child: Text(
-                                  'ログアウト',
-                                  style: TextStyle(
-                                    fontSize: 28 / 2,
-                                    color: popupMenuTextColor,
-                                  ),
-                                ),
-                              ),
+                              // PopupMenuItem(
+                              //   value: _HeaderMenuAction.logout,
+                              //   child: Text(
+                              //     'ログアウト',
+                              //     style: TextStyle(
+                              //       fontSize: 28 / 2,
+                              //       color: popupMenuTextColor,
+                              //     ),
+                              //   ),
+                              // ),
                             ],
                           ),
                         ),
@@ -558,26 +562,21 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            if (service.isAuthenticated)
-                              const SizedBox(
-                                width: 42,
-                                child: NotificationBellButton(),
-                              ),
+                            // if (service.isAuthenticated)
+                            //   const SizedBox(
+                            //     width: 42,
+                            //     child: NotificationBellButton(),
+                            //   ),
                             SizedBox(
                               width: 104,
                               height: 36,
                               child: ElevatedButton.icon(
                                 onPressed: _goToProfile,
-                                icon: Icon(
-                                  service.isAuthenticated
-                                      ? Icons.person_outline
-                                      : Icons.login,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  service.isAuthenticated ? 'マイページ' : 'ログイン',
+                                icon: const Icon(Icons.person_outline, size: 16),
+                                label: const Text(
+                                  'マイページ',
                                   maxLines: 1,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
