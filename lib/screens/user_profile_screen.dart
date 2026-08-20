@@ -781,6 +781,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       FollowRelationshipStatus.pending => Icons.hourglass_top,
       FollowRelationshipStatus.accepted => Icons.person_remove_outlined,
     };
+    final followingBackgroundColor =
+        Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFFD3D3D3)
+        : Colors.black;
 
     return Row(
       children: [
@@ -792,9 +796,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             style:
                 relationship.followStatus == FollowRelationshipStatus.accepted
                 ? FilledButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: followingBackgroundColor,
                     foregroundColor: const Color(0xFF00BFFF),
-                    disabledBackgroundColor: Colors.black,
+                    disabledBackgroundColor: followingBackgroundColor,
                     disabledForegroundColor: const Color(0xFF00BFFF),
                   )
                 : null,
