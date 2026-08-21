@@ -44,7 +44,7 @@ class ProfilePageColors {
     ProfilePageColorOption(
       key: 'yellow',
       label: '黄色',
-      lightColor: Color(0xFF9B7B00),
+      lightColor: Color(0xFFF1D600),
       darkColor: Color(0xFFF1D600),
     ),
     ProfilePageColorOption(
@@ -74,8 +74,8 @@ class ProfilePageColors {
     ProfilePageColorOption(
       key: 'pink',
       label: '桃色',
-      lightColor: Color(0xFFC2185B),
-      darkColor: Color(0xFFFF5CA8),
+      lightColor: Color(0xFFD94F8A),
+      darkColor: Color(0xFFFFC1D9),
     ),
     ProfilePageColorOption(
       key: 'light_blue',
@@ -86,14 +86,14 @@ class ProfilePageColors {
     ProfilePageColorOption(
       key: 'emerald',
       label: 'エメラルド',
-      lightColor: Color(0xFF00745F),
-      darkColor: Color(0xFF00C9A7),
+      lightColor: Color(0xFF008C95),
+      darkColor: Color(0xFF20E0D0),
     ),
     ProfilePageColorOption(
       key: 'red_purple',
       label: '赤紫',
-      lightColor: Color(0xFF8E185D),
-      darkColor: Color(0xFFD94E9B),
+      lightColor: Color(0xFFB51F3E),
+      darkColor: Color(0xFFFF4D6D),
     ),
     ProfilePageColorOption(
       key: 'yellow_green',
