@@ -653,7 +653,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                               _profile!.username,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: isDesktopLayout ? 36 : 18,
+                                fontSize: isDesktopLayout ? 24 : 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -673,7 +673,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             ? '@${_profile!.id.substring(0, 8)}'
                             : '@${_profile!.id}',
                         style: TextStyle(
-                          fontSize: isDesktopLayout ? 22 : 11,
+                          fontSize: isDesktopLayout ? 17 : 11,
                           color: Colors.grey[400],
                           fontFamily: 'monospace',
                         ),
@@ -725,7 +725,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               child: Text(
                 _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません。',
                 style: TextStyle(
-                  fontSize: isDesktopLayout ? 24 : 12,
+                  fontSize: isDesktopLayout ? 18 : 12,
                   color: profileTextColor,
                   height: 1.4,
                 ),
@@ -754,7 +754,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               Text(
                 count,
                 style: TextStyle(
-                  fontSize: isDesktopLayout ? 28 : 14,
+                  fontSize: isDesktopLayout ? 21 : 14,
                   fontWeight: FontWeight.bold,
                   color: textColor,
                 ),
