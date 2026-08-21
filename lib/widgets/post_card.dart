@@ -127,10 +127,7 @@ class _PostCardState extends State<PostCard> {
         border: Border.all(
           color:
               widget.borderColor ??
-              ProfilePageColors.colorFor(
-                post.profilePageColorKey,
-                theme.brightness,
-              ),
+              ProfilePageColors.colorFor(post.profilePageColorKey),
           width: 2,
         ),
         boxShadow: [

@@ -189,6 +189,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   late bool _openPrivacyPasswordRecovery;
   String? _adminCheckedUserId;
   bool _isAdmin = false;
+  String? _viewedProfileId;
+  String? _viewedProfileUserId;
+  String? _viewedProfileColorKey;
 
   Uri _normalizedFragmentUri(String fragment) {
     var value = fragment;
@@ -249,6 +252,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 
   int _screenIndexFromPath(String path) {
+    if (path.startsWith('/users/') && path.length > '/users/'.length) {
+      return 5;
+    }
     switch (path) {
       case '/mypage':
       case '/profile':
@@ -275,6 +281,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         return '/help';
       case 4:
         return '/moderation';
+      case 5:
+        final profileId = _viewedProfileId;
+        return profileId == null || profileId.isEmpty
+            ? '/'
+            : '/users/${Uri.encodeComponent(profileId)}';
       default:
         return '/';
     }
@@ -328,13 +339,48 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     _openPrivacyPasswordRecovery =
         (currentUri.queryParameters['privacy_password_recovery'] == '1') ||
         (fragmentQuery['privacy_password_recovery'] == '1');
-    _currentScreenIndex = _screenIndexFromPath(
-      _currentAppPathFromUri(currentUri),
-    );
+    final currentPath = _currentAppPathFromUri(currentUri);
+    if (currentPath.startsWith('/users/')) {
+      final encodedProfileId = currentPath.substring('/users/'.length);
+      if (encodedProfileId.isNotEmpty) {
+        _viewedProfileId = Uri.decodeComponent(encodedProfileId);
+      }
+    }
+    _currentScreenIndex = _screenIndexFromPath(currentPath);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncBrowserUrlForScreen(_currentScreenIndex, replace: true);
+      if (_currentScreenIndex == 5 && _viewedProfileId != null) {
+        _loadViewedProfileHeader(_viewedProfileId!);
+      }
     });
+  }
+
+  Future<void> _loadViewedProfileHeader(String profileId) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final profile = await service.fetchUserProfile(profileId);
+    if (!mounted || _viewedProfileId != profileId) return;
+    setState(() {
+      _viewedProfileUserId = profile.userId;
+      _viewedProfileColorKey = profile.pageColorKey;
+    });
+  }
+
+  Future<void> _openUserProfile(String profileId) async {
+    if (profileId.isEmpty) return;
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (profileId == service.activeProfileId) {
+      await _goToProfile();
+      return;
+    }
+    setState(() {
+      _viewedProfileId = profileId;
+      _viewedProfileUserId = null;
+      _viewedProfileColorKey = null;
+      _currentScreenIndex = 5;
+    });
+    _syncBrowserUrlForScreen(5);
+    await _loadViewedProfileHeader(profileId);
   }
 
   Future<void> _goToProfile() async {
@@ -349,6 +395,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     //
     // await service.ensureCurrentUserProfile();
     // if (!mounted) return;
+    _viewedProfileId = null;
+    _viewedProfileUserId = null;
+    _viewedProfileColorKey = null;
     _setCurrentScreenIndex(1);
   }
 
@@ -396,6 +445,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         return 'ヘルプ';
       case 4:
         return '管理';
+      case 5:
+        final userId = _viewedProfileUserId;
+        return userId == null || userId.isEmpty ? 'プロフィール' : '@$userId';
       default:
         return 'ホーム';
     }
@@ -416,10 +468,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           }
         }
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        final headerColor = ProfilePageColors.colorFor(
+        final ownHeaderColor = ProfilePageColors.colorFor(
           service.activePageColorKey,
-          Theme.of(context).brightness,
         );
+        final headerColor = _currentScreenIndex == 5
+            ? ProfilePageColors.colorFor(_viewedProfileColorKey)
+            : ownHeaderColor;
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
         final headerSideWidth = 104.0;
@@ -572,8 +626,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFD00303),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: isDarkMode
+                                      ? Colors.black
+                                      : Colors.white,
+                                  foregroundColor: ownHeaderColor,
+                                  side: BorderSide(
+                                    color: ownHeaderColor,
+                                    width: 1.5,
+                                  ),
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                   ),
@@ -595,7 +655,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: _currentScreenIndex == 0
-                        ? const BookListScreen(key: ValueKey('BookListScreen'))
+                        ? BookListScreen(
+                            key: const ValueKey('BookListScreen'),
+                            onOpenUserProfile: _openUserProfile,
+                          )
                         : _currentScreenIndex == 1
                         ? UserProfileScreen(
                             key: const ValueKey('UserProfileScreen'),
@@ -611,6 +674,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           )
                         : _currentScreenIndex == 3
                         ? const _HelpScreen(key: ValueKey('HelpScreen'))
+                        : _currentScreenIndex == 5 && _viewedProfileId != null
+                        ? UserProfileScreen(
+                            key: ValueKey(
+                              'ViewedUserProfile-${_viewedProfileId!}',
+                            ),
+                            profileId: _viewedProfileId,
+                            onBack: _goToBookList,
+                            onOpenProfile: _openUserProfile,
+                            showAppBar: false,
+                          )
                         : const ModerationScreen(
                             key: ValueKey('ModerationScreen'),
                           ),

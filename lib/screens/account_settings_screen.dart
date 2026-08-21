@@ -402,7 +402,7 @@ class _PublicAccountSettingsScreenState
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: option.resolve(theme.brightness),
+                          color: option.color,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: selected

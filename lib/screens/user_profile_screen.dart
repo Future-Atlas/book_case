@@ -18,12 +18,14 @@ class UserProfileScreen extends StatefulWidget {
   final VoidCallback onBack;
   final bool showAppBar;
   final String? profileId;
+  final ValueChanged<String>? onOpenProfile;
 
   const UserProfileScreen({
     super.key,
     required this.onBack,
     this.showAppBar = true,
     this.profileId,
+    this.onOpenProfile,
   });
 
   @override
@@ -335,6 +337,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           profileId: profile.id,
           followers: followers,
           onProfileTap: (selectedProfile) {
+            final openInMainShell = widget.onOpenProfile;
+            if (openInMainShell != null) {
+              Navigator.of(routeContext).pop();
+              openInMainShell(selectedProfile.id);
+              return;
+            }
             Navigator.of(routeContext).push(
               MaterialPageRoute<void>(
                 builder: (context) => UserProfileScreen(
@@ -518,7 +526,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final profileHeaderColor = ProfilePageColors.colorFor(
       _profile?.pageColorKey,
-      Theme.of(context).brightness,
     );
     return Scaffold(
       appBar: widget.showAppBar
@@ -943,10 +950,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           post: post,
           showUserInfo: false,
           concealSpoiler: !_isOwnProfile,
-          borderColor: ProfilePageColors.colorFor(
-            _profile?.pageColorKey,
-            Theme.of(context).brightness,
-          ),
+          borderColor: ProfilePageColors.colorFor(_profile?.pageColorKey),
           onReaction: _isOwnProfile
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),

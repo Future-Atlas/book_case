@@ -4,17 +4,12 @@ class ProfilePageColorOption {
   const ProfilePageColorOption({
     required this.key,
     required this.label,
-    required this.lightColor,
-    required this.darkColor,
+    required this.color,
   });
 
   final String key;
   final String label;
-  final Color lightColor;
-  final Color darkColor;
-
-  Color resolve(Brightness brightness) =>
-      brightness == Brightness.dark ? darkColor : lightColor;
+  final Color color;
 }
 
 class ProfilePageColors {
@@ -23,90 +18,48 @@ class ProfilePageColors {
   static const String defaultKey = 'yellow';
 
   static const List<ProfilePageColorOption> options = [
-    ProfilePageColorOption(
-      key: 'red',
-      label: '赤',
-      lightColor: Color(0xFFD00303),
-      darkColor: Color(0xFFFF3B30),
-    ),
+    ProfilePageColorOption(key: 'red', label: '赤', color: Color(0xFFD00303)),
     ProfilePageColorOption(
       key: 'magenta',
       label: 'マゼンタ',
-      lightColor: Color(0xFFB0006F),
-      darkColor: Color(0xFFFF2CB3),
+      color: Color(0xFFFF2CB3),
     ),
-    ProfilePageColorOption(
-      key: 'blue',
-      label: '青',
-      lightColor: Color(0xFF005BBB),
-      darkColor: Color(0xFF2D9CFF),
-    ),
+    ProfilePageColorOption(key: 'blue', label: '青', color: Color(0xFF2D9CFF)),
     ProfilePageColorOption(
       key: 'yellow',
       label: '黄色',
-      lightColor: Color(0xFFF1D600),
-      darkColor: Color(0xFFF1D600),
+      color: Color(0xFFF1D600),
     ),
-    ProfilePageColorOption(
-      key: 'green',
-      label: '緑',
-      lightColor: Color(0xFF007A46),
-      darkColor: Color(0xFF00C875),
-    ),
-    ProfilePageColorOption(
-      key: 'purple',
-      label: '紫',
-      lightColor: Color(0xFF6A1FA2),
-      darkColor: Color(0xFFA855F7),
-    ),
-    ProfilePageColorOption(
-      key: 'gray',
-      label: 'グレー',
-      lightColor: Color(0xFF5C6470),
-      darkColor: Color(0xFFAAB2BD),
-    ),
+    ProfilePageColorOption(key: 'green', label: '緑', color: Color(0xFF00C875)),
+    ProfilePageColorOption(key: 'purple', label: '紫', color: Color(0xFFA855F7)),
+    ProfilePageColorOption(key: 'gray', label: 'グレー', color: Color(0xFFAAB2BD)),
     ProfilePageColorOption(
       key: 'orange',
       label: 'オレンジ',
-      lightColor: Color(0xFFC45100),
-      darkColor: Color(0xFFFF7A1A),
+      color: Color(0xFFFF7A1A),
     ),
-    ProfilePageColorOption(
-      key: 'pink',
-      label: '桃色',
-      lightColor: Color(0xFFD94F8A),
-      darkColor: Color(0xFFFFC1D9),
-    ),
+    ProfilePageColorOption(key: 'pink', label: '桃色', color: Color(0xFFFFC1D9)),
     ProfilePageColorOption(
       key: 'light_blue',
       label: '水色',
-      lightColor: Color(0xFF007A9E),
-      darkColor: Color(0xFF36CFFF),
+      color: Color(0xFF36CFFF),
     ),
     ProfilePageColorOption(
       key: 'emerald',
       label: 'エメラルド',
-      lightColor: Color(0xFF008C95),
-      darkColor: Color(0xFF20E0D0),
+      color: Color(0xFF20E0D0),
     ),
     ProfilePageColorOption(
       key: 'red_purple',
       label: '赤紫',
-      lightColor: Color(0xFFB51F3E),
-      darkColor: Color(0xFFFF4D6D),
+      color: Color(0xFF882255),
     ),
     ProfilePageColorOption(
       key: 'yellow_green',
       label: '黄緑',
-      lightColor: Color(0xFF5A8500),
-      darkColor: Color(0xFF9BD600),
+      color: Color(0xFF9BD600),
     ),
-    ProfilePageColorOption(
-      key: 'brown',
-      label: '茶色',
-      lightColor: Color(0xFF7A4820),
-      darkColor: Color(0xFFC9854B),
-    ),
+    ProfilePageColorOption(key: 'brown', label: '茶色', color: Color(0xFFC9854B)),
   ];
 
   static bool isValidKey(String? key) =>
@@ -115,10 +68,8 @@ class ProfilePageColors {
   static String normalizeKey(String? key) =>
       isValidKey(key) ? key! : defaultKey;
 
-  static Color colorFor(String? key, Brightness brightness) {
+  static Color colorFor(String? key) {
     final normalized = normalizeKey(key);
-    return options
-        .firstWhere((option) => option.key == normalized)
-        .resolve(brightness);
+    return options.firstWhere((option) => option.key == normalized).color;
   }
 }

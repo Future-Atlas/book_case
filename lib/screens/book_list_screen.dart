@@ -13,7 +13,9 @@ import 'report_post_dialog.dart';
 import 'user_profile_screen.dart';
 
 class BookListScreen extends StatefulWidget {
-  const BookListScreen({super.key});
+  const BookListScreen({super.key, this.onOpenUserProfile});
+
+  final ValueChanged<String>? onOpenUserProfile;
 
   @override
   State<BookListScreen> createState() => _BookListScreenState();
@@ -74,6 +76,11 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Future<void> _openUserProfile(String profileId) async {
     if (!await _ensureAuthenticated() || !mounted) return;
+    final openInMainShell = widget.onOpenUserProfile;
+    if (openInMainShell != null) {
+      openInMainShell(profileId);
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => UserProfileScreen(
