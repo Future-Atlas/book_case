@@ -5,6 +5,7 @@ import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
+import '../models/profile_page_color.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
 import '../widgets/post_composer_dialog.dart';
@@ -514,11 +515,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final profileHeaderColor = ProfilePageColors.colorFor(
+      _profile?.pageColorKey,
+      Theme.of(context).brightness,
+    );
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: isDarkMode ? Colors.black : Colors.white,
+              foregroundColor: isDarkMode ? Colors.white : Colors.black,
               elevation: 0,
+              shape: Border(
+                bottom: BorderSide(color: profileHeaderColor, width: 3),
+              ),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: widget.onBack,
@@ -539,9 +549,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       ),
                     ]
                   : null,
-              title: const Text(
-                'マイページ',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              title: Text(
+                (_profile?.userId.isNotEmpty ?? false)
+                    ? '@${_profile!.userId}'
+                    : 'プロフィール',
+                style: TextStyle(
+                  color: profileHeaderColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               centerTitle: true,
             )
@@ -925,6 +941,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           post: post,
           showUserInfo: false,
           concealSpoiler: !_isOwnProfile,
+          borderColor: ProfilePageColors.colorFor(
+            _profile?.pageColorKey,
+            Theme.of(context).brightness,
+          ),
           onReaction: _isOwnProfile
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),

@@ -11,6 +11,7 @@ import '../models/user_profile.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
 import '../models/moderation_models.dart';
+import '../models/profile_page_color.dart';
 import 'content_safety_service.dart';
 
 enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
@@ -28,6 +29,7 @@ class SupabaseService extends ChangeNotifier {
   String? _cachedConsentUserId;
   bool? _hasCompletedRegistrationCache;
   String? _cachedRegistrationUserId;
+  String _activePageColorKey = ProfilePageColors.defaultKey;
 
   // ----- Initialization ----------------------------------------------------
   Future<void> initialize({
@@ -60,7 +62,13 @@ class SupabaseService extends ChangeNotifier {
             _hasCompletedRegistrationCache = null;
           }
           if (user != null) {
-            _ensureProfile(userId: user.id);
+            unawaited(
+              _ensureProfile(
+                userId: user.id,
+              ).then((_) => refreshActiveProfileAppearance()),
+            );
+          } else {
+            _activePageColorKey = ProfilePageColors.defaultKey;
           }
           notifyListeners();
         });
@@ -79,6 +87,8 @@ class SupabaseService extends ChangeNotifier {
   // ----- Helper -----------------------------------------------------------
   // Returns the current authenticated user ID, or an empty string if not logged in.
   String get activeProfileId => _client?.auth.currentUser?.id ?? '';
+
+  String get activePageColorKey => _activePageColorKey;
 
   bool get isAuthenticated => _client?.auth.currentSession != null;
 
@@ -285,6 +295,7 @@ class SupabaseService extends ChangeNotifier {
     if (!_isInitialized || _client == null) return;
     try {
       await _client!.auth.signOut();
+      _activePageColorKey = ProfilePageColors.defaultKey;
       notifyListeners();
     } catch (e) {
       debugPrint('Error signing out: $e');
@@ -295,6 +306,35 @@ class SupabaseService extends ChangeNotifier {
     final user = currentUser;
     if (user == null) return;
     await _ensureProfile(userId: user.id);
+    await refreshActiveProfileAppearance();
+  }
+
+  Future<void> refreshActiveProfileAppearance() async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) {
+      if (_activePageColorKey != ProfilePageColors.defaultKey) {
+        _activePageColorKey = ProfilePageColors.defaultKey;
+        notifyListeners();
+      }
+      return;
+    }
+
+    try {
+      final profile = await _client!
+          .from('profiles')
+          .select('page_color')
+          .eq('id', profileId)
+          .maybeSingle();
+      final nextKey = ProfilePageColors.normalizeKey(
+        profile?['page_color']?.toString(),
+      );
+      if (_activePageColorKey != nextKey) {
+        _activePageColorKey = nextKey;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading active profile appearance: $e');
+    }
   }
 
   Future<void> _ensureProfile({
@@ -561,9 +601,12 @@ class SupabaseService extends ChangeNotifier {
     try {
       final profile = await _client!
           .from('profiles')
-          .select('username, user_id, avatar_url, bio, is_private')
+          .select('username, user_id, avatar_url, bio, is_private, page_color')
           .eq('id', profileId)
           .single();
+      _activePageColorKey = ProfilePageColors.normalizeKey(
+        profile['page_color']?.toString(),
+      );
       final details = await fetchCurrentAccountDetails();
       return {...profile, ...?details, 'email': currentUser?.email ?? ''};
     } catch (e) {
@@ -577,11 +620,16 @@ class SupabaseService extends ChangeNotifier {
     required String userId,
     required String bio,
     required bool isPrivate,
+    required String pageColorKey,
   }) async {
     if (!_isInitialized || _client == null || !isAuthenticated) {
       return 'ログイン状態を確認できませんでした。';
     }
     try {
+      final normalizedPageColor = ProfilePageColors.normalizeKey(pageColorKey);
+      if (normalizedPageColor != pageColorKey) {
+        return 'ページカラーを選択してください。';
+      }
       await _client!.rpc(
         'update_public_profile',
         params: {
@@ -591,6 +639,11 @@ class SupabaseService extends ChangeNotifier {
           'p_is_private': isPrivate,
         },
       );
+      await _client!.rpc(
+        'update_profile_page_color',
+        params: {'p_page_color': normalizedPageColor},
+      );
+      _activePageColorKey = normalizedPageColor;
       notifyListeners();
       return null;
     } on PostgrestException catch (e) {
@@ -1342,7 +1395,7 @@ class SupabaseService extends ChangeNotifier {
         final response = await _client!
             .from('posts')
             .select(
-              '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url)',
+              '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url, page_color)',
             )
             .order('created_at', ascending: false);
         final data = response as List<dynamic>;
@@ -1383,7 +1436,13 @@ class SupabaseService extends ChangeNotifier {
             .select()
             .eq('id', profileId)
             .single();
-        return UserProfile.fromJson(response);
+        final profile = UserProfile.fromJson(response);
+        if (profileId == activeProfileId) {
+          _activePageColorKey = ProfilePageColors.normalizeKey(
+            profile.pageColorKey,
+          );
+        }
+        return profile;
       } catch (e) {
         debugPrint('Error fetching user profile in Supabase: $e');
       }
@@ -1461,7 +1520,7 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('posts')
           .select(
-            '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url)',
+            '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url, page_color)',
           )
           .eq('profile_id', uid)
           .order('created_at', ascending: false);

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/user_profile.dart';
+import '../models/profile_page_color.dart';
 import '../services/supabase_service.dart';
 import '../services/theme_service.dart';
 import 'community_guidelines_screen.dart';
@@ -250,6 +251,7 @@ class _PublicAccountSettingsScreenState
   final _userIdController = TextEditingController();
   final _bioController = TextEditingController();
   bool _isPrivate = false;
+  String _pageColorKey = ProfilePageColors.defaultKey;
   String _avatarUrl = '';
   bool _loading = true;
   bool _saving = false;
@@ -273,6 +275,9 @@ class _PublicAccountSettingsScreenState
     setState(() {
       _avatarUrl = data?['avatar_url']?.toString() ?? '';
       _isPrivate = data?['is_private'] == true;
+      _pageColorKey = ProfilePageColors.normalizeKey(
+        data?['page_color']?.toString(),
+      );
       _loading = false;
     });
   }
@@ -294,6 +299,7 @@ class _PublicAccountSettingsScreenState
           userId: _userIdController.text,
           bio: _bioController.text,
           isPrivate: _isPrivate,
+          pageColorKey: _pageColorKey,
         );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -355,6 +361,89 @@ class _PublicAccountSettingsScreenState
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
     return 'image/jpeg';
+  }
+
+  Widget _buildPageColorPicker() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'ページカラー',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'ヘッダーと投稿の外枠に使用され、他のユーザーにも表示されます。',
+          style: TextStyle(
+            fontSize: 12,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.68),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 12,
+          children: ProfilePageColors.options.map((option) {
+            final selected = option.key == _pageColorKey;
+            return Semantics(
+              button: true,
+              selected: selected,
+              label: '${option.label}を選択',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => setState(() => _pageColorKey = option.key),
+                child: SizedBox(
+                  width: 70,
+                  child: Column(
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: option.resolve(theme.brightness),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected
+                                ? theme.colorScheme.onSurface
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.25,
+                                  ),
+                            width: selected ? 3 : 1,
+                          ),
+                        ),
+                        child: selected
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 24,
+                                shadows: [
+                                  Shadow(color: Colors.black54, blurRadius: 3),
+                                ],
+                              )
+                            : null,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        option.label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   Future<void> _removeAvatar() async {
@@ -492,6 +581,8 @@ class _PublicAccountSettingsScreenState
                           border: OutlineInputBorder(),
                         ),
                       ),
+                      const SizedBox(height: 20),
+                      _buildPageColorPicker(),
                       const SizedBox(height: 8),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,

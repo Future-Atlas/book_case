@@ -12,6 +12,7 @@ class Post {
   // Joined fields
   final String username;
   final String userAvatarUrl;
+  final String profilePageColorKey;
   final String bookTitle;
   final String bookAuthor;
   final String bookCoverUrl;
@@ -49,6 +50,7 @@ class Post {
     this.editedAt,
     required this.username,
     required this.userAvatarUrl,
+    this.profilePageColorKey = 'yellow',
     required this.bookTitle,
     required this.bookAuthor,
     required this.bookCoverUrl,
@@ -78,6 +80,7 @@ class Post {
           : null,
       username: profile?['username'] ?? '匿名ユーザー',
       userAvatarUrl: profile?['avatar_url'] ?? '',
+      profilePageColorKey: profile?['page_color']?.toString() ?? 'yellow',
       bookTitle: json['book_title'] ?? book?['title'] ?? '',
       bookAuthor: json['book_author'] ?? book?['author'] ?? '',
       bookCoverUrl: book?['cover_url'] ?? '',
@@ -115,6 +118,7 @@ class Post {
     DateTime? editedAt,
     String? username,
     String? userAvatarUrl,
+    String? profilePageColorKey,
     String? bookTitle,
     String? bookAuthor,
     String? bookCoverUrl,
@@ -134,6 +138,7 @@ class Post {
       editedAt: editedAt ?? this.editedAt,
       username: username ?? this.username,
       userAvatarUrl: userAvatarUrl ?? this.userAvatarUrl,
+      profilePageColorKey: profilePageColorKey ?? this.profilePageColorKey,
       bookTitle: bookTitle ?? this.bookTitle,
       bookAuthor: bookAuthor ?? this.bookAuthor,
       bookCoverUrl: bookCoverUrl ?? this.bookCoverUrl,

@@ -8,6 +8,7 @@ class UserProfile {
   final int followingCount;
   final int readCount;
   final bool isPrivate;
+  final String pageColorKey;
 
   UserProfile({
     required this.id,
@@ -19,6 +20,7 @@ class UserProfile {
     required this.followingCount,
     required this.readCount,
     required this.isPrivate,
+    this.pageColorKey = 'yellow',
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class UserProfile {
       followingCount: json['following_count'] ?? 0,
       readCount: json['read_count'] ?? 0,
       isPrivate: json['is_private'] ?? false,
+      pageColorKey: json['page_color']?.toString() ?? 'yellow',
     );
   }
 
@@ -44,6 +47,7 @@ class UserProfile {
     int? followingCount,
     int? readCount,
     bool? isPrivate,
+    String? pageColorKey,
   }) {
     return UserProfile(
       id: id,
@@ -55,6 +59,7 @@ class UserProfile {
       followingCount: followingCount ?? this.followingCount,
       readCount: readCount ?? this.readCount,
       isPrivate: isPrivate ?? this.isPrivate,
+      pageColorKey: pageColorKey ?? this.pageColorKey,
     );
   }
 
@@ -69,6 +74,7 @@ class UserProfile {
       'following_count': followingCount,
       'read_count': readCount,
       'is_private': isPrivate,
+      'page_color': pageColorKey,
     };
   }
 }

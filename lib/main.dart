@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
+import 'models/profile_page_color.dart';
 import 'screens/book_list_screen.dart';
 import 'screens/user_profile_screen.dart';
 import 'screens/auth_screen.dart';
@@ -69,9 +70,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: GoogleFonts.notoSansJp().fontFamily,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(
-          0xFFF8F9FA,
-        ), // Off-white HSL(210, 20%, 98%)
+        scaffoldBackgroundColor: Colors.white,
         primaryColor: const Color(0xFFD00303), // Brand Red
         cardColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
@@ -79,7 +78,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.light,
           primary: const Color(0xFFD00303),
           secondary: const Color(0xFF264653), // Slate blue
-          surface: const Color(0xFFF8F9FA),
+          surface: Colors.white,
         ),
         textTheme: GoogleFonts.notoSansJpTextTheme(ThemeData.light().textTheme)
             .copyWith(
@@ -95,7 +94,7 @@ class MyApp extends StatelessWidget {
             ),
         dividerColor: const Color(0xFFE9ECEF),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF8F9FA),
+          backgroundColor: Colors.white,
           foregroundColor: Colors.black,
         ),
       ),
@@ -414,12 +413,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           _adminCheckedUserId = currentUserId;
           _isAdmin = false;
           if (currentUserId.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (_) => _checkAdministratorAccess(service, currentUserId),
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _checkAdministratorAccess(service, currentUserId);
+              service.refreshActiveProfileAppearance();
+            });
           }
         }
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final headerColor = ProfilePageColors.colorFor(
+          service.activePageColorKey,
+          Theme.of(context).brightness,
+        );
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
         final headerSideWidth = service.isAuthenticated ? 146.0 : 104.0;
@@ -443,10 +447,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: BoxDecoration(
-                    border: Border.all(
-                      color: const Color(0xFFF1D600),
-                      width: 3,
-                    ),
+                    color: isDarkMode ? Colors.black : Colors.white,
+                    border: Border.all(color: headerColor, width: 3),
                   ),
                   child: Row(
                     children: [
@@ -536,8 +538,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             fit: BoxFit.scaleDown,
                             child: Text(
                               _currentHeaderTitle(),
-                              style: const TextStyle(
-                                color: Color(0xFFF1D600),
+                              style: TextStyle(
+                                color: headerColor,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
                               ),

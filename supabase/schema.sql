@@ -13,6 +13,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     following_count INTEGER DEFAULT 0,
     read_count INTEGER DEFAULT 0,
     is_private BOOLEAN NOT NULL DEFAULT false,
+    page_color TEXT NOT NULL DEFAULT 'yellow' CHECK (
+        page_color IN (
+            'red', 'magenta', 'blue', 'yellow', 'green', 'purple',
+            'gray', 'orange', 'pink', 'light_blue', 'emerald',
+            'red_purple', 'yellow_green', 'brown'
+        )
+    ),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -2988,6 +2995,55 @@ SET raw_user_meta_data = coalesce(auth_user.raw_user_meta_data, '{}'::jsonb)
     updated_at = now()
 FROM public.profiles AS profile
 WHERE profile.id = auth_user.id;
+
+-- Public profile accent color used for headers and post borders.
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS page_color TEXT NOT NULL DEFAULT 'yellow';
+
+ALTER TABLE public.profiles
+DROP CONSTRAINT IF EXISTS profiles_page_color_check;
+ALTER TABLE public.profiles
+ADD CONSTRAINT profiles_page_color_check CHECK (
+    page_color IN (
+        'red', 'magenta', 'blue', 'yellow', 'green', 'purple',
+        'gray', 'orange', 'pink', 'light_blue', 'emerald',
+        'red_purple', 'yellow_green', 'brown'
+    )
+);
+
+CREATE OR REPLACE FUNCTION public.update_profile_page_color(
+    p_page_color TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+    END IF;
+    IF p_page_color IS NULL OR p_page_color NOT IN (
+        'red', 'magenta', 'blue', 'yellow', 'green', 'purple',
+        'gray', 'orange', 'pink', 'light_blue', 'emerald',
+        'red_purple', 'yellow_green', 'brown'
+    ) THEN
+        RAISE EXCEPTION 'Invalid page color' USING ERRCODE = '23514';
+    END IF;
+
+    UPDATE public.profiles
+    SET page_color = p_page_color
+    WHERE id = auth.uid();
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Profile not found' USING ERRCODE = 'P0002';
+    END IF;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.update_profile_page_color(TEXT)
+    FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_profile_page_color(TEXT)
+    TO authenticated;
 
 -- Public user IDs are selected once during registration and remain immutable.
 CREATE OR REPLACE FUNCTION public.update_public_profile(

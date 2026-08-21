@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../models/post.dart';
 import '../models/social_models.dart';
+import '../models/profile_page_color.dart';
 
 class PostCard extends StatefulWidget {
   final Post post;
@@ -14,6 +15,7 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final bool concealSpoiler;
+  final Color? borderColor;
 
   const PostCard({
     super.key,
@@ -27,6 +29,7 @@ class PostCard extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.concealSpoiler = true,
+    this.borderColor,
   });
 
   @override
@@ -108,7 +111,6 @@ class _PostCardState extends State<PostCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDarkMode = theme.brightness == Brightness.dark;
     final primaryTextColor = colorScheme.onSurface;
     final secondaryTextColor = colorScheme.onSurface.withValues(alpha: 0.72);
     final tertiaryTextColor = colorScheme.onSurface.withValues(alpha: 0.58);
@@ -123,8 +125,13 @@ class _PostCardState extends State<PostCard> {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDarkMode ? const Color(0xFFFFFFFF) : Colors.black,
-          width: 1.5,
+          color:
+              widget.borderColor ??
+              ProfilePageColors.colorFor(
+                post.profilePageColorKey,
+                theme.brightness,
+              ),
+          width: 2,
         ),
         boxShadow: [
           BoxShadow(
