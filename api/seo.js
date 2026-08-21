@@ -924,6 +924,158 @@ module.exports = async (req, res) => {
         return res.status(200).send(html);
     }
 
+    if (decodedPath === "/community-guidelines") {
+        const html = renderPage({
+            title: "コミュニティガイドライン",
+            description:
+                "Sharemariumのコミュニティガイドラインです。安心して使える読書コミュニティのためのルールを掲載しています。",
+            content: `
+        <section>
+          <h2>コミュニティガイドライン</h2>
+          <p>Sharemariumでは、他の利用者への敬意と安全性を重視しています。</p>
+          <h3>主な方針</h3>
+          <p>誹謗中傷、差別、スパム、不正行為、権利侵害につながる投稿は禁止します。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "コミュニティガイドライン | Sharemarium",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "Sharemariumのコミュニティガイドラインです。安心して使える読書コミュニティのためのルールを掲載しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    {
+                        name: "コミュニティガイドライン",
+                        url: toAbsoluteUrl(decodedPath),
+                    },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/infringement-policy") {
+        const html = renderPage({
+            title: "権利侵害・通報ポリシー",
+            description:
+                "Sharemariumの権利侵害・通報ポリシーです。著作権侵害や不適切な投稿への対応方針を説明しています。",
+            content: `
+        <section>
+          <h2>権利侵害・通報ポリシー</h2>
+          <p>著作権、肖像権、商標権など第三者の権利を侵害する投稿は禁止しています。</p>
+          <h3>通報への対応</h3>
+          <p>通報内容を確認し、必要に応じて投稿の削除やアカウント制限を行います。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "権利侵害・通報ポリシー | Sharemarium",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "Sharemariumの権利侵害・通報ポリシーです。著作権侵害や不適切な投稿への対応方針を説明しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    {
+                        name: "権利侵害・通報ポリシー",
+                        url: toAbsoluteUrl(decodedPath),
+                    },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/external-transmission") {
+        const html = renderPage({
+            title: "外部送信に関する公表事項",
+            description:
+                "Sharemariumの外部送信に関する公表事項です。第三者サービスへの情報送信内容と目的を掲載しています。",
+            content: `
+        <section>
+          <h2>外部送信に関する公表事項</h2>
+          <p>本サービスでは、機能提供・分析・広告配信のために必要な範囲で外部事業者へ情報を送信する場合があります。</p>
+          <h3>主な目的</h3>
+          <p>ログイン維持、サービス改善、広告配信と効果測定、不正利用防止のために利用します。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "外部送信に関する公表事項 | Sharemarium",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "Sharemariumの外部送信に関する公表事項です。第三者サービスへの情報送信内容と目的を掲載しています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    {
+                        name: "外部送信に関する公表事項",
+                        url: toAbsoluteUrl(decodedPath),
+                    },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
+    if (decodedPath === "/contact") {
+        const html = renderPage({
+            title: "お問い合わせ",
+            description:
+                "Sharemariumへのお問い合わせページです。ご意見・不具合報告・権利侵害の申告を受け付けています。",
+            content: `
+        <section>
+          <h2>お問い合わせ</h2>
+          <p>サービスに関するご質問、不具合報告、権利侵害申告などを受け付けています。</p>
+          <p>アプリ内のお問い合わせフォームからご連絡ください。</p>
+        </section>
+      `,
+            jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "ContactPage",
+                name: "お問い合わせ | Sharemarium",
+                url: toAbsoluteUrl(decodedPath),
+                description:
+                    "Sharemariumへのお問い合わせページです。ご意見・不具合報告・権利侵害の申告を受け付けています。",
+            },
+            extraJsonLd: [
+                breadcrumbStructuredData([
+                    { name: "ホーム", url: `${SITE_URL}/` },
+                    { name: "お問い合わせ", url: toAbsoluteUrl(decodedPath) },
+                ]),
+            ],
+            pagePath: decodedPath,
+            robots: "index,follow",
+        });
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        setDiagnosticsHeader(res, diagnostics);
+        return res.status(200).send(html);
+    }
+
     const genreSection = sectionByGenrePath(decodedPath);
     if (genreSection) {
         let books = [];
@@ -1173,8 +1325,12 @@ module.exports = async (req, res) => {
                 <li><a href="${SITE_URL}/genre/recommended">おすすめの本一覧</a></li>
                 <li><a href="${SITE_URL}/genre/western">洋書一覧</a></li>
                 <li><a href="${SITE_URL}/genre/popular">人気作品一覧</a></li>
-                                <li><a href="${SITE_URL}/privacy">プライバシーポリシー</a></li>
-                                <li><a href="${SITE_URL}/terms">利用規約</a></li>
+                <li><a href="${SITE_URL}/privacy">プライバシーポリシー</a></li>
+                <li><a href="${SITE_URL}/terms">利用規約</a></li>
+                <li><a href="${SITE_URL}/community-guidelines">コミュニティガイドライン</a></li>
+                <li><a href="${SITE_URL}/infringement-policy">権利侵害・通報ポリシー</a></li>
+                <li><a href="${SITE_URL}/external-transmission">外部送信に関する公表事項</a></li>
+                <li><a href="${SITE_URL}/contact">お問い合わせ</a></li>
                 <li><a href="${SITE_URL}/book/konbini-ningen">コンビニ人間の紹介</a></li>
                 <li><a href="${SITE_URL}/book/fune-wo-amu">舟を編むの紹介</a></li>
                 <li><a href="${SITE_URL}/book/midnight-library">The Midnight Library の紹介</a></li>
@@ -1200,7 +1356,7 @@ module.exports = async (req, res) => {
                 <li>書籍情報の検索とお気に入り管理</li>
             </ul>
             <p>読んだ本を忘れずに記録したい方、所有している本を整理したい方、読書習慣を振り返りたい方に向けたサービスです。</p>
-            <p><a href="${SITE_URL}/login">ログインする</a> / <a href="${SITE_URL}/">Sharemariumを始める</a></p>
+            <p><a href="${SITE_URL}/">Sharemariumを始める</a> / <a href="${SITE_URL}/contact">お問い合わせ</a></p>
             </section>
             ${sampleNoticeHtml}
 
