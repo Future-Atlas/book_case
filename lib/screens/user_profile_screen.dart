@@ -650,8 +650,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             child: Text(
                               _profile!.username,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 18,
+                              style: TextStyle(
+                                fontSize: isDesktopLayout ? 36 : 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -671,7 +671,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             ? '@${_profile!.id.substring(0, 8)}'
                             : '@${_profile!.id}',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: isDesktopLayout ? 22 : 11,
                           color: Colors.grey[400],
                           fontFamily: 'monospace',
                         ),
@@ -723,7 +723,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               child: Text(
                 _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません。',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: isDesktopLayout ? 24 : 12,
                   color: profileTextColor,
                   height: 1.4,
                 ),
@@ -736,6 +736,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildStatColumn(String label, String count, {VoidCallback? onTap}) {
+    final isDesktopLayout = MediaQuery.sizeOf(context).width >= 768;
     final textColor = Theme.of(context).brightness == Brightness.dark
         ? Colors.white
         : Colors.black;
@@ -751,13 +752,19 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               Text(
                 count,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: isDesktopLayout ? 28 : 14,
                   fontWeight: FontWeight.bold,
                   color: textColor,
                 ),
               ),
               const SizedBox(height: 2),
-              Text(label, style: TextStyle(fontSize: 10, color: textColor)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: isDesktopLayout ? 20 : 10,
+                  color: textColor,
+                ),
+              ),
             ],
           ),
         ),
