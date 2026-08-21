@@ -32,6 +32,21 @@ class ProfileRelationship {
   final bool blockedEitherDirection;
 
   bool get blockedByThem => blockedEitherDirection && !blockedByMe;
+
+  ProfileRelationship copyWith({
+    bool? isOwnProfile,
+    FollowRelationshipStatus? followStatus,
+    bool? blockedByMe,
+    bool? blockedEitherDirection,
+  }) {
+    return ProfileRelationship(
+      isOwnProfile: isOwnProfile ?? this.isOwnProfile,
+      followStatus: followStatus ?? this.followStatus,
+      blockedByMe: blockedByMe ?? this.blockedByMe,
+      blockedEitherDirection:
+          blockedEitherDirection ?? this.blockedEitherDirection,
+    );
+  }
 }
 
 enum SocialNotificationType { reaction, follow, followRequest }

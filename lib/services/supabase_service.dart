@@ -937,6 +937,46 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, FollowRelationshipStatus>> fetchCurrentFollowStatuses(
+    Iterable<String> targetProfileIds,
+  ) async {
+    final viewerId = activeProfileId;
+    final targets = targetProfileIds
+        .where((id) => id.isNotEmpty && id != viewerId)
+        .toSet()
+        .toList(growable: false);
+    if (!_isInitialized ||
+        _client == null ||
+        viewerId.isEmpty ||
+        targets.isEmpty) {
+      return const <String, FollowRelationshipStatus>{};
+    }
+
+    try {
+      final response = await _client!
+          .from('follows')
+          .select('following_id, status')
+          .eq('follower_id', viewerId)
+          .inFilter('following_id', targets);
+      final statuses = <String, FollowRelationshipStatus>{};
+      for (final row in response as List<dynamic>) {
+        final data = row as Map<String, dynamic>;
+        final profileId = data['following_id']?.toString() ?? '';
+        final rawStatus = data['status']?.toString();
+        if (profileId.isEmpty) continue;
+        statuses[profileId] = rawStatus == 'accepted'
+            ? FollowRelationshipStatus.accepted
+            : rawStatus == 'pending'
+            ? FollowRelationshipStatus.pending
+            : FollowRelationshipStatus.none;
+      }
+      return statuses;
+    } catch (e) {
+      debugPrint('Error fetching follow statuses: $e');
+      return const <String, FollowRelationshipStatus>{};
+    }
+  }
+
   Future<FollowRelationshipStatus?> followProfile(
     String targetProfileId,
   ) async {
