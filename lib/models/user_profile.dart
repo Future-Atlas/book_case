@@ -35,6 +35,29 @@ class UserProfile {
     );
   }
 
+  UserProfile copyWith({
+    String? username,
+    String? userId,
+    String? avatarUrl,
+    String? bio,
+    int? followersCount,
+    int? followingCount,
+    int? readCount,
+    bool? isPrivate,
+  }) {
+    return UserProfile(
+      id: id,
+      username: username ?? this.username,
+      userId: userId ?? this.userId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      bio: bio ?? this.bio,
+      followersCount: followersCount ?? this.followersCount,
+      followingCount: followingCount ?? this.followingCount,
+      readCount: readCount ?? this.readCount,
+      isPrivate: isPrivate ?? this.isPrivate,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

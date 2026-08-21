@@ -61,7 +61,7 @@ class MyApp extends StatelessWidget {
     final isDarkMode = context.watch<ThemeService>().isDarkMode;
 
     return MaterialApp(
-      title: 'BookCase',
+      title: 'Sharemarium',
       debugShowCheckedModeBanner: false,
 
       // Premium Light Theme Design System

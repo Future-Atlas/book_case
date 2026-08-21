@@ -215,20 +215,61 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       return;
     }
 
-    setState(() => _isSocialActionInProgress = true);
+    final wasFollowing =
+        relationship.followStatus != FollowRelationshipStatus.none;
+    final optimisticStatus = wasFollowing
+        ? FollowRelationshipStatus.none
+        : profile.isPrivate
+        ? FollowRelationshipStatus.pending
+        : FollowRelationshipStatus.accepted;
+    final followerDelta =
+        relationship.followStatus == FollowRelationshipStatus.accepted
+        ? -1
+        : optimisticStatus == FollowRelationshipStatus.accepted
+        ? 1
+        : 0;
+
+    setState(() {
+      _isSocialActionInProgress = true;
+      _relationship = relationship.copyWith(followStatus: optimisticStatus);
+      _profile = profile.copyWith(
+        followersCount: (profile.followersCount + followerDelta)
+            .clamp(0, 1 << 31)
+            .toInt(),
+      );
+    });
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final success = relationship.followStatus == FollowRelationshipStatus.none
-        ? await service.followProfile(profile.id) != null
-        : await service.unfollowProfile(profile.id);
+    final returnedStatus = wasFollowing
+        ? null
+        : await service.followProfile(profile.id);
+    final success = wasFollowing
+        ? await service.unfollowProfile(profile.id)
+        : returnedStatus != null;
     if (!mounted) return;
-    setState(() => _isSocialActionInProgress = false);
     if (!success) {
+      setState(() {
+        _isSocialActionInProgress = false;
+        _relationship = relationship;
+        _profile = profile;
+      });
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('フォロー設定を変更できませんでした。')));
       return;
     }
-    await _loadProfileData();
+    setState(() {
+      _isSocialActionInProgress = false;
+      if (returnedStatus != null && returnedStatus != optimisticStatus) {
+        _relationship = relationship.copyWith(followStatus: returnedStatus);
+        final correctedDelta =
+            returnedStatus == FollowRelationshipStatus.accepted ? 1 : 0;
+        _profile = profile.copyWith(
+          followersCount: (profile.followersCount + correctedDelta)
+              .clamp(0, 1 << 31)
+              .toInt(),
+        );
+      }
+    });
   }
 
   Future<void> _toggleBlock() async {
@@ -305,6 +346,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         ),
       ),
     );
+    if (!mounted) return;
+    final refreshedProfile = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).fetchUserProfile(profile.id);
+    if (mounted) setState(() => _profile = refreshedProfile);
   }
 
   Future<void> _toggleReaction(String postId, PostReactionType reaction) async {
@@ -493,7 +540,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     ]
                   : null,
               title: const Text(
-                'マイプロフィール',
+                'マイページ',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               centerTitle: true,
@@ -521,8 +568,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           : Container(
               width: double.infinity,
               color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).scaffoldBackgroundColor
-                  : const Color(0xFFF5F5F5),
+                  ? Colors.black
+                  : Colors.white,
               child: NestedScrollView(
                 headerSliverBuilder: (context, innerBoxIsScrolled) => [
                   SliverToBoxAdapter(
@@ -560,22 +607,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget _buildProfileHeader() {
     if (_profile == null) return const SizedBox.shrink();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final informationBoxColor = isDarkMode ? null : const Color(0xFFD0D0D0);
+    final isDesktopLayout = MediaQuery.sizeOf(context).width >= 768;
+    final avatarRadius = isDesktopLayout ? 80.0 : 40.0;
+    final profileBackgroundColor = isDarkMode ? Colors.black : Colors.white;
+    final profileTextColor = isDarkMode ? Colors.white : Colors.black;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: profileBackgroundColor,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
         ),
         child: Column(
           children: [
@@ -585,12 +628,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               children: [
                 // Profile Photo
                 CircleAvatar(
-                  radius: 40,
+                  radius: avatarRadius,
                   backgroundImage: _profile!.avatarUrl.isNotEmpty
                       ? NetworkImage(_profile!.avatarUrl)
                       : null,
                   child: _profile!.avatarUrl.isEmpty
-                      ? const Icon(Icons.person, size: 40)
+                      ? Icon(Icons.person, size: avatarRadius)
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -638,10 +681,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                       // Stat counters row
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: informationBoxColor ?? Colors.grey[50],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        color: profileBackgroundColor,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
@@ -679,34 +719,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: informationBoxColor ?? Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!, width: 0.5),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '自己紹介',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _profile!.bio.isNotEmpty
-                        ? _profile!.bio
-                        : '自己紹介はまだ登録されていません。',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[850],
-                      height: 1.4,
-                    ),
-                  ),
-                ],
+              color: profileBackgroundColor,
+              child: Text(
+                _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません。',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: profileTextColor,
+                  height: 1.4,
+                ),
               ),
             ),
           ],
@@ -716,6 +736,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildStatColumn(String label, String count, {VoidCallback? onTap}) {
+    final textColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -727,17 +750,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             children: [
               Text(
                 count,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 10, color: Colors.black),
-              ),
+              Text(label, style: TextStyle(fontSize: 10, color: textColor)),
             ],
           ),
         ),
@@ -844,22 +864,30 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildTabBar() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final tabBackgroundColor = isDarkMode
+        ? const Color(0xFF424242)
+        : const Color(0xFFBDBDBD);
+    final selectedBackgroundColor = isDarkMode ? Colors.white : Colors.black;
+    final selectedTextColor = isDarkMode ? Colors.black : Colors.white;
+    final unselectedTextColor = isDarkMode ? Colors.white : Colors.black;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: tabBackgroundColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
-          color: colorScheme.onSurface,
+          color: selectedBackgroundColor,
           borderRadius: BorderRadius.circular(12),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: colorScheme.surface,
-        unselectedLabelColor: colorScheme.onSurfaceVariant,
+        dividerColor: Colors.transparent,
+        dividerHeight: 0,
+        labelColor: selectedTextColor,
+        unselectedLabelColor: unselectedTextColor,
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         unselectedLabelStyle: const TextStyle(
           fontWeight: FontWeight.w500,
