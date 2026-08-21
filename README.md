@@ -5,6 +5,7 @@
 ---
 
 ## Table of Contents
+
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Getting Started (Local Development)](#getting-started-local-development)
@@ -19,6 +20,7 @@
 ---
 
 ## Features
+
 - Cross‑platform UI built with **Flutter** (single codebase for iOS, Android, Web).
 - **Supabase** backend for authentication, storage, and Postgres data.
 - Premium design: Google Fonts, glass‑morphism style, dark / light themes, responsive layout.
@@ -28,6 +30,7 @@
 ---
 
 ## Tech Stack
+
 - **Flutter** (stable channel) – UI framework.
 - **supabase_flutter ^2.14.1** – Supabase client.
 - **provider ^6.1.2** – State management.
@@ -39,6 +42,7 @@
 ---
 
 ## Getting Started (Local Development)
+
 1. **Clone the repo**
    ```bash
    git clone <repo-url>
@@ -73,6 +77,7 @@
 ---
 
 ## Supabase Setup
+
 - The repository already contains the migration file `supabase/migrations/20260606144325_init_schema.sql` which creates the following tables:
   - `profiles`
   - `books`
@@ -89,18 +94,22 @@
 ---
 
 ## Running the App
+
 The entry point (`lib/main.dart`) now loads variables via `flutter_dotenv`:
+
 ```dart
 await dotenv.load(fileName: '.env');
 final supabaseUrl = dotenv.get('SUPABASE_URL', fallback: '');
 final supabaseKey = dotenv.get('SUPABASE_ANON_KEY', fallback: '');
 await supabaseService.initialize(url: supabaseUrl, anonKey: supabaseKey);
 ```
+
 When the keys are present, the service falls back to **real Supabase**; otherwise it uses the built‑in mock objects.
 
 ---
 
 ## Deploying to Vercel (Production)
+
 1. **Add environment variables in Vercel** (Project Settings → Environment Variables → Production):
    - `SUPABASE_URL` – e.g. `https://your‑project.supabase.co`
    - `SUPABASE_ANON_KEY` – the publishable key from the Supabase console.
@@ -111,6 +120,7 @@ When the keys are present, the service falls back to **real Supabase**; otherwis
 ---
 
 ## Project Structure
+
 ```
 book_case/
 ├─ .env               ← local env (git‑ignored)
@@ -137,12 +147,13 @@ book_case/
 ---
 
 ## Environment Variables
-| Variable | Description | Example |
-|----------|------------|---------|
-| `APP_ENV` | App runtime environment label | `production`, `staging`, `development` |
-| `SUPABASE_URL` | Supabase project URL (local or cloud) | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
-| `SUPABASE_ANON_KEY` | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH` |
-| `SUPABASE_REDIRECT_URL` | OAuth redirect URL for auth providers | `https://www.sharemarium.com/` |
+
+| Variable                | Description                                                                   | Example                                               |
+| ----------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `APP_ENV`               | App runtime environment label                                                 | `production`, `staging`, `development`                |
+| `SUPABASE_URL`          | Supabase project URL (local or cloud)                                         | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
+| `SUPABASE_ANON_KEY`     | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`      |
+| `SUPABASE_REDIRECT_URL` | OAuth redirect URL for auth providers                                         | `https://www.sharemarium.com/`                        |
 
 Runtime variables are passed via `--dart-define` and read by `String.fromEnvironment`.
 
@@ -152,21 +163,21 @@ Runtime variables are passed via `--dart-define` and read by `String.fromEnviron
 - Production deploy: `.github/workflows/deploy.yaml` (push to `main`) with `APP_ENV=production`.
 - Staging deploy: `.github/workflows/deploy-staging.yaml` (push to `staging`) with `APP_ENV=staging`.
 - Example define files:
-   - `env.production.example.json`
-   - `env.staging.example.json`
+  - `env.production.example.json`
+  - `env.staging.example.json`
 
 Recommended setup in GitHub:
 
 1. Create branch `staging` and use it for validation releases.
 2. Add repository secrets for both workflows:
-    - `SUPABASE_URL`
-    - `SUPABASE_ANON_KEY`
-    - `SUPABASE_REDIRECT_URL`
-    - `RAKUTEN_APP_ID`
-    - `RAKUTEN_ACCESS_KEY`
-    - `VERCEL_ORG_ID`
-    - `VERCEL_PROJECT_ID`
-    - `VERCEL_TOKEN`
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_REDIRECT_URL`
+   - `RAKUTEN_APP_ID`
+   - `RAKUTEN_ACCESS_KEY`
+   - `VERCEL_ORG_ID`
+   - `VERCEL_PROJECT_ID`
+   - `VERCEL_TOKEN`
 3. Keep production values in main deploy context and staging values in staging deploy context.
 
 Local build examples:
@@ -190,6 +201,7 @@ flutter build web --release \
 ---
 
 ## Useful Commands
+
 ```bash
 # Supabase local commands
 supabase start          # launch all services
@@ -212,8 +224,9 @@ git push origin main
 ---
 
 ## License
+
 MIT License – see `LICENSE` file.
 
 ---
 
-*Happy coding! 🚀*
+_Happy coding! 🚀_
