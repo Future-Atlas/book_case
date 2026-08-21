@@ -63,7 +63,7 @@
             "dest": "/api/seo?path=/"
         },
         {
-            "src": "/(genre/.*|book/.*|user/.*|profile/.*|privacy|terms)",
+            "src": "/(genre/.*|book/.*|user/.*|profile/.*|privacy|terms|community-guidelines|infringement-policy|external-transmission|contact)",
             "has": [
                 {
                     "type": "header",
