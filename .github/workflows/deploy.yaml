@@ -31,7 +31,7 @@ jobs:
 
             # 4. Webアプリの組み立て（末尾に RAKUTEN_ACCESS_KEY を追加）
             - name: Build Flutter Web
-              run: flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=RAKUTEN_APP_ID=${{ secrets.RAKUTEN_APP_ID }} --dart-define=RAKUTEN_ACCESS_KEY=${{ secrets.RAKUTEN_ACCESS_KEY }}
+              run: flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html --dart-define=APP_ENV=production --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=SUPABASE_REDIRECT_URL=${{ secrets.SUPABASE_REDIRECT_URL }} --dart-define=RAKUTEN_APP_ID=${{ secrets.RAKUTEN_APP_ID }} --dart-define=RAKUTEN_ACCESS_KEY=${{ secrets.RAKUTEN_ACCESS_KEY }}
 
             # 5. Vercelのツールをインストール
             - name: Install Vercel CLI

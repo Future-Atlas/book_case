@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'config/app_environment.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
 import 'models/profile_page_color.dart';
@@ -25,21 +26,20 @@ enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 final supabaseService = SupabaseService();
 final themeService = ThemeService();
 
-// 💡 パッケージを使わず、環境変数（JSON）から直接安全に引き抜く
-const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-const supabaseRedirectUrl = String.fromEnvironment('SUPABASE_REDIRECT_URL');
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await themeService.initialize();
 
+  debugPrint(
+    'Starting Sharemarium with APP_ENV=${AppEnvironmentConfig.environmentName}',
+  );
+
   // Initialize Supabase service
   await supabaseService.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseKey,
-    redirectUrl: supabaseRedirectUrl,
+    url: AppEnvironmentConfig.supabaseUrl,
+    anonKey: AppEnvironmentConfig.supabaseAnonKey,
+    redirectUrl: AppEnvironmentConfig.supabaseRedirectUrl,
   );
 
   runApp(

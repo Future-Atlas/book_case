@@ -1,0 +1,43 @@
+name: Deploy Flutter Web to Vercel (Staging)
+
+on:
+    push:
+        branches:
+            - staging
+    workflow_dispatch:
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        env:
+            VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+            VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+            VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+            VERCEL_SCOPE: sharemarium
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                  channel: "stable"
+                  cache: true
+
+            - name: Install dependencies
+              run: flutter pub get
+
+            - name: Build Flutter Web (Staging)
+              run: flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html --dart-define=APP_ENV=staging --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=SUPABASE_REDIRECT_URL=${{ secrets.SUPABASE_REDIRECT_URL }} --dart-define=RAKUTEN_APP_ID=${{ secrets.RAKUTEN_APP_ID }} --dart-define=RAKUTEN_ACCESS_KEY=${{ secrets.RAKUTEN_ACCESS_KEY }}
+
+            - name: Install Vercel CLI
+              run: npm install --global vercel@58.7.1
+
+            - name: Pull Vercel Environment Information (Preview)
+              run: vercel pull --yes --environment=preview --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
+
+            - name: Build Vercel Prebuilt Output (Preview)
+              run: vercel build --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
+
+            - name: Deploy to Vercel Preview
+              run: vercel deploy --prebuilt --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"

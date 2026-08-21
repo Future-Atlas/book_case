@@ -139,10 +139,53 @@ book_case/
 ## Environment Variables
 | Variable | Description | Example |
 |----------|------------|---------|
+| `APP_ENV` | App runtime environment label | `production`, `staging`, `development` |
 | `SUPABASE_URL` | Supabase project URL (local or cloud) | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
 | `SUPABASE_ANON_KEY` | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH` |
+| `SUPABASE_REDIRECT_URL` | OAuth redirect URL for auth providers | `https://www.sharemarium.com/` |
 
-Both variables are loaded with `flutter_dotenv` and also passed to Vercel builds via `--dart-define`.
+Runtime variables are passed via `--dart-define` and read by `String.fromEnvironment`.
+
+### Environment Separation (Production / Staging)
+
+- Runtime config is switched by `APP_ENV` (read in `lib/config/app_environment.dart`).
+- Production deploy: `.github/workflows/deploy.yaml` (push to `main`) with `APP_ENV=production`.
+- Staging deploy: `.github/workflows/deploy-staging.yaml` (push to `staging`) with `APP_ENV=staging`.
+- Example define files:
+   - `env.production.example.json`
+   - `env.staging.example.json`
+
+Recommended setup in GitHub:
+
+1. Create branch `staging` and use it for validation releases.
+2. Add repository secrets for both workflows:
+    - `SUPABASE_URL`
+    - `SUPABASE_ANON_KEY`
+    - `SUPABASE_REDIRECT_URL`
+    - `RAKUTEN_APP_ID`
+    - `RAKUTEN_ACCESS_KEY`
+    - `VERCEL_ORG_ID`
+    - `VERCEL_PROJECT_ID`
+    - `VERCEL_TOKEN`
+3. Keep production values in main deploy context and staging values in staging deploy context.
+
+Local build examples:
+
+```bash
+# production-like build
+flutter build web --release \
+   --dart-define=APP_ENV=production \
+   --dart-define=SUPABASE_URL=https://your-prod-project.supabase.co \
+   --dart-define=SUPABASE_ANON_KEY=sb_publishable_xxx \
+   --dart-define=SUPABASE_REDIRECT_URL=https://www.sharemarium.com/
+
+# staging-like build
+flutter build web --release \
+   --dart-define=APP_ENV=staging \
+   --dart-define=SUPABASE_URL=https://your-staging-project.supabase.co \
+   --dart-define=SUPABASE_ANON_KEY=sb_publishable_xxx \
+   --dart-define=SUPABASE_REDIRECT_URL=https://staging.sharemarium.com/
+```
 
 ---
 
