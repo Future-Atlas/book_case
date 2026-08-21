@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
-  const PrivacyPolicyScreen({super.key});
+  const PrivacyPolicyScreen({super.key, this.onClose});
+
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +16,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         title: const Text('プライバシーポリシー'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: onClose ?? () => Navigator.of(context).pop(),
         ),
       ),
       body: const SafeArea(

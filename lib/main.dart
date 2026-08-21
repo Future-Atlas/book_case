@@ -171,7 +171,8 @@ class MainNavigationShell extends StatefulWidget {
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends State<MainNavigationShell> {
+class _MainNavigationShellState extends State<MainNavigationShell>
+  with WidgetsBindingObserver {
   static const Set<String> _transientQueryKeys = {
     'code',
     'state',
@@ -266,6 +267,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         return 3;
       case '/moderation':
         return 4;
+      case '/terms':
+        return 6;
+      case '/privacy':
+        return 7;
+      case '/community-guidelines':
+        return 8;
+      case '/infringement-policy':
+        return 9;
+      case '/external-transmission':
+        return 10;
+      case '/contact':
+        return 11;
       default:
         return _openPrivacyPasswordRecovery ? 2 : 0;
     }
@@ -286,6 +299,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         return profileId == null || profileId.isEmpty
             ? '/'
             : '/users/${Uri.encodeComponent(profileId)}';
+      case 6:
+        return '/terms';
+      case 7:
+        return '/privacy';
+      case 8:
+        return '/community-guidelines';
+      case 9:
+        return '/infringement-policy';
+      case 10:
+        return '/external-transmission';
+      case 11:
+        return '/contact';
       default:
         return '/';
     }
@@ -320,18 +345,67 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     SystemNavigator.routeInformationUpdated(uri: targetUri, replace: replace);
   }
 
-  void _setCurrentScreenIndex(int index, {bool replaceUrl = false}) {
+  void _setCurrentScreenIndex(
+    int index, {
+    bool replaceUrl = false,
+    bool syncUrl = true,
+  }) {
     if (_currentScreenIndex != index) {
       setState(() {
         _currentScreenIndex = index;
       });
     }
-    _syncBrowserUrlForScreen(index, replace: replaceUrl);
+    if (syncUrl) {
+      _syncBrowserUrlForScreen(index, replace: replaceUrl);
+    }
+  }
+
+  void _applyScreenStateFromPath(
+    String path, {
+    bool replaceUrl = false,
+    bool syncUrl = true,
+  }) {
+    final index = _screenIndexFromPath(path);
+    String? nextViewedProfileId;
+    if (index == 5) {
+      final encodedProfileId = path.substring('/users/'.length);
+      if (encodedProfileId.isNotEmpty) {
+        nextViewedProfileId = Uri.decodeComponent(encodedProfileId);
+      }
+    }
+
+    if (_currentScreenIndex != index || _viewedProfileId != nextViewedProfileId) {
+      setState(() {
+        _currentScreenIndex = index;
+        _viewedProfileId = nextViewedProfileId;
+        if (index != 5) {
+          _viewedProfileUserId = null;
+          _viewedProfileColorKey = null;
+        } else {
+          _viewedProfileUserId = null;
+          _viewedProfileColorKey = null;
+        }
+      });
+    }
+
+    if (syncUrl) {
+      _syncBrowserUrlForScreen(index, replace: replaceUrl);
+    }
+
+    if (index == 5 && nextViewedProfileId != null) {
+      _loadViewedProfileHeader(nextViewedProfileId);
+    }
+  }
+
+  void _applyRouteFromUri(Uri uri, {bool replaceUrl = false}) {
+    final currentPath = _currentAppPathFromUri(uri);
+    _applyScreenStateFromPath(currentPath, replaceUrl: replaceUrl);
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final currentUri = Uri.base;
     final fragmentQuery = currentUri.fragment.startsWith('/')
         ? _normalizedFragmentUri(currentUri.fragment).queryParameters
@@ -339,21 +413,38 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     _openPrivacyPasswordRecovery =
         (currentUri.queryParameters['privacy_password_recovery'] == '1') ||
         (fragmentQuery['privacy_password_recovery'] == '1');
-    final currentPath = _currentAppPathFromUri(currentUri);
-    if (currentPath.startsWith('/users/')) {
-      final encodedProfileId = currentPath.substring('/users/'.length);
-      if (encodedProfileId.isNotEmpty) {
-        _viewedProfileId = Uri.decodeComponent(encodedProfileId);
-      }
-    }
-    _currentScreenIndex = _screenIndexFromPath(currentPath);
+    _currentScreenIndex = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _syncBrowserUrlForScreen(_currentScreenIndex, replace: true);
-      if (_currentScreenIndex == 5 && _viewedProfileId != null) {
-        _loadViewedProfileHeader(_viewedProfileId!);
-      }
+      _applyRouteFromUri(currentUri, replaceUrl: true);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
+    final uri = routeInformation.uri;
+    if (uri != null) {
+      _applyRouteFromUri(uri, replaceUrl: _hasTransientQuery(uri));
+      return true;
+    }
+
+    final location = routeInformation.location;
+    if (location == null || location.isEmpty) {
+      return false;
+    }
+
+    final parsed = Uri.tryParse(location);
+    if (parsed == null) {
+      return false;
+    }
+    _applyRouteFromUri(parsed, replaceUrl: _hasTransientQuery(parsed));
+    return true;
   }
 
   Future<void> _loadViewedProfileHeader(String profileId) async {
@@ -402,7 +493,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   }
 
   void _goToBookList() {
+    _viewedProfileId = null;
+    _viewedProfileUserId = null;
+    _viewedProfileColorKey = null;
     _setCurrentScreenIndex(0);
+  }
+
+  void _openHelpPath(String path) {
+    _applyScreenStateFromPath(path);
   }
 
   Future<void> _onMenuAction(_HeaderMenuAction action) async {
@@ -448,6 +546,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       case 5:
         final userId = _viewedProfileUserId;
         return userId == null || userId.isEmpty ? 'プロフィール' : '@$userId';
+      case 6:
+        return '利用規約';
+      case 7:
+        return 'プライバシーポリシー';
+      case 8:
+        return 'コミュニティガイドライン';
+      case 9:
+        return '権利侵害・通報ポリシー';
+      case 10:
+        return '外部送信に関する公表事項';
+      case 11:
+        return 'お問い合わせ';
       default:
         return 'ホーム';
     }
@@ -673,7 +783,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                                 _openPrivacyPasswordRecovery,
                           )
                         : _currentScreenIndex == 3
-                        ? const _HelpScreen(key: ValueKey('HelpScreen'))
+                        ? _HelpScreen(
+                            key: const ValueKey('HelpScreen'),
+                            onSelectPath: _openHelpPath,
+                          )
                         : _currentScreenIndex == 5 && _viewedProfileId != null
                         ? UserProfileScreen(
                             key: ValueKey(
@@ -683,6 +796,36 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                             onBack: _goToBookList,
                             onOpenProfile: _openUserProfile,
                             showAppBar: false,
+                          )
+                        : _currentScreenIndex == 6
+                        ? TermsScreen(
+                            key: const ValueKey('TermsScreen'),
+                            onClose: () => _setCurrentScreenIndex(3),
+                          )
+                        : _currentScreenIndex == 7
+                        ? PrivacyPolicyScreen(
+                            key: const ValueKey('PrivacyPolicyScreen'),
+                            onClose: () => _setCurrentScreenIndex(3),
+                          )
+                        : _currentScreenIndex == 8
+                        ? CommunityGuidelinesScreen(
+                            key: const ValueKey('CommunityGuidelinesScreen'),
+                            onClose: () => _setCurrentScreenIndex(3),
+                          )
+                        : _currentScreenIndex == 9
+                        ? InfringementPolicyScreen(
+                            key: const ValueKey('InfringementPolicyScreen'),
+                            onClose: () => _setCurrentScreenIndex(3),
+                          )
+                        : _currentScreenIndex == 10
+                        ? ExternalTransmissionScreen(
+                            key: const ValueKey('ExternalTransmissionScreen'),
+                            onClose: () => _setCurrentScreenIndex(3),
+                          )
+                        : _currentScreenIndex == 11
+                        ? ContactScreen(
+                            key: const ValueKey('ContactScreen'),
+                            onClose: () => _setCurrentScreenIndex(3),
                           )
                         : const ModerationScreen(
                             key: ValueKey('ModerationScreen'),
@@ -699,29 +842,43 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 }
 
 class _HelpScreen extends StatelessWidget {
-  const _HelpScreen({super.key});
+  const _HelpScreen({super.key, this.onSelectPath});
+
+  final ValueChanged<String>? onSelectPath;
 
   @override
   Widget build(BuildContext context) {
     final items = <_HelpItem>[
-      _HelpItem(title: '利用規約', screenBuilder: (_) => const TermsScreen()),
+      _HelpItem(
+        title: '利用規約',
+        path: '/terms',
+        screenBuilder: (_) => const TermsScreen(),
+      ),
       _HelpItem(
         title: 'プライバシーポリシー',
+        path: '/privacy',
         screenBuilder: (_) => const PrivacyPolicyScreen(),
       ),
       _HelpItem(
         title: 'コミュニティガイドライン',
+        path: '/community-guidelines',
         screenBuilder: (_) => const CommunityGuidelinesScreen(),
       ),
       _HelpItem(
         title: '権利侵害・通報ポリシー',
+        path: '/infringement-policy',
         screenBuilder: (_) => const InfringementPolicyScreen(),
       ),
       _HelpItem(
         title: '外部送信に関する公表事項',
+        path: '/external-transmission',
         screenBuilder: (_) => const ExternalTransmissionScreen(),
       ),
-      _HelpItem(title: 'お問い合わせ', screenBuilder: (_) => const ContactScreen()),
+      _HelpItem(
+        title: 'お問い合わせ',
+        path: '/contact',
+        screenBuilder: (_) => const ContactScreen(),
+      ),
     ];
 
     return Align(
@@ -751,6 +908,10 @@ class _HelpScreen extends StatelessWidget {
                 title: Text(item.title),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
+                  if (onSelectPath != null) {
+                    onSelectPath!(item.path);
+                    return;
+                  }
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: item.screenBuilder));
@@ -765,8 +926,13 @@ class _HelpScreen extends StatelessWidget {
 }
 
 class _HelpItem {
-  const _HelpItem({required this.title, required this.screenBuilder});
+  const _HelpItem({
+    required this.title,
+    required this.path,
+    required this.screenBuilder,
+  });
 
   final String title;
+  final String path;
   final WidgetBuilder screenBuilder;
 }

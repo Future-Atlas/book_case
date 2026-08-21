@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../services/supabase_service.dart';
 
 class ContactScreen extends StatefulWidget {
-  const ContactScreen({super.key});
+  const ContactScreen({super.key, this.onClose});
+
+  final VoidCallback? onClose;
 
   @override
   State<ContactScreen> createState() => _ContactScreenState();
@@ -80,13 +82,25 @@ class _ContactScreenState extends State<ContactScreen> {
         ],
       ),
     );
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    final close = widget.onClose;
+    if (close != null) {
+      close();
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('お問い合わせ')),
+      appBar: AppBar(
+        title: const Text('お問い合わせ'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SafeArea(
         child: Align(
           alignment: Alignment.topCenter,

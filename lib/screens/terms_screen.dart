@@ -1,7 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 
 class TermsScreen extends StatelessWidget {
-  const TermsScreen({super.key});
+  const TermsScreen({super.key, this.onClose});
+
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +16,7 @@ class TermsScreen extends StatelessWidget {
         title: const Text('利用規約'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: onClose ?? () => Navigator.of(context).pop(),
         ),
       ),
       body: const SafeArea(

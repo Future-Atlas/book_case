@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class CommunityGuidelinesScreen extends StatelessWidget {
-  const CommunityGuidelinesScreen({super.key});
+  const CommunityGuidelinesScreen({super.key, this.onClose});
+
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +16,7 @@ class CommunityGuidelinesScreen extends StatelessWidget {
         title: const Text('コミュニティガイドライン'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: onClose ?? () => Navigator.of(context).pop(),
         ),
       ),
       body: const SafeArea(

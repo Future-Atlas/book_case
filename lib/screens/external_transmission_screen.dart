@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class ExternalTransmissionScreen extends StatelessWidget {
-  const ExternalTransmissionScreen({super.key});
+  const ExternalTransmissionScreen({super.key, this.onClose});
+
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +16,7 @@ class ExternalTransmissionScreen extends StatelessWidget {
         title: const Text('外部送信に関する公表事項'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: onClose ?? () => Navigator.of(context).pop(),
         ),
       ),
       body: const SafeArea(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class InfringementPolicyScreen extends StatelessWidget {
-  const InfringementPolicyScreen({super.key});
+  const InfringementPolicyScreen({super.key, this.onClose});
+
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +16,7 @@ class InfringementPolicyScreen extends StatelessWidget {
         title: const Text('権利侵害・通報ポリシー'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: onClose ?? () => Navigator.of(context).pop(),
         ),
       ),
       body: const SafeArea(
