@@ -596,6 +596,43 @@ function genrePathBySection(sectionTitle) {
     return map[sectionTitle] || "/";
 }
 
+function truncateForMeta(text, maxLength = 110) {
+    const value = String(text || "").replace(/\s+/g, " ").trim();
+    if (!value) return "";
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function buildProfileDescription(username, stats) {
+    return truncateForMeta(
+        `${username}さんのプロフィールページ。読了数${stats.read}冊、フォロワー${stats.followers}人、フォロー${stats.following}人。書評やお気に入り本をチェックできます。`,
+    );
+}
+
+function buildGenreDescription(sectionTitle, books) {
+    const titles = (books || [])
+        .slice(0, 3)
+        .map((book) => book?.title)
+        .filter(Boolean)
+        .join("、");
+    if (!titles) {
+        return truncateForMeta(
+            `Sharemariumの${sectionTitle}ページです。注目タイトルや著者情報、作品概要をまとめて確認できます。`,
+        );
+    }
+    return truncateForMeta(
+        `Sharemariumの${sectionTitle}ページです。${titles} などの注目タイトルを一覧で確認できます。`,
+    );
+}
+
+function buildBookDescription(book) {
+    const base = `${book.title}（${book.author}）の紹介ページです。`;
+    const detail = book.description
+        ? `${book.description} ${book.section}ジャンルの関連作品も確認できます。`
+        : `${book.section}ジャンルの関連作品も確認できます。`;
+    return truncateForMeta(`${base}${detail}`);
+}
+
 module.exports = async (req, res) => {
     const { path } = req.query;
     const decodedPath = decodeURIComponent(path || "");
@@ -816,7 +853,7 @@ module.exports = async (req, res) => {
 
         const html = renderPage({
             title: `${escapeHtml(username)} のプロフィール`,
-            description: `${escapeHtml(username)}さんの読書履歴、書評、お気に入り本リスト。読了数: ${stats.read}冊、フォロワー: ${stats.followers}人。`,
+            description: buildProfileDescription(username, stats),
             content: `
         <h2>ユーザー情報</h2>
         <div style="background:#eee; padding:15px; border-radius:8px; margin-bottom:20px;">
@@ -1099,7 +1136,7 @@ module.exports = async (req, res) => {
 
         const html = renderPage({
             title: `${genreSection}一覧`,
-            description: `Sharemariumの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
+            description: buildGenreDescription(genreSection, books),
             content: `
         <h2>${genreSection}について</h2>
         <p>Sharemariumが注目する${genreSection}を一覧で紹介します。</p>
@@ -1111,7 +1148,7 @@ module.exports = async (req, res) => {
                 "@context": "https://schema.org",
                 "@type": "CollectionPage",
                 name: `${genreSection}一覧 | Sharemarium`,
-                description: `Sharemariumの${genreSection}ページ。注目タイトル、著者、簡単な概要を確認できます。`,
+                description: buildGenreDescription(genreSection, books),
                 url: toAbsoluteUrl(decodedPath),
             },
             extraJsonLd: [
@@ -1158,7 +1195,7 @@ module.exports = async (req, res) => {
         const genrePath = genrePathBySection(book.section);
         const html = renderPage({
             title: `${book.title} の紹介`,
-            description: `${book.title}（${book.author}）の概要と関連ジャンル情報を掲載しています。`,
+            description: buildBookDescription(book),
             content: `
         <h2>${escapeHtml(book.title)}</h2>
         <p><strong>著者:</strong> ${escapeHtml(book.author)}</p>
