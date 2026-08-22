@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/book.dart';
@@ -14,7 +15,57 @@ class RakutenApi {
 
   static const String _appId = String.fromEnvironment('RAKUTEN_APP_ID');
   static const String _accessKey = String.fromEnvironment('RAKUTEN_ACCESS_KEY');
+  static const String _proxyBaseUrl = String.fromEnvironment(
+    'RAKUTEN_PROXY_BASE_URL',
+  );
   static final Map<String, Book?> _bookByIdCache = <String, Book?>{};
+
+  static bool get _hasDirectCredentials =>
+      _appId.isNotEmpty && _accessKey.isNotEmpty;
+
+  static bool _canRequestRakuten() {
+    if (kIsWeb) return true;
+    return _hasDirectCredentials || _proxyBaseUrl.trim().isNotEmpty;
+  }
+
+  static Uri _buildProxyUri(
+    String endpoint,
+    Map<String, String> queryParameters,
+  ) {
+    final params = <String, String>{'endpoint': endpoint, ...queryParameters};
+    final trimmedBase = _proxyBaseUrl.trim();
+    if (trimmedBase.isEmpty) {
+      return Uri(path: '/api/rakuten', queryParameters: params);
+    }
+
+    final normalized = trimmedBase.endsWith('/')
+        ? trimmedBase.substring(0, trimmedBase.length - 1)
+        : trimmedBase;
+    return Uri.parse('$normalized/api/rakuten').replace(
+      queryParameters: params,
+    );
+  }
+
+  static Future<http.Response?> _requestRakuten(
+    String endpoint,
+    Map<String, String> queryParameters,
+  ) async {
+    if (kIsWeb || !_hasDirectCredentials) {
+      final proxyUri = _buildProxyUri(endpoint, queryParameters);
+      return _getWithRateLimitRetry(proxyUri);
+    }
+
+    final baseUrl = endpoint == 'foreign' ? _foreignBookBaseUrl : _bookBaseUrl;
+    final directUri = Uri.parse(baseUrl).replace(
+      queryParameters: {
+        'format': 'json',
+        ...queryParameters,
+        'applicationId': _appId,
+        'accessKey': _accessKey,
+      },
+    );
+    return _getWithRateLimitRetry(directUri);
+  }
 
   static List<String> buildSearchKeywordVariants(String keyword) {
     final original = keyword.trim();
@@ -71,7 +122,7 @@ class RakutenApi {
   }
 
   static Future<Book?> fetchBookById(String bookId) async {
-    if (_appId.isEmpty || _accessKey.isEmpty || bookId.trim().isEmpty) {
+    if (bookId.trim().isEmpty || !_canRequestRakuten()) {
       return null;
     }
 
@@ -83,15 +134,15 @@ class RakutenApi {
 
     final isbnLike = RegExp(r'^[0-9Xx-]{10,17}$').hasMatch(trimmed);
 
-    final queryParam = isbnLike
-        ? 'isbn=${Uri.encodeComponent(trimmed.replaceAll('-', ''))}'
-        : 'keyword=${Uri.encodeComponent(trimmed)}';
-
-    final urlString =
-        '$_bookBaseUrl?format=json&hits=1&applicationId=$_appId&accessKey=$_accessKey&$queryParam';
+    final queryParameters = <String, String>{'hits': '1'};
+    if (isbnLike) {
+      queryParameters['isbn'] = trimmed.replaceAll('-', '');
+    } else {
+      queryParameters['keyword'] = trimmed;
+    }
 
     try {
-      final response = await _getWithRateLimitRetry(Uri.parse(urlString));
+      final response = await _requestRakuten('book', queryParameters);
       if (response == null || response.statusCode != 200) {
         _bookByIdCache[cacheKey] = null;
         return null;
@@ -155,7 +206,7 @@ class RakutenApi {
     String? sort,
     String? searchField,
   }) async {
-    if (_appId.isEmpty || _accessKey.isEmpty) {
+    if (!_canRequestRakuten()) {
       print('💡 [RakutenApi] APIキーが未設定のため通信をスキップします。');
       return [];
     }
@@ -163,7 +214,11 @@ class RakutenApi {
     // 楽天APIの hits は上限があるため、要求件数を安全な範囲に収める。
     final effectiveCount = count.clamp(1, 30);
 
-    String urlString = '';
+    var endpoint = 'book';
+    final queryParameters = <String, String>{
+      'page': '$page',
+      'hits': '$effectiveCount',
+    };
 
     // 💡 選択されたタブ・ジャンルによって、叩くAPIとパラメータを完全に切り替える
     if (keywordSearch) {
@@ -173,13 +228,15 @@ class RakutenApi {
       final field = allowedFields.contains(searchField)
           ? searchField!
           : 'title';
-      urlString =
-          '$_bookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=001&$field=${Uri.encodeComponent(selectedGenre.trim())}&sort=${Uri.encodeComponent(sort ?? 'reviewCount')}';
+        queryParameters['booksGenreId'] = '001';
+        queryParameters[field] = selectedGenre.trim();
+        queryParameters['sort'] = sort ?? 'reviewCount';
     } else if (selectedGenre.contains('English') ||
         selectedGenre.contains('洋書')) {
       // ⭕ 洋書検索APIを呼び出す（必須条件：booksGenreId=005を指定）
-      urlString =
-          '$_foreignBookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=005&sort=${Uri.encodeComponent(sort ?? 'reviewCount')}';
+        endpoint = 'foreign';
+        queryParameters['booksGenreId'] = '005';
+        queryParameters['sort'] = sort ?? 'reviewCount';
     } else {
       // ⭕ 通常の書籍検索API（日本語の本）を呼び出す
       String genreId = '001';
@@ -199,22 +256,22 @@ class RakutenApi {
         keyword = selectedGenre;
       }
 
-      urlString =
-          '$_bookBaseUrl?format=json&page=$page&hits=$effectiveCount&applicationId=$_appId&accessKey=$_accessKey&booksGenreId=$genreId';
+      queryParameters['booksGenreId'] = genreId;
 
       if (keyword.isNotEmpty) {
-        urlString += '&keyword=${Uri.encodeComponent(keyword)}';
+        queryParameters['keyword'] = keyword;
       }
       if (sort != null && sort.isNotEmpty) {
-        urlString += '&sort=${Uri.encodeComponent(sort)}';
+        queryParameters['sort'] = sort;
       }
     }
 
-    print('📡 [RakutenApi] リクエスト送信（$selectedGenre）：$urlString');
+    print(
+      '📡 [RakutenApi] リクエスト送信（$selectedGenre）：endpoint=$endpoint params=$queryParameters',
+    );
 
     try {
-      final uri = Uri.parse(urlString);
-      final response = await _getWithRateLimitRetry(uri);
+      final response = await _requestRakuten(endpoint, queryParameters);
 
       if (response == null) {
         print('❌ [RakutenApi] レスポンス取得に失敗しました。');

@@ -1,0 +1,2 @@
+-- Seed file used by `supabase db reset` based on supabase/config.toml.
+-- Add deterministic local-only seed data here when needed.

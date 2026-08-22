@@ -34,8 +34,7 @@
 - **Flutter** (stable channel) – UI framework.
 - **supabase_flutter ^2.14.1** – Supabase client.
 - **provider ^6.1.2** – State management.
-- **google_fonts ^6.2.1** – Premium typography.
-- **flutter_dotenv ^5.0.2** – Load `.env` variables.
+- **google_fonts ^6.0.0** – Premium typography.
 - **Vercel** – Hosting for the web build.
 - **Supabase CLI** – Local database & API.
 
@@ -57,15 +56,9 @@
    supabase start
    ```
    This launches Studio, REST, GraphQL, Edge Functions and the Postgres instance.
-4. **Create `.env`** (copy from example) and fill in the keys:
-   ```bash
-   cp .env.example .env
-   ```
-   ```text
-   # .env (local development)
-   SUPABASE_URL = http://127.0.0.1:54321
-   SUPABASE_ANON_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
-   ```
+4. **Create local runtime define file** from template and fill values:
+   - `env.example.json`
+   - or `env.staging.example.json` / `env.production.example.json`
 5. **Run the app**
    ```bash
    flutter run -d chrome   # web
@@ -89,18 +82,17 @@
   supabase db reset   # drops & recreates the DB
   supabase db push    # runs the migration scripts
   ```
-- Insert seed data or use the mock data defined in `lib/services/supabase_service.dart` for quick testing.
+- `supabase db reset` reads `supabase/seed.sql` after migrations. Add deterministic local seed data there when needed.
 
 ---
 
 ## Running the App
 
-The entry point (`lib/main.dart`) now loads variables via `flutter_dotenv`:
+The entry point (`lib/main.dart`) reads runtime variables with `String.fromEnvironment`:
 
 ```dart
-await dotenv.load(fileName: '.env');
-final supabaseUrl = dotenv.get('SUPABASE_URL', fallback: '');
-final supabaseKey = dotenv.get('SUPABASE_ANON_KEY', fallback: '');
+const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 await supabaseService.initialize(url: supabaseUrl, anonKey: supabaseKey);
 ```
 
@@ -113,9 +105,10 @@ When the keys are present, the service falls back to **real Supabase**; otherwis
 1. **Add environment variables in Vercel** (Project Settings → Environment Variables → Production):
    - `SUPABASE_URL` – e.g. `https://your‑project.supabase.co`
    - `SUPABASE_ANON_KEY` – the publishable key from the Supabase console.
-2. **GitHub Actions workflow** (`.github/workflows/deploy.yaml`) builds the web app with the keys via `--dart-define` and deploys to Vercel automatically on `main` pushes.
-3. **Vercel configuration** – `vercel.json` contains rewrites that send crawler user‑agents to the SEO edge function (`/api/seo.js`).
-4. After the workflow finishes, visit the Vercel URL; you’ll see live data from the **cloud Supabase** instance.
+2. **GitHub Actions workflow** (`.github/workflows/deploy.yaml`) runs `flutter analyze` and `flutter test`, then builds/deploys on `main` pushes.
+3. **Rakuten API secret handling**: web clients call `/api/rakuten` (server-side proxy), so `RAKUTEN_ACCESS_KEY` is not embedded into Flutter web bundles.
+4. **Vercel configuration** – `vercel.json` contains rewrites that send crawler user‑agents to the SEO edge function (`/api/seo.js`).
+5. After the workflow finishes, visit the Vercel URL; you’ll see live data from the **cloud Supabase** instance.
 
 ---
 
@@ -123,8 +116,9 @@ When the keys are present, the service falls back to **real Supabase**; otherwis
 
 ```
 book_case/
-├─ .env               ← local env (git‑ignored)
-├─ .env.example       ← template for collaborators
+├─ env.example.json
+├─ env.staging.example.json
+├─ env.production.example.json
 ├─ lib/
 │   ├─ main.dart
 │   ├─ services/
@@ -154,6 +148,7 @@ book_case/
 | `SUPABASE_URL`          | Supabase project URL (local or cloud)                                         | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
 | `SUPABASE_ANON_KEY`     | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`      |
 | `SUPABASE_REDIRECT_URL` | OAuth redirect URL for auth providers                                         | `https://www.sharemarium.com/`                        |
+| `RAKUTEN_PROXY_BASE_URL` | Optional absolute base URL for Rakuten proxy when app and API are split      | `https://api.sharemarium.com`                         |
 
 Runtime variables are passed via `--dart-define` and read by `String.fromEnvironment`.
 
@@ -175,6 +170,7 @@ Recommended setup in GitHub:
    - `SUPABASE_REDIRECT_URL`
    - `RAKUTEN_APP_ID`
    - `RAKUTEN_ACCESS_KEY`
+   - `RAKUTEN_REFERER`
    - `VERCEL_ORG_ID`
    - `VERCEL_PROJECT_ID`
    - `VERCEL_TOKEN`

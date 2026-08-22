@@ -27,8 +27,14 @@ jobs:
             - name: Install dependencies
               run: flutter pub get
 
+            - name: Analyze
+              run: flutter analyze --no-fatal-infos
+
+            - name: Test
+              run: flutter test
+
             - name: Build Flutter Web (Staging)
-              run: flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html --dart-define=APP_ENV=staging --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=SUPABASE_REDIRECT_URL=${{ secrets.SUPABASE_REDIRECT_URL }} --dart-define=RAKUTEN_APP_ID=${{ secrets.RAKUTEN_APP_ID }} --dart-define=RAKUTEN_ACCESS_KEY=${{ secrets.RAKUTEN_ACCESS_KEY }}
+              run: flutter build web --release --dart-define=FLUTTER_WEB_RENDERER=html --dart-define=APP_ENV=staging --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=SUPABASE_REDIRECT_URL=${{ secrets.SUPABASE_REDIRECT_URL }}
 
             - name: Install Vercel CLI
               run: npm install --global vercel@58.7.1
