@@ -511,11 +511,7 @@ class _BookListScreenState extends State<BookListScreen> {
           child: RefreshIndicator(
             onRefresh: () => _controller.loadData(context),
             color: const Color(0xFFD00303),
-            child: _controller.isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFD00303)),
-                  )
-                : SingleChildScrollView(
+            child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,6 +537,8 @@ class _BookListScreenState extends State<BookListScreen> {
                                   isLoadingMore:
                                       _controller.isLoadingMoreRecommended,
                                   hasMore: _controller.hasMoreRecommended,
+                                    isLoadingInitial:
+                                      _controller.isLoadingRecommended,
                                 ),
                                 const AdBanner(),
                                 _buildGenreSection(
@@ -554,6 +552,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                   isLoadingMore:
                                       _controller.isLoadingMoreWestern,
                                   hasMore: _controller.hasMoreWestern,
+                                  isLoadingInitial: _controller.isLoadingWestern,
                                 ),
                                 _buildGenreSection(
                                   title: '人気作品',
@@ -566,6 +565,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                   isLoadingMore:
                                       _controller.isLoadingMorePopular,
                                   hasMore: _controller.hasMorePopular,
+                                    isLoadingInitial: _controller.isLoadingPopular,
                                 ),
                                 const AdBanner(),
                                 _buildSectionHeader('タイムライン'),
@@ -701,13 +701,18 @@ class _BookListScreenState extends State<BookListScreen> {
     required bool canLoadPrevious,
     required bool isLoadingMore,
     required bool hasMore,
+    required bool isLoadingInitial,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(title, failedToLoad: bookList.isEmpty),
+        _buildSectionHeader(
+          title,
+          failedToLoad: bookList.isEmpty && !isLoadingInitial,
+        ),
         _buildBookCarousel(
           bookList,
+          isLoadingInitial: isLoadingInitial,
           onLoadMore: onLoadMore,
           onLoadPrevious: onLoadPrevious,
           canLoadPrevious: canLoadPrevious,
@@ -756,6 +761,7 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Widget _buildBookCarousel(
     List<Book> bookList, {
+    required bool isLoadingInitial,
     required Future<void> Function() onLoadMore,
     required VoidCallback onLoadPrevious,
     required bool canLoadPrevious,
@@ -763,6 +769,37 @@ class _BookListScreenState extends State<BookListScreen> {
     required bool hasMore,
   }) {
     if (bookList.isEmpty) {
+      if (isLoadingInitial) {
+        return Container(
+          height: 220,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFD00303).withValues(alpha: 0.25),
+            ),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFD00303),
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'このセクションを読み込み中...',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        );
+      }
       return Container(
         height: 220,
         alignment: Alignment.center,
@@ -1037,6 +1074,28 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Widget _buildTimeline() {
+    if (_controller.isLoadingTimeline && _controller.timelinePosts.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        alignment: Alignment.center,
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFD00303),
+              ),
+            ),
+            SizedBox(height: 10),
+            Text('タイムラインを読み込み中...'),
+          ],
+        ),
+      );
+    }
+
     if (_controller.timelinePosts.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 40),

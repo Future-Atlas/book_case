@@ -13,6 +13,10 @@ class BookListController extends ChangeNotifier {
   String searchQuery = '';
   Timer? _searchDebounce;
   bool isLoading = true;
+  bool isLoadingRecommended = true;
+  bool isLoadingWestern = true;
+  bool isLoadingPopular = true;
+  bool isLoadingTimeline = true;
 
   bool isSearching = false;
   bool hasMoreSearch = true;
@@ -237,6 +241,10 @@ class BookListController extends ChangeNotifier {
 
   Future<void> _loadData(BuildContext context) async {
     isLoading = true;
+    isLoadingRecommended = true;
+    isLoadingWestern = true;
+    isLoadingPopular = true;
+    isLoadingTimeline = true;
     notifyListeners();
 
     _allowAdultContent = await SupabaseService().canViewAdultContent();
@@ -254,6 +262,11 @@ class BookListController extends ChangeNotifier {
     _recommendedReachedEnd = false;
     _westernReachedEnd = false;
     _popularReachedEnd = false;
+    recommendedBooks = [];
+    westernBooks = [];
+    popularBooks = [];
+    timelinePosts = [];
+    notifyListeners();
 
     try {
       recommendedBooks = await repository.fetchBooksByGenre(
@@ -267,6 +280,9 @@ class BookListController extends ChangeNotifier {
       print('おすすめ本の取得でエラーが発生しました: $e');
       recommendedBooks = [];
       hasMoreRecommended = false;
+    } finally {
+      isLoadingRecommended = false;
+      notifyListeners();
     }
 
     try {
@@ -281,6 +297,9 @@ class BookListController extends ChangeNotifier {
       print('洋書の取得でエラーが発生しました: $e');
       westernBooks = [];
       hasMoreWestern = false;
+    } finally {
+      isLoadingWestern = false;
+      notifyListeners();
     }
 
     try {
@@ -295,6 +314,9 @@ class BookListController extends ChangeNotifier {
       print('人気作品の取得でエラーが発生しました: $e');
       popularBooks = [];
       hasMorePopular = false;
+    } finally {
+      isLoadingPopular = false;
+      notifyListeners();
     }
 
     try {
@@ -302,6 +324,9 @@ class BookListController extends ChangeNotifier {
     } catch (e) {
       print('Supabaseの接続エラー: $e');
       timelinePosts = [];
+    } finally {
+      isLoadingTimeline = false;
+      notifyListeners();
     }
 
     isLoading = false;
