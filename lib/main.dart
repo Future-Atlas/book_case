@@ -429,21 +429,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   @override
   Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
     final uri = routeInformation.uri;
-    if (uri != null) {
-      _applyRouteFromUri(uri, replaceUrl: _hasTransientQuery(uri));
-      return true;
-    }
-
-    final location = routeInformation.location;
-    if (location == null || location.isEmpty) {
-      return false;
-    }
-
-    final parsed = Uri.tryParse(location);
-    if (parsed == null) {
-      return false;
-    }
-    _applyRouteFromUri(parsed, replaceUrl: _hasTransientQuery(parsed));
+    _applyRouteFromUri(uri, replaceUrl: _hasTransientQuery(uri));
     return true;
   }
 
