@@ -1,7 +1,7 @@
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
 const RAKUTEN_REFERER =
-  process.env.RAKUTEN_REFERER || "https://sharemarium.com/";
+  process.env.RAKUTEN_REFERER || "https://www.sharemarium.com/";
 
 const ENDPOINTS = {
   book: "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404",
@@ -41,8 +41,9 @@ module.exports = async (req, res) => {
 
   try {
     const response = await fetch(url, {
+      referrer: RAKUTEN_REFERER,
+      referrerPolicy: "unsafe-url",
       headers: {
-        Referer: RAKUTEN_REFERER,
         "User-Agent":
           "Sharemarium-Rakuten-Proxy/1.0 (+https://sharemarium.com)",
       },

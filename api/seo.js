@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
 const RAKUTEN_REFERER =
-  process.env.RAKUTEN_REFERER || "https://sharemarium.com/";
+  process.env.RAKUTEN_REFERER || "https://www.sharemarium.com/";
 const ENABLE_NDL_FALLBACK =
   String(process.env.SEO_ENABLE_NDL_FALLBACK || "false").toLowerCase() ===
   "true";
@@ -91,13 +91,14 @@ function rakutenBaseParams() {
 
 function rakutenRequestHeaders() {
   return {
-    Referer: RAKUTEN_REFERER,
     "User-Agent": "Sharemarium-SEO-Bot/1.0 (+https://sharemarium.com)",
   };
 }
 
 async function rakutenFetch(url) {
   return fetch(url, {
+    referrer: RAKUTEN_REFERER,
+    referrerPolicy: "unsafe-url",
     headers: rakutenRequestHeaders(),
   });
 }
@@ -336,7 +337,7 @@ async function fetchRakutenBookByIsbn(isbn, diagnostics) {
   const url = `${RAKUTEN_BOOK_API}?${rakutenBaseParams()}&isbn=${encodeURIComponent(
     compact,
   )}&hits=1&page=1`;
-  const response = await fetch(url);
+  const response = await rakutenFetch(url);
   const body = await response.text();
   if (!response.ok) {
     diagnostics.rakutenIsbnFailures += 1;
