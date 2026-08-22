@@ -1,3 +1,5 @@
+const { requestRakuten } = require("./_rakuten_request");
+
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
 const RAKUTEN_REFERER =
@@ -40,13 +42,10 @@ module.exports = async (req, res) => {
   const url = `${baseUrl}?${query.toString()}`;
 
   try {
-    const response = await fetch(url, {
-      referrer: RAKUTEN_REFERER,
-      referrerPolicy: "unsafe-url",
-      headers: {
-        "User-Agent":
-          "Sharemarium-Rakuten-Proxy/1.0 (+https://sharemarium.com)",
-      },
+    const response = await requestRakuten(url, {
+      referer: RAKUTEN_REFERER,
+      userAgent:
+        "Sharemarium-Rakuten-Proxy/1.0 (+https://www.sharemarium.com)",
     });
 
     const body = await response.text();
@@ -55,6 +54,7 @@ module.exports = async (req, res) => {
       "public, s-maxage=120, stale-while-revalidate=300",
     );
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("X-Rakuten-Proxy-Transport", "node-http");
     return res.status(response.status).send(body);
   } catch (error) {
     return res.status(502).json({

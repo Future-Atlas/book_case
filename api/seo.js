@@ -1,6 +1,8 @@
 // Vercel serverless function to return crawler-friendly HTML for Sharemarium.
 // Policy: no Google APIs. Data source order is Rakuten first, then NDL fallback.
 
+const { requestRakuten } = require("./_rakuten_request");
+
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
@@ -89,17 +91,10 @@ function rakutenBaseParams() {
   )}&accessKey=${encodeURIComponent(RAKUTEN_ACCESS_KEY)}`;
 }
 
-function rakutenRequestHeaders() {
-  return {
-    "User-Agent": "Sharemarium-SEO-Bot/1.0 (+https://sharemarium.com)",
-  };
-}
-
 async function rakutenFetch(url) {
-  return fetch(url, {
-    referrer: RAKUTEN_REFERER,
-    referrerPolicy: "unsafe-url",
-    headers: rakutenRequestHeaders(),
+  return requestRakuten(url, {
+    referer: RAKUTEN_REFERER,
+    userAgent: "Sharemarium-SEO-Bot/1.0 (+https://www.sharemarium.com)",
   });
 }
 
