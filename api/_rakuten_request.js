@@ -15,10 +15,11 @@ class RakutenResponse {
 
 function requestRakuten(
   url,
-  { referer, userAgent, timeoutMs = 15000 } = {},
+  { origin, userAgent, timeoutMs = 15000 } = {},
 ) {
   const target = new URL(url);
   const transport = target.protocol === "http:" ? http : https;
+  const requestOrigin = new URL(String(origin || "").trim()).origin;
 
   return new Promise((resolve, reject) => {
     const request = transport.request(
@@ -27,7 +28,7 @@ function requestRakuten(
         method: "GET",
         headers: {
           Accept: "application/json",
-          Referer: String(referer || "").trim(),
+          Origin: requestOrigin,
           "User-Agent": userAgent,
         },
       },

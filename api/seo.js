@@ -93,7 +93,7 @@ function rakutenBaseParams() {
 
 async function rakutenFetch(url) {
   return requestRakuten(url, {
-    referer: RAKUTEN_REFERER,
+    origin: RAKUTEN_REFERER,
     userAgent: "Sharemarium-SEO-Bot/1.0 (+https://www.sharemarium.com)",
   });
 }

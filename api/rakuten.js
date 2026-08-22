@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
 
   try {
     const response = await requestRakuten(url, {
-      referer: RAKUTEN_REFERER,
+      origin: RAKUTEN_REFERER,
       userAgent:
         "Sharemarium-Rakuten-Proxy/1.0 (+https://www.sharemarium.com)",
     });
