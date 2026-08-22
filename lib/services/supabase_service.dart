@@ -13,6 +13,7 @@ import '../models/social_models.dart';
 import '../models/moderation_models.dart';
 import '../models/profile_page_color.dart';
 import 'content_safety_service.dart';
+import 'input_security_service.dart';
 
 enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
 
@@ -30,6 +31,7 @@ class SupabaseService extends ChangeNotifier {
   bool? _hasCompletedRegistrationCache;
   String? _cachedRegistrationUserId;
   String _activePageColorKey = ProfilePageColors.defaultKey;
+  Timer? _sessionGuardTimer;
 
   // ----- Initialization ----------------------------------------------------
   Future<void> initialize({
@@ -62,12 +64,15 @@ class SupabaseService extends ChangeNotifier {
             _hasCompletedRegistrationCache = null;
           }
           if (user != null) {
+            _startSessionGuardLoop();
             unawaited(
               _ensureProfile(
                 userId: user.id,
               ).then((_) => refreshActiveProfileAppearance()),
             );
+            unawaited(_enforceSessionIpGuard());
           } else {
+            _stopSessionGuardLoop();
             _activePageColorKey = ProfilePageColors.defaultKey;
           }
           notifyListeners();
@@ -294,11 +299,57 @@ class SupabaseService extends ChangeNotifier {
   Future<void> signOut() async {
     if (!_isInitialized || _client == null) return;
     try {
+      _stopSessionGuardLoop();
       await _client!.auth.signOut();
       _activePageColorKey = ProfilePageColors.defaultKey;
       notifyListeners();
     } catch (e) {
       debugPrint('Error signing out: $e');
+    }
+  }
+
+  void _startSessionGuardLoop() {
+    _sessionGuardTimer?.cancel();
+    _sessionGuardTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      unawaited(_enforceSessionIpGuard());
+    });
+  }
+
+  void _stopSessionGuardLoop() {
+    _sessionGuardTimer?.cancel();
+    _sessionGuardTimer = null;
+  }
+
+  Future<bool> _enforceSessionIpGuard() async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return true;
+    try {
+      final response = await _client!.functions.invoke(
+        'session-guard',
+        body: const <String, dynamic>{},
+      );
+      if (response.status < 200 || response.status >= 300) {
+        debugPrint('Session guard endpoint returned status ${response.status}.');
+        return true;
+      }
+
+      final payload = response.data;
+      final data = payload is Map<String, dynamic>
+          ? payload
+          : payload is Map
+          ? Map<String, dynamic>.from(payload)
+          : const <String, dynamic>{};
+      if (data['ipChanged'] == true) {
+        debugPrint('IP change detected. Signing out to protect the session.');
+        await signOut();
+        return false;
+      }
+      return true;
+    } on FunctionException catch (e) {
+      debugPrint('Session guard function exception: $e');
+      return true;
+    } catch (e) {
+      debugPrint('Session guard failed: $e');
+      return true;
     }
   }
 
@@ -521,6 +572,20 @@ class SupabaseService extends ChangeNotifier {
       return 'ログイン状態を確認できませんでした。';
     }
 
+    final fullNameError = InputSecurityService.validateSafeText(
+      fullName,
+      fieldLabel: '氏名',
+      maxLength: 100,
+    );
+    if (fullNameError != null) return fullNameError;
+
+    final usernameError = InputSecurityService.validateSafeText(
+      username,
+      fieldLabel: 'ユーザー名',
+      maxLength: 30,
+    );
+    if (usernameError != null) return usernameError;
+
     try {
       await _ensureProfile(userId: profileId);
       await _client!.rpc(
@@ -625,6 +690,23 @@ class SupabaseService extends ChangeNotifier {
     if (!_isInitialized || _client == null || !isAuthenticated) {
       return 'ログイン状態を確認できませんでした。';
     }
+
+    final usernameError = InputSecurityService.validateSafeText(
+      username,
+      fieldLabel: 'ユーザー名',
+      maxLength: 30,
+    );
+    if (usernameError != null) return usernameError;
+
+    final bioError = InputSecurityService.validateSafeText(
+      bio,
+      fieldLabel: '自己紹介',
+      required: false,
+      allowNewLines: true,
+      maxLength: 500,
+    );
+    if (bioError != null) return bioError;
+
     try {
       final normalizedPageColor = ProfilePageColors.normalizeKey(pageColorKey);
       if (normalizedPageColor != pageColorKey) {
@@ -750,6 +832,14 @@ class SupabaseService extends ChangeNotifier {
     if (!_isInitialized || _client == null || !isAuthenticated) {
       return 'ログイン状態を確認できませんでした。';
     }
+
+    final fullNameError = InputSecurityService.validateSafeText(
+      fullName,
+      fieldLabel: '氏名',
+      maxLength: 100,
+    );
+    if (fullNameError != null) return fullNameError;
+
     try {
       final verified = await verifyPrivacyPassword(password);
       if (!verified) return 'パスワードが正しくありません。';
@@ -1326,14 +1416,33 @@ class SupabaseService extends ChangeNotifier {
       return 'お問い合わせ機能を初期化できませんでした。';
     }
 
+    final subjectError = InputSecurityService.validateSafeText(
+      subject,
+      fieldLabel: '件名',
+      maxLength: 120,
+    );
+    if (subjectError != null) return subjectError;
+
+    final messageError = InputSecurityService.validateSafeText(
+      message,
+      fieldLabel: 'お問い合わせ内容',
+      allowNewLines: true,
+      maxLength: 4000,
+    );
+    if (messageError != null) return messageError;
+
     try {
       final profileId = activeProfileId;
       await _client!.from('contact_requests').insert({
         'profile_id': profileId.isEmpty ? null : profileId,
         'email': email.trim(),
         'category': category,
-        'subject': subject.trim(),
-        'message': message.trim(),
+        'subject': InputSecurityService.normalizeText(subject, maxLength: 120),
+        'message': InputSecurityService.normalizeText(
+          message,
+          allowNewLines: true,
+          maxLength: 4000,
+        ),
       });
       return null;
     } catch (e) {
@@ -1745,13 +1854,26 @@ class SupabaseService extends ChangeNotifier {
     String details = '',
   }) async {
     if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    final detailsError = InputSecurityService.validateSafeText(
+      details,
+      fieldLabel: '報告詳細',
+      required: false,
+      allowNewLines: true,
+      maxLength: 1000,
+    );
+    if (detailsError != null) return false;
     try {
+      final normalizedDetails = InputSecurityService.normalizeText(
+        details,
+        allowNewLines: true,
+        maxLength: 1000,
+      );
       await _client!.rpc(
         'submit_post_report',
         params: {
           'target_post': postId,
           'report_category': category.databaseValue,
-          'report_details': details.trim().isEmpty ? null : details.trim(),
+          'report_details': normalizedDetails.isEmpty ? null : normalizedDetails,
         },
       );
       return true;
@@ -1891,13 +2013,26 @@ class SupabaseService extends ChangeNotifier {
     String reason = '',
   }) async {
     if (!_isInitialized || _client == null || profileId.isEmpty) return false;
+    final reasonError = InputSecurityService.validateSafeText(
+      reason,
+      fieldLabel: '停止理由',
+      required: false,
+      allowNewLines: true,
+      maxLength: 500,
+    );
+    if (reasonError != null) return false;
     try {
+      final normalizedReason = InputSecurityService.normalizeText(
+        reason,
+        allowNewLines: true,
+        maxLength: 500,
+      );
       await _client!.rpc(
         'admin_set_account_suspension',
         params: {
           'target_profile': profileId,
           'suspend': suspended,
-          'reason': reason.trim().isEmpty ? null : reason.trim(),
+          'reason': normalizedReason.isEmpty ? null : normalizedReason,
         },
       );
       return true;
@@ -1918,11 +2053,24 @@ class SupabaseService extends ChangeNotifier {
       return false;
     }
     try {
+      final reasonError = InputSecurityService.validateSafeText(
+        reason,
+        fieldLabel: '削除理由',
+        allowNewLines: true,
+        maxLength: 500,
+      );
+      if (reasonError != null) return false;
+
+      final normalizedReason = InputSecurityService.normalizeText(
+        reason,
+        allowNewLines: true,
+        maxLength: 500,
+      );
       final response = await _client!.functions.invoke(
         'admin-delete-account',
         body: {
           'targetProfileId': profileId,
-          'reason': reason.trim(),
+          'reason': normalizedReason,
           'confirmation': 'DELETE',
         },
       );
@@ -2006,9 +2154,26 @@ class SupabaseService extends ChangeNotifier {
       debugPrint('Cannot create post: this user already posted this book.');
       return false;
     }
+    final commentError = InputSecurityService.validateSafeText(
+      comment,
+      fieldLabel: '感想',
+      allowNewLines: true,
+      maxLength: 3000,
+    );
+    if (commentError != null) {
+      debugPrint(commentError);
+      return false;
+    }
+
+    final normalizedComment = InputSecurityService.normalizeText(
+      comment,
+      allowNewLines: true,
+      maxLength: 3000,
+    );
+
     final isAgeRestricted =
         ContentSafetyService.isAdultBook(book) ||
-        ContentSafetyService.containsAdultContentTerms([comment]);
+        ContentSafetyService.containsAdultContentTerms([normalizedComment]);
     if (isAgeRestricted && !await canViewAdultContent()) {
       debugPrint('Cannot create an age-restricted post for a minor.');
       return false;
@@ -2024,7 +2189,7 @@ class SupabaseService extends ChangeNotifier {
           'book_description': book.description,
           'is_age_restricted': isAgeRestricted,
           'rating': rating,
-          'comment': comment,
+          'comment': normalizedComment,
           'is_spoiler': isSpoiler,
         });
 
@@ -2075,7 +2240,19 @@ class SupabaseService extends ChangeNotifier {
       return false;
     }
 
-    final trimmedComment = comment.trim();
+    final commentError = InputSecurityService.validateSafeText(
+      comment,
+      fieldLabel: '感想',
+      allowNewLines: true,
+      maxLength: 3000,
+    );
+    if (commentError != null) return false;
+
+    final trimmedComment = InputSecurityService.normalizeText(
+      comment,
+      allowNewLines: true,
+      maxLength: 3000,
+    );
     if (trimmedComment.isEmpty || rating < 1 || rating > 5) return false;
 
     final isAgeRestricted =
