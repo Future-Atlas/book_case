@@ -142,13 +142,13 @@ book_case/
 
 ## Environment Variables
 
-| Variable                | Description                                                                   | Example                                               |
-| ----------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `APP_ENV`               | App runtime environment label                                                 | `production`, `staging`, `development`                |
-| `SUPABASE_URL`          | Supabase project URL (local or cloud)                                         | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
-| `SUPABASE_ANON_KEY`     | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`      |
-| `SUPABASE_REDIRECT_URL` | OAuth redirect URL for auth providers                                         | `https://www.sharemarium.com/`                        |
-| `RAKUTEN_PROXY_BASE_URL` | Optional absolute base URL for Rakuten proxy when app and API are split      | `https://api.sharemarium.com`                         |
+| Variable                 | Description                                                                   | Example                                               |
+| ------------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `APP_ENV`                | App runtime environment label                                                 | `production`, `staging`, `development`                |
+| `SUPABASE_URL`           | Supabase project URL (local or cloud)                                         | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
+| `SUPABASE_ANON_KEY`      | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`      |
+| `SUPABASE_REDIRECT_URL`  | OAuth redirect URL for auth providers                                         | `https://www.sharemarium.com/`                        |
+| `RAKUTEN_PROXY_BASE_URL` | Optional absolute base URL for Rakuten proxy when app and API are split       | `https://api.sharemarium.com`                         |
 
 Runtime variables are passed via `--dart-define` and read by `String.fromEnvironment`.
 

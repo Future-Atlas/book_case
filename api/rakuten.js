@@ -43,12 +43,16 @@ module.exports = async (req, res) => {
     const response = await fetch(url, {
       headers: {
         Referer: RAKUTEN_REFERER,
-        "User-Agent": "Sharemarium-Rakuten-Proxy/1.0 (+https://sharemarium.com)",
+        "User-Agent":
+          "Sharemarium-Rakuten-Proxy/1.0 (+https://sharemarium.com)",
       },
     });
 
     const body = await response.text();
-    res.setHeader("Cache-Control", "public, s-maxage=120, stale-while-revalidate=300");
+    res.setHeader(
+      "Cache-Control",
+      "public, s-maxage=120, stale-while-revalidate=300",
+    );
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.status(response.status).send(body);
   } catch (error) {

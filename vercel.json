@@ -1,84 +1,84 @@
 {
-    "version": 2,
-    "cleanUrls": true,
-    "framework": null,
-    "buildCommand": null,
-    "outputDirectory": "build/web",
-    "headers": [
+  "version": 2,
+  "cleanUrls": true,
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": "build/web",
+  "headers": [
+    {
+      "source": "/sitemap.xml",
+      "headers": [
         {
-            "source": "/sitemap.xml",
-            "headers": [
-                {
-                    "key": "Content-Type",
-                    "value": "application/xml; charset=utf-8"
-                },
-                {
-                    "key": "X-Content-Type-Options",
-                    "value": "nosniff"
-                }
-            ]
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
         },
         {
-            "source": "/robots.txt",
-            "headers": [
-                {
-                    "key": "Content-Type",
-                    "value": "text/plain; charset=utf-8"
-                },
-                {
-                    "key": "X-Content-Type-Options",
-                    "value": "nosniff"
-                }
-            ]
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         }
-    ],
-    "routes": [
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
         {
-            "src": "/sitemap$",
-            "status": 308,
-            "headers": {
-                "Location": "/sitemap.xml"
-            }
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
         },
         {
-            "src": "/(.*)",
-            "has": [
-                {
-                    "type": "query",
-                    "key": "seo_preview",
-                    "value": "1"
-                }
-            ],
-            "dest": "/api/seo?path=$1"
-        },
-        {
-            "src": "/",
-            "has": [
-                {
-                    "type": "header",
-                    "key": "user-agent",
-                    "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
-                }
-            ],
-            "dest": "/api/seo?path=/"
-        },
-        {
-            "src": "/(genre/.*|book/.*|user/.*|users/.*|profile/.*|privacy|terms|community-guidelines|infringement-policy|external-transmission|contact)",
-            "has": [
-                {
-                    "type": "header",
-                    "key": "user-agent",
-                    "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
-                }
-            ],
-            "dest": "/api/seo?path=/$1"
-        },
-        {
-            "handle": "filesystem"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         }
-    ]
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "src": "/sitemap$",
+      "status": 308,
+      "headers": {
+        "Location": "/sitemap.xml"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "seo_preview",
+          "value": "1"
+        }
+      ],
+      "dest": "/api/seo?path=$1"
+    },
+    {
+      "src": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
+        }
+      ],
+      "dest": "/api/seo?path=/"
+    },
+    {
+      "src": "/(genre/.*|book/.*|user/.*|users/.*|profile/.*|privacy|terms|community-guidelines|infringement-policy|external-transmission|contact)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
+        }
+      ],
+      "dest": "/api/seo?path=/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ]
 }
