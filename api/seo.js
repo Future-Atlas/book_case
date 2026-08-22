@@ -683,9 +683,14 @@ module.exports = async (req, res) => {
       <meta property="og:url" content="${absoluteUrl}">
             <meta property="og:image" content="${OG_IMAGE_URL}">
       <meta name="twitter:card" content="summary_large_image">
-            <meta name="twitter:title" content="${fullTitle}">
+      <meta name="twitter:title" content="${fullTitle}">
       <meta name="twitter:description" content="${description}">
             <meta name="twitter:image" content="${OG_IMAGE_URL}">
+      <link rel="icon" type="image/png" sizes="48x48" href="${SITE_URL}/favicon.png">
+      <link rel="icon" type="image/png" sizes="192x192" href="${SITE_URL}/icons/Icon-192.png">
+      <link rel="icon" type="image/svg+xml" sizes="any" href="${SITE_URL}/favicon.svg">
+      <link rel="shortcut icon" href="${SITE_URL}/favicon.png">
+      <link rel="apple-touch-icon" sizes="192x192" href="${SITE_URL}/icons/Icon-192.png">
       ${jsonLdList
         .map(
           (item) =>
