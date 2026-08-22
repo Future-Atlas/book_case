@@ -83,6 +83,7 @@
   supabase db push    # runs the migration scripts
   ```
 - `supabase db reset` reads `supabase/seed.sql` after migrations. Add deterministic local seed data there when needed.
+- Source of truth is `supabase/migrations/*.sql`. Treat `supabase/schema.sql` as an optional snapshot artifact only.
 
 ---
 
@@ -128,7 +129,8 @@ book_case/
 │       └─ user_profile_screen.dart
 ├─ supabase/
 │   ├─ migrations/20260606144325_init_schema.sql
-│   └─ schema.sql        ← full schema + seed data
+│   ├─ seed.sql          ← local reset seed data
+│   └─ schema.sql        ← optional snapshot (not canonical source)
 ├─ web/
 │   └─ index.html       ← SEO meta tags
 ├─ api/

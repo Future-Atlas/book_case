@@ -1,0 +1,36 @@
+name: Validate Supabase Migrations
+
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/supabase-*.yaml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify required DB files
+        run: |
+          test -f supabase/config.toml
+          test -f supabase/seed.sql
+
+      - name: Start local Supabase services
+        run: supabase start
+
+      - name: Reset local DB with migrations and seed
+        run: supabase db reset
+
+      - name: Stop local Supabase services
+        if: always()
+        run: supabase stop
