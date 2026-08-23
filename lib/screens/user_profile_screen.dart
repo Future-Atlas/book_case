@@ -167,7 +167,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final uid = widget.profileId ?? service.activeProfileId;
+    final uid =
+      widget.profileId ??
+      (service.activeProfileId.isNotEmpty
+        ? service.activeProfileId
+        : SupabaseService.guestSampleProfileId);
 
     if (uid.isEmpty) {
       if (mounted) {

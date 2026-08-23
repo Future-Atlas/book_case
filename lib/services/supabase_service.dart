@@ -19,6 +19,9 @@ import 'input_security_service.dart';
 enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
 
 class SupabaseService extends ChangeNotifier {
+  static const String guestSampleProfileId =
+      'd3b07384-d113-4ec5-a587-f3e098a58f4a';
+
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
   SupabaseService._internal();
