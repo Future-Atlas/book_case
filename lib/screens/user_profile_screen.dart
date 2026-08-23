@@ -4,11 +4,13 @@ import '../services/supabase_service.dart';
 import '../models/book.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
+import '../models/post_reply.dart';
 import '../models/social_models.dart';
 import '../models/profile_page_color.dart';
 import '../widgets/post_card.dart';
 import '../widgets/book_card.dart';
 import '../widgets/post_composer_dialog.dart';
+import '../widgets/post_reply_dialog.dart';
 import 'profile_book_search_screen.dart';
 import 'report_post_dialog.dart';
 import 'follow_list_screen.dart';
@@ -38,6 +40,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   final TextEditingController _footerSearchController = TextEditingController();
   UserProfile? _profile;
   List<Post> _userPosts = [];
+  Map<String, List<PostReply>> _postReplies = {};
   List<Book> _collections = [];
   List<Book> _favorites = [];
   List<Book> _searchResults = [];
@@ -171,6 +174,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         setState(() {
           _profile = null;
           _userPosts = [];
+          _postReplies = {};
           _collections = [];
           _favorites = [];
           _isLoading = false;
@@ -188,6 +192,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 relationship.followStatus ==
                     FollowRelationshipStatus.accepted));
     final posts = canLoadContent ? await service.fetchUserPosts(uid) : <Post>[];
+    final replies = canLoadContent
+      ? await service.fetchRepliesForPosts(
+        posts.map((post) => post.id).toList(growable: false),
+        )
+      : <String, List<PostReply>>{};
     final colls = canLoadContent
         ? await service.fetchUserCollections(uid)
         : <Book>[];
@@ -204,6 +213,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         _profile = profile;
         _relationship = relationship;
         _userPosts = posts;
+        _postReplies = replies;
         _collections = colls;
         _favorites = visibleFavorites;
         _isLoading = false;
@@ -399,6 +409,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Future<void> _reportPost(String postId) async {
     await showPostReportDialog(context: context, postId: postId);
+  }
+
+  Future<void> _replyToPost(Post post) async {
+    final posted = await showPostReplyDialog(context: context, postId: post.id);
+    if (!mounted || !posted) return;
+    await _loadProfileData();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('返信を投稿しました。')));
   }
 
   void _showFavoriteResult(FavoriteToggleResult result) {
@@ -948,6 +968,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         return PostCard(
           key: ValueKey(post.id),
           post: post,
+          replies: _postReplies[post.id] ?? const [],
           showUserInfo: false,
           concealSpoiler: !_isOwnProfile,
           borderColor: ProfilePageColors.colorFor(_profile?.pageColorKey),
@@ -959,6 +980,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           onFavorite: _isOwnProfile ? () => _toggleFavorite(post.bookId) : null,
           favoriteLabel: _isFavorited(post.bookId) ? 'お気に入りから解除' : 'お気に入りに追加',
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
+          onReply: () => _replyToPost(post),
         );
       },
     );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../repositories/book_repository.dart';
 import '../models/post.dart';
+import '../models/post_reply.dart';
 import '../models/social_models.dart';
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
@@ -57,6 +58,7 @@ class BookListController extends ChangeNotifier {
 
   // タイムライン用
   List<Post> timelinePosts = [];
+  Map<String, List<PostReply>> timelineReplies = {};
   bool _allowAdultContent = false;
 
   BookRepository get _repository =>
@@ -266,6 +268,7 @@ class BookListController extends ChangeNotifier {
     westernBooks = [];
     popularBooks = [];
     timelinePosts = [];
+    timelineReplies = {};
     notifyListeners();
 
     try {
@@ -321,9 +324,13 @@ class BookListController extends ChangeNotifier {
 
     try {
       timelinePosts = await SupabaseService().fetchTimelinePosts();
+      timelineReplies = await SupabaseService().fetchRepliesForPosts(
+        timelinePosts.map((post) => post.id).toList(growable: false),
+      );
     } catch (e) {
       print('Supabaseの接続エラー: $e');
       timelinePosts = [];
+      timelineReplies = {};
     } finally {
       isLoadingTimeline = false;
       notifyListeners();

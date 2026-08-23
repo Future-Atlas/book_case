@@ -9,6 +9,26 @@ class InputSecurityService {
     caseSensitive: false,
   );
 
+  static final RegExp _urlPattern = RegExp(
+    r'((https?:\/\/|www\.)\S+)',
+    caseSensitive: false,
+  );
+
+  static final RegExp _mediaPattern = RegExp(
+    r'(<\s*(img|video|source)\b|!\[[^\]]*\]\([^\)]*\)|\.(png|jpe?g|gif|webp|bmp|svg|mp4|mov|avi|wmv|webm|mkv)\b)',
+    caseSensitive: false,
+  );
+
+  static final RegExp _phonePattern = RegExp(
+    r'(\+?\d[\d\s\-()]{8,}\d)',
+    caseSensitive: false,
+  );
+
+  static final RegExp _addressPattern = RegExp(
+    r'([0-9０-９]{1,4}(丁目|番地|番|号)|都道府県|都|道|府|県|市|区|町|村)',
+    caseSensitive: false,
+  );
+
   static String normalizeText(
     String input, {
     bool allowNewLines = false,
@@ -28,6 +48,34 @@ class InputSecurityService {
 
   static bool containsInjectionPayload(String value) {
     return _scriptPattern.hasMatch(value) || _sqlPayloadPattern.hasMatch(value);
+  }
+
+  static String normalizeReplyMessage(String input) {
+    return normalizeText(input, allowNewLines: false, maxLength: 100);
+  }
+
+  static String? validateReplyMessage(String value) {
+    if (value.runes.length > 100) {
+      return '返信は100文字以内で入力してください。';
+    }
+    final normalized = normalizeReplyMessage(value);
+    if (normalized.isEmpty) return '返信内容を入力してください。';
+    if (containsInjectionPayload(normalized)) {
+      return '返信に使用できない文字列が含まれています。';
+    }
+    if (_urlPattern.hasMatch(normalized)) {
+      return 'URLは返信に含められません。';
+    }
+    if (_mediaPattern.hasMatch(normalized)) {
+      return '画像・動画に関する内容は返信に含められません。';
+    }
+    if (_phonePattern.hasMatch(normalized)) {
+      return '電話番号と推測される情報は返信に含められません。';
+    }
+    if (_addressPattern.hasMatch(normalized)) {
+      return '住所と推測される情報は返信に含められません。';
+    }
+    return null;
   }
 
   static String? validateSafeText(

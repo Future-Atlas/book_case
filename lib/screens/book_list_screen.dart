@@ -9,6 +9,7 @@ import '../models/post.dart';
 import '../models/social_models.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_composer_dialog.dart';
+import '../widgets/post_reply_dialog.dart';
 import 'report_post_dialog.dart';
 import 'user_profile_screen.dart';
 
@@ -122,6 +123,18 @@ class _BookListScreenState extends State<BookListScreen> {
   Future<void> _reportPost(String postId) async {
     if (!await _ensureAuthenticated() || !mounted) return;
     await showPostReportDialog(context: context, postId: postId);
+  }
+
+  Future<void> _replyToPost(Post post) async {
+    if (!await _ensureAuthenticated() || !mounted) return;
+    final posted = await showPostReplyDialog(context: context, postId: post.id);
+    if (posted && mounted) {
+      await _controller.loadData(context);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('返信を投稿しました。')));
+    }
   }
 
   void _showFavoriteResult(FavoriteToggleResult result) {
@@ -1144,6 +1157,7 @@ class _BookListScreenState extends State<BookListScreen> {
             return PostCard(
               key: ValueKey(post.id),
               post: post,
+              replies: _controller.timelineReplies[post.id] ?? const [],
               concealSpoiler: post.profileId != currentProfileId,
               onUserTap: () => _openUserProfile(post.profileId),
               onReaction: post.profileId == currentProfileId
@@ -1161,6 +1175,7 @@ class _BookListScreenState extends State<BookListScreen> {
               onReport: post.profileId == currentProfileId
                   ? null
                   : () => _reportPost(post.id),
+              onReply: () => _replyToPost(post),
             );
           },
         ),

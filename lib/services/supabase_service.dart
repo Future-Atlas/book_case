@@ -9,6 +9,7 @@ import '../models/book.dart';
 import 'legal_document_versions.dart';
 import '../models/user_profile.dart';
 import '../models/post.dart';
+import '../models/post_reply.dart';
 import '../models/social_models.dart';
 import '../models/moderation_models.dart';
 import '../models/profile_page_color.dart';
@@ -1530,6 +1531,68 @@ class SupabaseService extends ChangeNotifier {
       }
     }
     return [];
+  }
+
+  Future<Map<String, List<PostReply>>> fetchRepliesForPosts(
+    List<String> postIds,
+  ) async {
+    final grouped = <String, List<PostReply>>{};
+    if (!_isInitialized || _client == null || postIds.isEmpty) return grouped;
+
+    final filteredIds = postIds.where((id) => id.trim().isNotEmpty).toList();
+    if (filteredIds.isEmpty) return grouped;
+
+    try {
+      final response = await _client!
+          .from('post_replies')
+          .select(
+            'id, post_id, profile_id, message, created_at, '
+            'profiles:profiles!post_replies_profile_id_fkey(username, avatar_url)',
+          )
+          .inFilter('post_id', filteredIds)
+          .order('created_at', ascending: true);
+
+      for (final raw in response as List<dynamic>) {
+        if (raw is! Map<String, dynamic>) continue;
+        final reply = PostReply.fromJson(raw);
+        if (reply.id.isEmpty || reply.postId.isEmpty) continue;
+        grouped.putIfAbsent(reply.postId, () => <PostReply>[]).add(reply);
+      }
+    } catch (e) {
+      debugPrint('Error fetching post replies: $e');
+    }
+
+    return grouped;
+  }
+
+  Future<String?> createPostReply({
+    required String postId,
+    required String message,
+  }) async {
+    final profileId = activeProfileId;
+    if (!_isInitialized || _client == null || profileId.isEmpty) {
+      return 'ログイン状態を確認できませんでした。';
+    }
+
+    final messageError = InputSecurityService.validateReplyMessage(message);
+    if (messageError != null) return messageError;
+
+    try {
+      await _client!.from('post_replies').insert({
+        'post_id': postId,
+        'profile_id': profileId,
+        'message': InputSecurityService.normalizeReplyMessage(message),
+      });
+      return null;
+    } on PostgrestException catch (e) {
+      if (e.code == '23514') {
+        return '返信内容が制限に抵触しました。本文を見直してください。';
+      }
+      return '返信を投稿できませんでした。';
+    } catch (e) {
+      debugPrint('Error creating post reply: $e');
+      return '返信を投稿できませんでした。';
+    }
   }
 
   // Removed duplicate fetchBooksByGenre (books table no longer exists).

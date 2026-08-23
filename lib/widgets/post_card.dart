@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../models/post.dart';
+import '../models/post_reply.dart';
 import '../models/social_models.dart';
 import '../models/profile_page_color.dart';
 
@@ -14,6 +15,8 @@ class PostCard extends StatefulWidget {
   final String favoriteLabel;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onReply;
+  final List<PostReply> replies;
   final bool concealSpoiler;
   final Color? borderColor;
 
@@ -28,6 +31,8 @@ class PostCard extends StatefulWidget {
     this.favoriteLabel = 'お気に入りに追加／解除',
     this.onEdit,
     this.onDelete,
+    this.onReply,
+    this.replies = const [],
     this.concealSpoiler = true,
     this.borderColor,
   });
@@ -51,6 +56,8 @@ class _PostCardState extends State<PostCard> {
   VoidCallback? get onFavorite => widget.onFavorite;
   VoidCallback? get onEdit => widget.onEdit;
   VoidCallback? get onDelete => widget.onDelete;
+  VoidCallback? get onReply => widget.onReply;
+  List<PostReply> get replies => widget.replies;
 
   @override
   void didChangeDependencies() {
@@ -431,8 +438,64 @@ class _PostCardState extends State<PostCard> {
                                 minimumSize: const Size(0, 34),
                               ),
                             ),
+                          if (onReply != null)
+                            TextButton.icon(
+                              onPressed: onReply,
+                              icon: const Icon(Icons.reply_outlined, size: 16),
+                              label: Text('返信 ${replies.length}'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: tertiaryTextColor,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                minimumSize: const Size(0, 34),
+                              ),
+                            ),
                         ],
                       ),
+                      if (replies.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.45,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: tertiaryTextColor.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '返信',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              for (final reply in replies)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Text(
+                                    '${reply.username}: ${reply.message}',
+                                    style: TextStyle(
+                                      color: primaryTextColor,
+                                      fontSize: 12,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
