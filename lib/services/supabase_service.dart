@@ -1552,10 +1552,17 @@ class SupabaseService extends ChangeNotifier {
           .inFilter('post_id', filteredIds)
           .order('created_at', ascending: true);
 
-      for (final raw in response as List<dynamic>) {
-        if (raw is! Map<String, dynamic>) continue;
+      final rows = (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false);
+      final blockedProfileIds = await _blockedProfileIdsForCurrentViewer(
+        rows.map((row) => row['profile_id']?.toString() ?? ''),
+      );
+
+      for (final raw in rows) {
         final reply = PostReply.fromJson(raw);
         if (reply.id.isEmpty || reply.postId.isEmpty) continue;
+        if (blockedProfileIds.contains(reply.profileId)) continue;
         grouped.putIfAbsent(reply.postId, () => <PostReply>[]).add(reply);
       }
     } catch (e) {
@@ -1769,8 +1776,17 @@ class SupabaseService extends ChangeNotifier {
   }
 
   Future<List<Post>> _filterPostsForCurrentViewer(List<Post> posts) async {
-    if (await canViewAdultContent()) return posts;
-    return posts
+    if (posts.isEmpty) return posts;
+
+    final blockedProfileIds = await _blockedProfileIdsForCurrentViewer(
+      posts.map((post) => post.profileId),
+    );
+    final withoutBlocked = posts
+        .where((post) => !blockedProfileIds.contains(post.profileId))
+        .toList(growable: false);
+
+    if (await canViewAdultContent()) return withoutBlocked;
+    return withoutBlocked
         .where((post) {
           return !post.isAgeRestricted &&
               !ContentSafetyService.containsAdultContentTerms([
@@ -1780,6 +1796,50 @@ class SupabaseService extends ChangeNotifier {
               ]);
         })
         .toList(growable: false);
+  }
+
+  Future<Set<String>> _blockedProfileIdsForCurrentViewer(
+    Iterable<String> candidateProfileIds,
+  ) async {
+    final viewerId = activeProfileId;
+    if (!_isInitialized || _client == null || viewerId.isEmpty) {
+      return const <String>{};
+    }
+
+    final candidates = candidateProfileIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty && id != viewerId)
+        .toSet()
+        .toList(growable: false);
+    if (candidates.isEmpty) return const <String>{};
+
+    try {
+      final blockedByMeResponse = await _client!
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', viewerId)
+          .inFilter('blocked_id', candidates);
+
+      final blockedMeResponse = await _client!
+          .from('blocks')
+          .select('blocker_id')
+          .eq('blocked_id', viewerId)
+          .inFilter('blocker_id', candidates);
+
+      final blockedIds = <String>{};
+      for (final row in blockedByMeResponse as List<dynamic>) {
+        final id = row['blocked_id']?.toString() ?? '';
+        if (id.isNotEmpty) blockedIds.add(id);
+      }
+      for (final row in blockedMeResponse as List<dynamic>) {
+        final id = row['blocker_id']?.toString() ?? '';
+        if (id.isNotEmpty) blockedIds.add(id);
+      }
+      return blockedIds;
+    } catch (e) {
+      debugPrint('Error loading blocked profile IDs: $e');
+      return const <String>{};
+    }
   }
 
   List<Post> _sortTimelineByReactionScore(Iterable<Post> posts) {
