@@ -860,7 +860,7 @@ class _BookListScreenState extends State<BookListScreen> {
           if (canLoadPrevious)
             _buildCarouselPageButton(
               direction: AxisDirection.left,
-              tooltip: '前の9冊に戻る',
+              tooltip: '前の10冊に戻る',
               onPressed: onLoadPrevious,
             ),
           Expanded(
@@ -879,7 +879,7 @@ class _BookListScreenState extends State<BookListScreen> {
           if (hasMore || isLoadingMore)
             _buildCarouselPageButton(
               direction: AxisDirection.right,
-              tooltip: '次の9冊を読み込む',
+              tooltip: '次の10冊を読み込む',
               isLoading: isLoadingMore,
               onPressed: isLoadingMore ? null : () => onLoadMore(),
             ),

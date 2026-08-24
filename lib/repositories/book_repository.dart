@@ -225,7 +225,7 @@ class BookRepository {
           return b.ratingAvg.compareTo(a.ratingAvg);
         });
       }
-      return _randomRankedSelection(filtered, count: 9);
+      return _randomRankedSelection(filtered, count: 10);
     } catch (e) {
       print('❌ [Repository] 楽天ジャンル本の取得でエラーが発生しました: $e');
       return [];
