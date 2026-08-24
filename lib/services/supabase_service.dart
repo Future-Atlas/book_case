@@ -1588,20 +1588,29 @@ class SupabaseService extends ChangeNotifier {
     if (messageError != null) return messageError;
 
     try {
-      await _client!.from('post_replies').insert({
-        'post_id': postId,
-        'profile_id': profileId,
-        'message': InputSecurityService.normalizeReplyMessage(message),
+      await _client!.rpc('create_post_reply', params: {
+        'target_post': postId,
+        'reply_message': InputSecurityService.normalizeReplyMessage(message),
       });
       return null;
     } on PostgrestException catch (e) {
+      debugPrint(
+        'Error creating post reply: code=${e.code}, message=${e.message}, '
+        'details=${e.details}, hint=${e.hint}',
+      );
       if (e.code == '42501') {
-        return '返信は限定コンテンツです';
+        if (e.message.contains('entitlement')) {
+          return '返信は限定コンテンツです';
+        }
+        return '返信する権限を確認できませんでした。';
       }
       if (e.code == '23514') {
         return '返信内容が制限に抵触しました。本文を見直してください。';
       }
-      return '返信を投稿できませんでした。';
+      if (e.code == 'P0002' || e.code == '23503' || e.code == '22P02') {
+        return '対象の投稿を確認できませんでした。画面を更新してください。';
+      }
+      return '返信を投稿できませんでした（${e.code}）。';
     } catch (e) {
       debugPrint('Error creating post reply: $e');
       return '返信を投稿できませんでした。';
