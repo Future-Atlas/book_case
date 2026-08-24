@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../services/input_security_service.dart';
 import '../services/supabase_service.dart';
 
-Future<void> showPostReplyLockedDialog({
-  required BuildContext context,
-}) {
+class _ReplyLengthFormatter extends TextInputFormatter {
+  const _ReplyLengthFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final isWithinLimits =
+        newValue.text.runes.length <=
+            InputSecurityService.maxReplyRawCharacters &&
+        InputSecurityService.replyCharacterCount(newValue.text) <=
+            InputSecurityService.maxReplyCharacters;
+    return isWithinLimits ? newValue : oldValue;
+  }
+}
+
+Future<void> showPostReplyLockedDialog({required BuildContext context}) {
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -39,68 +56,86 @@ Future<bool> showPostReplyDialog({
 
   final submitted = await showDialog<bool>(
     context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('返信する'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '100文字以内で返信できます',
-              style: TextStyle(fontSize: 12),
+    builder: (dialogContext) {
+      final availableWidth = MediaQuery.sizeOf(dialogContext).width - 80;
+      final contentWidth = availableWidth.clamp(240.0, 340.0).toDouble();
+
+      return StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('返信する'),
+          content: SizedBox(
+            width: contentWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('100文字以内で返信できます', style: TextStyle(fontSize: 12)),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller,
+                  enabled: !isSubmitting,
+                  minLines: 5,
+                  maxLines: 5,
+                  textInputAction: TextInputAction.newline,
+                  inputFormatters: const [_ReplyLengthFormatter()],
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: '返信内容を入力',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, child) => Text(
+                      '${InputSecurityService.replyCharacterCount(value.text)}/100',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: controller,
-              enabled: !isSubmitting,
-              maxLength: 100,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '返信内容を入力',
-              ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      final service = SupabaseService();
+                      final error = await service.createPostReply(
+                        postId: postId,
+                        message: controller.text,
+                      );
+                      if (!dialogContext.mounted) return;
+                      if (error == null) {
+                        Navigator.of(dialogContext).pop(true);
+                        return;
+                      }
+                      setDialogState(() => isSubmitting = false);
+                      ScaffoldMessenger.of(
+                        dialogContext,
+                      ).showSnackBar(SnackBar(content: Text(error)));
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('返信を投稿'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: isSubmitting
-                ? null
-                : () => Navigator.of(dialogContext).pop(false),
-            child: const Text('キャンセル'),
-          ),
-          FilledButton(
-            onPressed: isSubmitting
-                ? null
-                : () async {
-                    setDialogState(() => isSubmitting = true);
-                    final service = SupabaseService();
-                    final error = await service.createPostReply(
-                      postId: postId,
-                      message: controller.text,
-                    );
-                    if (!dialogContext.mounted) return;
-                    if (error == null) {
-                      Navigator.of(dialogContext).pop(true);
-                      return;
-                    }
-                    setDialogState(() => isSubmitting = false);
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(content: Text(error)),
-                    );
-                  },
-            child: isSubmitting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('返信を投稿'),
-          ),
-        ],
-      ),
-    ),
+      );
+    },
   );
 
   controller.dispose();

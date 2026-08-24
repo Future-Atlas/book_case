@@ -1,4 +1,9 @@
 class InputSecurityService {
+  static const int maxReplyCharacters = 100;
+  static const int maxReplyRawCharacters = 500;
+
+  static final RegExp _whitespacePattern = RegExp(r'\s');
+
   static final RegExp _scriptPattern = RegExp(
     r'(<\s*/?\s*script\b|javascript:|on[a-z]+\s*=|<\s*iframe\b|<\s*object\b|<\s*embed\b)',
     caseSensitive: false,
@@ -38,7 +43,10 @@ class InputSecurityService {
     if (!allowNewLines) {
       value = value.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
     }
-    value = value.replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'), '');
+    value = value.replaceAll(
+      RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'),
+      '',
+    );
     value = value.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
     if (value.length > maxLength) {
       value = value.substring(0, maxLength);
@@ -51,11 +59,34 @@ class InputSecurityService {
   }
 
   static String normalizeReplyMessage(String input) {
-    return normalizeText(input, allowNewLines: false, maxLength: 100);
+    var value = input
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll('\t', ' ');
+    value = value.replaceAll(
+      RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F]'),
+      '',
+    );
+    value = value.replaceAll(RegExp(r' {2,}'), ' ');
+    value = value.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+    if (value.runes.length > maxReplyRawCharacters) {
+      value = String.fromCharCodes(value.runes.take(maxReplyRawCharacters));
+    }
+    return value;
+  }
+
+  static int replyCharacterCount(String value) {
+    return value.runes.where((rune) {
+      final character = String.fromCharCodes([rune]);
+      return !_whitespacePattern.hasMatch(character);
+    }).length;
   }
 
   static String? validateReplyMessage(String value) {
-    if (value.runes.length > 100) {
+    if (value.runes.length > maxReplyRawCharacters) {
+      return '返信に含まれる空白または改行が多すぎます。';
+    }
+    if (replyCharacterCount(value) > maxReplyCharacters) {
       return '返信は100文字以内で入力してください。';
     }
     final normalized = normalizeReplyMessage(value);
