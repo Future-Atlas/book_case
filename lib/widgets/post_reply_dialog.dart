@@ -2,6 +2,34 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 
+Future<void> showPostReplyLockedDialog({
+  required BuildContext context,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      content: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_rounded, size: 64),
+          SizedBox(height: 16),
+          Text(
+            '返信は限定コンテンツです',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('閉じる'),
+        ),
+      ],
+    ),
+  );
+}
+
 Future<bool> showPostReplyDialog({
   required BuildContext context,
   required String postId,
@@ -19,7 +47,7 @@ Future<bool> showPostReplyDialog({
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '100文字以内。URL・電話番号・住所・画像動画に関する記述は投稿できません。',
+              '100文字以内で返信できます',
               style: TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 10),

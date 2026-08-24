@@ -126,7 +126,13 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Future<void> _replyToPost(Post post) async {
-    if (!await _ensureAuthenticated() || !mounted) return;
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final canReply = await service.canCreatePostReplies();
+    if (!mounted) return;
+    if (!canReply) {
+      await showPostReplyLockedDialog(context: context);
+      return;
+    }
     final posted = await showPostReplyDialog(context: context, postId: post.id);
     if (posted && mounted) {
       await _controller.loadData(context);

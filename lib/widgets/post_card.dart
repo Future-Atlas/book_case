@@ -252,7 +252,7 @@ class _PostCardState extends State<PostCard> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Review text (there is no reply/comment feature)
+                      // Review text
                       if (post.hasSpoiler) ...[
                         const Text(
                           'ネタバレあり',

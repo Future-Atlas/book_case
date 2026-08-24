@@ -416,6 +416,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Future<void> _replyToPost(Post post) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final canReply = await service.canCreatePostReplies();
+    if (!mounted) return;
+    if (!canReply) {
+      await showPostReplyLockedDialog(context: context);
+      return;
+    }
     final posted = await showPostReplyDialog(context: context, postId: post.id);
     if (!mounted || !posted) return;
     await _loadProfileData();

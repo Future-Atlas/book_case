@@ -1595,6 +1595,9 @@ class SupabaseService extends ChangeNotifier {
       });
       return null;
     } on PostgrestException catch (e) {
+      if (e.code == '42501') {
+        return '返信は限定コンテンツです';
+      }
       if (e.code == '23514') {
         return '返信内容が制限に抵触しました。本文を見直してください。';
       }
@@ -1602,6 +1605,22 @@ class SupabaseService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error creating post reply: $e');
       return '返信を投稿できませんでした。';
+    }
+  }
+
+  Future<bool> canCreatePostReplies() async {
+    if (!_isInitialized ||
+        _client == null ||
+        activeProfileId.isEmpty ||
+        !isAuthenticated) {
+      return false;
+    }
+
+    try {
+      return await _client!.rpc('current_user_can_reply') == true;
+    } catch (e) {
+      debugPrint('Error checking post reply access: $e');
+      return false;
     }
   }
 
