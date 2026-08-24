@@ -154,6 +154,17 @@ class _PostCardState extends State<PostCard> {
         ((widget.concealSpoiler && !_spoilerRevealed) ||
             _spoilerManuallyHidden);
 
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return _buildMobileCard(
+        context,
+        theme,
+        primaryTextColor,
+        secondaryTextColor,
+        tertiaryTextColor,
+        spoilerIsHidden,
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -525,6 +536,391 @@ class _PostCardState extends State<PostCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMobileCard(
+    BuildContext context,
+    ThemeData theme,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color tertiaryTextColor,
+    bool spoilerIsHidden,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              widget.borderColor ??
+              ProfilePageColors.colorFor(post.profilePageColorKey),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showUserInfo) ...[
+              InkWell(
+                onTap: onUserTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: post.userAvatarUrl.isNotEmpty
+                            ? NetworkImage(post.userAvatarUrl)
+                            : null,
+                        radius: 18,
+                        child: post.userAvatarUrl.isEmpty
+                            ? const Icon(Icons.person, size: 18)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          post.username,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: primaryTextColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 24, thickness: 0.8),
+            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    post.bookCoverUrl,
+                    width: 76,
+                    height: 108,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 76,
+                      height: 108,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.book, color: Colors.grey),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.bookTitle,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: primaryTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        post.bookAuthor,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: secondaryTextColor,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                _buildStars(post.rating),
+                Text(
+                  '${post.rating.toStringAsFixed(1)} / 5.0',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: Colors.amber,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (post.hasSpoiler) ...[
+              const Text(
+                'ネタバレあり',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+            if (spoilerIsHidden)
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _spoilerRevealed = true;
+                    _spoilerManuallyHidden = false;
+                  });
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: primaryTextColor,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  alignment: Alignment.centerLeft,
+                ),
+                child: const Text(
+                  '感想を読む',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              )
+            else ...[
+              Text(
+                post.reviewText,
+                style: TextStyle(
+                  color: primaryTextColor,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              if (post.hasSpoiler)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _spoilerRevealed = false;
+                      _spoilerManuallyHidden = true;
+                    });
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: primaryTextColor,
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    alignment: Alignment.centerLeft,
+                  ),
+                  child: const Text(
+                    '感想を隠す',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+            ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (post.isEdited)
+                    Text(
+                      '編集済み',
+                      style: TextStyle(
+                        color: tertiaryTextColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  Text(
+                    _formatDate(post.createdAt),
+                    style: TextStyle(color: tertiaryTextColor, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        for (final reaction in PostReactionType.values)
+                          _buildReactionButton(
+                            context,
+                            reaction,
+                            tertiaryTextColor,
+                          ),
+                      ],
+                    ),
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 0,
+                      runSpacing: 0,
+                      children: [
+                        if (onFavorite != null ||
+                            onEdit != null ||
+                            onDelete != null)
+                          _buildPostMenu(tertiaryTextColor),
+                        if (onReport != null)
+                          TextButton.icon(
+                            onPressed: onReport,
+                            icon: const Icon(Icons.flag_outlined, size: 16),
+                            label: const Text('報告'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: tertiaryTextColor,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
+                              minimumSize: const Size(0, 34),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        if (onReply != null)
+                          TextButton.icon(
+                            onPressed: () => onReply!(null),
+                            icon: const Icon(Icons.reply_outlined, size: 16),
+                            label: Text('返信 ${replies.length}'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: tertiaryTextColor,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                              ),
+                              minimumSize: const Size(0, 34),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+            if (replies.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildRepliesPanel(context, primaryTextColor, tertiaryTextColor),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostMenu(Color tertiaryTextColor) {
+    return PopupMenuButton<String>(
+      tooltip: '投稿メニュー',
+      icon: Icon(Icons.more_vert, size: 22, color: tertiaryTextColor),
+      padding: EdgeInsets.zero,
+      position: PopupMenuPosition.under,
+      onSelected: (value) {
+        if (value == 'favorite') onFavorite?.call();
+        if (value == 'edit') onEdit?.call();
+        if (value == 'delete') onDelete?.call();
+      },
+      itemBuilder: (context) => [
+        if (onFavorite != null)
+          PopupMenuItem<String>(
+            value: 'favorite',
+            child: Row(
+              children: [
+                const Icon(Icons.favorite_border, size: 19),
+                const SizedBox(width: 8),
+                Text(widget.favoriteLabel),
+              ],
+            ),
+          ),
+        if (onEdit != null)
+          const PopupMenuItem<String>(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 19),
+                SizedBox(width: 8),
+                Text('編集'),
+              ],
+            ),
+          ),
+        if (onDelete != null)
+          const PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, color: Colors.red, size: 19),
+                SizedBox(width: 8),
+                Text('投稿削除', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRepliesPanel(
+    BuildContext context,
+    Color primaryTextColor,
+    Color tertiaryTextColor,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tertiaryTextColor.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '返信',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          for (final reply in _rootReplies())
+            _buildReplyThread(
+              context,
+              reply,
+              primaryTextColor,
+              tertiaryTextColor,
+            ),
+        ],
       ),
     );
   }
