@@ -332,7 +332,9 @@ class SupabaseService extends ChangeNotifier {
         body: const <String, dynamic>{},
       );
       if (response.status < 200 || response.status >= 300) {
-        debugPrint('Session guard endpoint returned status ${response.status}.');
+        debugPrint(
+          'Session guard endpoint returned status ${response.status}.',
+        );
         return true;
       }
 
@@ -1256,9 +1258,9 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('notifications')
           .select(
-            'id, type, actor_id, post_id, read_at, created_at, '
+            'id, type, actor_id, post_id, reply_id, read_at, created_at, '
             'actor:profiles!notifications_actor_id_fkey(username, avatar_url), '
-            'post:posts!notifications_post_id_fkey(book_id)',
+            'post:posts!notifications_post_id_fkey(book_id, book_title)',
           )
           .eq('recipient_id', profileId)
           .order('created_at', ascending: false)
@@ -1280,15 +1282,19 @@ class SupabaseService extends ChangeNotifier {
         final actor = row['actor'] as Map<String, dynamic>?;
         final post = row['post'] as Map<String, dynamic>?;
         final rawType = row['type']?.toString();
-        final type = rawType == 'reaction'
-            ? SocialNotificationType.reaction
-            : rawType == 'follow_request'
-            ? SocialNotificationType.followRequest
-            : SocialNotificationType.follow;
+        final type = switch (rawType) {
+          'reaction' => SocialNotificationType.reaction,
+          'reply' => SocialNotificationType.reply,
+          'follow_request' => SocialNotificationType.followRequest,
+          _ => SocialNotificationType.follow,
+        };
         final actorId = row['actor_id']?.toString() ?? '';
         final bookId = post?['book_id']?.toString();
         String? bookTitle;
-        if (bookId != null && bookId.isNotEmpty) {
+        bookTitle = post?['book_title']?.toString();
+        if ((bookTitle == null || bookTitle.isEmpty) &&
+            bookId != null &&
+            bookId.isNotEmpty) {
           bookTitle = bookCache[bookId];
           if (bookTitle == null) {
             final book = await RakutenApi.fetchBookById(bookId);
@@ -1304,6 +1310,7 @@ class SupabaseService extends ChangeNotifier {
             actorUsername: actor?['username']?.toString() ?? 'ユーザー',
             actorAvatarUrl: actor?['avatar_url']?.toString() ?? '',
             postId: row['post_id']?.toString(),
+            replyId: row['reply_id']?.toString(),
             bookId: bookId,
             bookTitle: bookTitle,
             isRead: row['read_at'] != null,
@@ -1536,6 +1543,46 @@ class SupabaseService extends ChangeNotifier {
     return [];
   }
 
+  Future<Post?> fetchPostById(String postId) async {
+    if (!_isInitialized || _client == null || postId.trim().isEmpty) {
+      return null;
+    }
+
+    Future<Post?> parseResponse(Map<String, dynamic> row) async {
+      final parsed = _parsePostsSafely(<dynamic>[row]);
+      if (parsed.isEmpty) return null;
+      final enriched = await _enrichPostsWithBookMetadata(parsed);
+      final visible = await _filterPostsForCurrentViewer(enriched);
+      return visible.isEmpty ? null : visible.first;
+    }
+
+    try {
+      final response = await _client!
+          .from('posts')
+          .select(
+            '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url, page_color)',
+          )
+          .eq('id', postId)
+          .maybeSingle();
+      if (response == null) return null;
+      return parseResponse(response);
+    } catch (e) {
+      debugPrint('Error fetching post by id with profile join: $e');
+      try {
+        final fallback = await _client!
+            .from('posts')
+            .select('*')
+            .eq('id', postId)
+            .maybeSingle();
+        if (fallback == null) return null;
+        return parseResponse(fallback);
+      } catch (fallbackError) {
+        debugPrint('Error fetching post by id fallback: $fallbackError');
+        return null;
+      }
+    }
+  }
+
   Future<Map<String, List<PostReply>>> fetchRepliesForPosts(
     List<String> postIds,
   ) async {
@@ -1549,8 +1596,8 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('post_replies')
           .select(
-            'id, post_id, profile_id, message, created_at, '
-            'profiles:profiles!post_replies_profile_id_fkey(username, avatar_url)',
+            'id, post_id, profile_id, parent_reply_id, message, created_at, '
+            'profiles:profiles!post_replies_profile_id_fkey(username, user_id, avatar_url)',
           )
           .inFilter('post_id', filteredIds)
           .order('created_at', ascending: true);
@@ -1578,6 +1625,7 @@ class SupabaseService extends ChangeNotifier {
   Future<String?> createPostReply({
     required String postId,
     required String message,
+    String? parentReplyId,
   }) async {
     final profileId = activeProfileId;
     if (!_isInitialized || _client == null || profileId.isEmpty) {
@@ -1588,10 +1636,16 @@ class SupabaseService extends ChangeNotifier {
     if (messageError != null) return messageError;
 
     try {
-      await _client!.rpc('create_post_reply', params: {
-        'target_post': postId,
-        'reply_message': InputSecurityService.normalizeReplyMessage(message),
-      });
+      await _client!.rpc(
+        'create_post_reply',
+        params: {
+          'target_post': postId,
+          'reply_message': InputSecurityService.normalizeReplyMessage(message),
+          'target_reply': parentReplyId == null
+              ? null
+              : int.tryParse(parentReplyId),
+        },
+      );
       return null;
     } on PostgrestException catch (e) {
       debugPrint(
@@ -2027,7 +2081,9 @@ class SupabaseService extends ChangeNotifier {
         params: {
           'target_post': postId,
           'report_category': category.databaseValue,
-          'report_details': normalizedDetails.isEmpty ? null : normalizedDetails,
+          'report_details': normalizedDetails.isEmpty
+              ? null
+              : normalizedDetails,
         },
       );
       return true;

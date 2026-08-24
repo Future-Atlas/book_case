@@ -168,10 +168,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     setState(() => _isLoading = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
     final uid =
-      widget.profileId ??
-      (service.activeProfileId.isNotEmpty
-        ? service.activeProfileId
-        : SupabaseService.guestSampleProfileId);
+        widget.profileId ??
+        (service.activeProfileId.isNotEmpty
+            ? service.activeProfileId
+            : SupabaseService.guestSampleProfileId);
 
     if (uid.isEmpty) {
       if (mounted) {
@@ -197,10 +197,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                     FollowRelationshipStatus.accepted));
     final posts = canLoadContent ? await service.fetchUserPosts(uid) : <Post>[];
     final replies = canLoadContent
-      ? await service.fetchRepliesForPosts(
-        posts.map((post) => post.id).toList(growable: false),
-        )
-      : <String, List<PostReply>>{};
+        ? await service.fetchRepliesForPosts(
+            posts.map((post) => post.id).toList(growable: false),
+          )
+        : <String, List<PostReply>>{};
     final colls = canLoadContent
         ? await service.fetchUserCollections(uid)
         : <Book>[];
@@ -415,7 +415,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     await showPostReportDialog(context: context, postId: postId);
   }
 
-  Future<void> _replyToPost(Post post) async {
+  Future<void> _replyToPost(Post post, [PostReply? parentReply]) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     final canReply = await service.canCreatePostReplies();
     if (!mounted) return;
@@ -423,13 +423,34 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       await showPostReplyLockedDialog(context: context);
       return;
     }
-    final posted = await showPostReplyDialog(context: context, postId: post.id);
+    final posted = await showPostReplyDialog(
+      context: context,
+      postId: post.id,
+      parentReplyId: parentReply?.id,
+      replyToUsername: parentReply?.username,
+    );
     if (!mounted || !posted) return;
     await _loadProfileData();
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('返信を投稿しました。')));
+  }
+
+  Future<void> _openReplyProfile(String profileId) async {
+    final openInMainShell = widget.onOpenProfile;
+    if (openInMainShell != null) {
+      openInMainShell(profileId);
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => UserProfileScreen(
+          profileId: profileId,
+          onBack: () => Navigator.of(routeContext).pop(),
+        ),
+      ),
+    );
   }
 
   void _showFavoriteResult(FavoriteToggleResult result) {
@@ -991,7 +1012,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           onFavorite: _isOwnProfile ? () => _toggleFavorite(post.bookId) : null,
           favoriteLabel: _isFavorited(post.bookId) ? 'お気に入りから解除' : 'お気に入りに追加',
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
-          onReply: () => _replyToPost(post),
+          onReply: (parentReply) => _replyToPost(post, parentReply),
+          onReplyUserTap: _openReplyProfile,
         );
       },
     );

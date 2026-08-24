@@ -49,7 +49,7 @@ class ProfileRelationship {
   }
 }
 
-enum SocialNotificationType { reaction, follow, followRequest }
+enum SocialNotificationType { reaction, reply, follow, followRequest }
 
 class SocialNotification {
   const SocialNotification({
@@ -59,6 +59,7 @@ class SocialNotification {
     required this.actorUsername,
     required this.actorAvatarUrl,
     required this.postId,
+    required this.replyId,
     required this.bookId,
     required this.bookTitle,
     required this.isRead,
@@ -72,6 +73,7 @@ class SocialNotification {
   final String actorUsername;
   final String actorAvatarUrl;
   final String? postId;
+  final String? replyId;
   final String? bookId;
   final String? bookTitle;
   final bool isRead;
@@ -90,6 +92,7 @@ class SocialNotification {
       actorUsername: actorUsername,
       actorAvatarUrl: actorAvatarUrl,
       postId: postId,
+      replyId: replyId,
       bookId: bookId,
       bookTitle: bookTitle ?? this.bookTitle,
       isRead: isRead ?? this.isRead,

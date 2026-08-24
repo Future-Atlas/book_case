@@ -6,6 +6,7 @@ import '../widgets/post_card.dart';
 import '../controllers/book_list_controller.dart';
 import '../models/book.dart';
 import '../models/post.dart';
+import '../models/post_reply.dart';
 import '../models/social_models.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_composer_dialog.dart';
@@ -125,7 +126,7 @@ class _BookListScreenState extends State<BookListScreen> {
     await showPostReportDialog(context: context, postId: postId);
   }
 
-  Future<void> _replyToPost(Post post) async {
+  Future<void> _replyToPost(Post post, [PostReply? parentReply]) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     final canReply = await service.canCreatePostReplies();
     if (!mounted) return;
@@ -133,7 +134,12 @@ class _BookListScreenState extends State<BookListScreen> {
       await showPostReplyLockedDialog(context: context);
       return;
     }
-    final posted = await showPostReplyDialog(context: context, postId: post.id);
+    final posted = await showPostReplyDialog(
+      context: context,
+      postId: post.id,
+      parentReplyId: parentReply?.id,
+      replyToUsername: parentReply?.username,
+    );
     if (posted && mounted) {
       await _controller.loadData(context);
       if (!mounted) return;
@@ -531,72 +537,63 @@ class _BookListScreenState extends State<BookListScreen> {
             onRefresh: () => _controller.loadData(context),
             color: const Color(0xFFD00303),
             child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTopHeroImage(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildTopHeroImage(),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildSearchBar(),
-                              if (_controller.searchQuery.isNotEmpty)
-                                _buildSearchResults()
-                              else ...[
-                                _buildGenreSection(
-                                  title: 'おすすめの本',
-                                  bookList: _controller.recommendedBooks,
-                                  onLoadMore: _controller.loadMoreRecommended,
-                                  onLoadPrevious:
-                                      _controller.loadPreviousRecommended,
-                                  canLoadPrevious:
-                                      _controller.canLoadPreviousRecommended,
-                                  isLoadingMore:
-                                      _controller.isLoadingMoreRecommended,
-                                  hasMore: _controller.hasMoreRecommended,
-                                    isLoadingInitial:
-                                      _controller.isLoadingRecommended,
-                                ),
-                                const AdBanner(),
-                                _buildGenreSection(
-                                  title: '洋書',
-                                  bookList: _controller.westernBooks,
-                                  onLoadMore: _controller.loadMoreWestern,
-                                  onLoadPrevious:
-                                      _controller.loadPreviousWestern,
-                                  canLoadPrevious:
-                                      _controller.canLoadPreviousWestern,
-                                  isLoadingMore:
-                                      _controller.isLoadingMoreWestern,
-                                  hasMore: _controller.hasMoreWestern,
-                                  isLoadingInitial: _controller.isLoadingWestern,
-                                ),
-                                _buildGenreSection(
-                                  title: '人気作品',
-                                  bookList: _controller.popularBooks,
-                                  onLoadMore: _controller.loadMorePopular,
-                                  onLoadPrevious:
-                                      _controller.loadPreviousPopular,
-                                  canLoadPrevious:
-                                      _controller.canLoadPreviousPopular,
-                                  isLoadingMore:
-                                      _controller.isLoadingMorePopular,
-                                  hasMore: _controller.hasMorePopular,
-                                    isLoadingInitial: _controller.isLoadingPopular,
-                                ),
-                                const AdBanner(),
-                                _buildSectionHeader('タイムライン'),
-                                _buildTimeline(),
-                              ],
-                              _buildFooter(),
-                            ],
+                        _buildSearchBar(),
+                        if (_controller.searchQuery.isNotEmpty)
+                          _buildSearchResults()
+                        else ...[
+                          _buildGenreSection(
+                            title: 'おすすめの本',
+                            bookList: _controller.recommendedBooks,
+                            onLoadMore: _controller.loadMoreRecommended,
+                            onLoadPrevious: _controller.loadPreviousRecommended,
+                            canLoadPrevious:
+                                _controller.canLoadPreviousRecommended,
+                            isLoadingMore: _controller.isLoadingMoreRecommended,
+                            hasMore: _controller.hasMoreRecommended,
+                            isLoadingInitial: _controller.isLoadingRecommended,
                           ),
-                        ),
+                          const AdBanner(),
+                          _buildGenreSection(
+                            title: '洋書',
+                            bookList: _controller.westernBooks,
+                            onLoadMore: _controller.loadMoreWestern,
+                            onLoadPrevious: _controller.loadPreviousWestern,
+                            canLoadPrevious: _controller.canLoadPreviousWestern,
+                            isLoadingMore: _controller.isLoadingMoreWestern,
+                            hasMore: _controller.hasMoreWestern,
+                            isLoadingInitial: _controller.isLoadingWestern,
+                          ),
+                          _buildGenreSection(
+                            title: '人気作品',
+                            bookList: _controller.popularBooks,
+                            onLoadMore: _controller.loadMorePopular,
+                            onLoadPrevious: _controller.loadPreviousPopular,
+                            canLoadPrevious: _controller.canLoadPreviousPopular,
+                            isLoadingMore: _controller.isLoadingMorePopular,
+                            hasMore: _controller.hasMorePopular,
+                            isLoadingInitial: _controller.isLoadingPopular,
+                          ),
+                          const AdBanner(),
+                          _buildSectionHeader('タイムライン'),
+                          _buildTimeline(),
+                        ],
+                        _buildFooter(),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -1181,7 +1178,8 @@ class _BookListScreenState extends State<BookListScreen> {
               onReport: post.profileId == currentProfileId
                   ? null
                   : () => _reportPost(post.id),
-              onReply: () => _replyToPost(post),
+              onReply: (parentReply) => _replyToPost(post, parentReply),
+              onReplyUserTap: _openUserProfile,
             );
           },
         ),

@@ -15,8 +15,10 @@ class PostCard extends StatefulWidget {
   final String favoriteLabel;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  final VoidCallback? onReply;
+  final ValueChanged<PostReply?>? onReply;
+  final ValueChanged<String>? onReplyUserTap;
   final List<PostReply> replies;
+  final String? highlightedReplyId;
   final bool concealSpoiler;
   final Color? borderColor;
 
@@ -32,7 +34,9 @@ class PostCard extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onReply,
+    this.onReplyUserTap,
     this.replies = const [],
+    this.highlightedReplyId,
     this.concealSpoiler = true,
     this.borderColor,
   });
@@ -46,6 +50,7 @@ class _PostCardState extends State<PostCard> {
   bool _spoilerManuallyHidden = false;
   bool _wasVisible = true;
   ScrollPosition? _scrollPosition;
+  final Map<String, GlobalKey> _replyKeys = <String, GlobalKey>{};
 
   Post get post => widget.post;
   bool get showUserInfo => widget.showUserInfo;
@@ -56,7 +61,8 @@ class _PostCardState extends State<PostCard> {
   VoidCallback? get onFavorite => widget.onFavorite;
   VoidCallback? get onEdit => widget.onEdit;
   VoidCallback? get onDelete => widget.onDelete;
-  VoidCallback? get onReply => widget.onReply;
+  ValueChanged<PostReply?>? get onReply => widget.onReply;
+  ValueChanged<String>? get onReplyUserTap => widget.onReplyUserTap;
   List<PostReply> get replies => widget.replies;
 
   @override
@@ -69,6 +75,9 @@ class _PostCardState extends State<PostCard> {
       _scrollPosition?.addListener(_handleScroll);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateVisibility());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToHighlightedReply(),
+    );
   }
 
   @override
@@ -79,6 +88,12 @@ class _PostCardState extends State<PostCard> {
       _spoilerRevealed = false;
       _spoilerManuallyHidden = false;
     }
+    if (oldWidget.highlightedReplyId != widget.highlightedReplyId ||
+        oldWidget.replies.length != widget.replies.length) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToHighlightedReply(),
+      );
+    }
   }
 
   @override
@@ -88,6 +103,19 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _handleScroll() => _updateVisibility();
+
+  void _scrollToHighlightedReply() {
+    final replyId = widget.highlightedReplyId;
+    if (!mounted || replyId == null) return;
+    final targetContext = _replyKeys[replyId]?.currentContext;
+    if (targetContext == null) return;
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      alignment: 0.45,
+    );
+  }
 
   void _updateVisibility() {
     if (!mounted || !post.hasSpoiler) return;
@@ -440,7 +468,7 @@ class _PostCardState extends State<PostCard> {
                             ),
                           if (onReply != null)
                             TextButton.icon(
-                              onPressed: onReply,
+                              onPressed: () => onReply!(null),
                               icon: const Icon(Icons.reply_outlined, size: 16),
                               label: Text('返信 ${replies.length}'),
                               style: TextButton.styleFrom(
@@ -459,11 +487,10 @@ class _PostCardState extends State<PostCard> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.45,
-                            ),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: tertiaryTextColor.withValues(alpha: 0.25),
@@ -480,17 +507,12 @@ class _PostCardState extends State<PostCard> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              for (final reply in replies)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Text(
-                                    '${reply.username}: ${reply.message}',
-                                    style: TextStyle(
-                                      color: primaryTextColor,
-                                      fontSize: 12,
-                                      height: 1.4,
-                                    ),
-                                  ),
+                              for (final reply in _rootReplies())
+                                _buildReplyThread(
+                                  context,
+                                  reply,
+                                  primaryTextColor,
+                                  tertiaryTextColor,
                                 ),
                             ],
                           ),
@@ -503,6 +525,166 @@ class _PostCardState extends State<PostCard> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  List<PostReply> _rootReplies() {
+    final ids = replies.map((reply) => reply.id).toSet();
+    return replies
+        .where(
+          (reply) =>
+              reply.parentReplyId == null || !ids.contains(reply.parentReplyId),
+        )
+        .toList(growable: false);
+  }
+
+  List<PostReply> _childReplies(String parentReplyId) => replies
+      .where((reply) => reply.parentReplyId == parentReplyId)
+      .toList(growable: false);
+
+  Widget _buildReplyThread(
+    BuildContext context,
+    PostReply reply,
+    Color primaryTextColor,
+    Color tertiaryTextColor, {
+    int depth = 0,
+  }) {
+    final highlighted = widget.highlightedReplyId == reply.id;
+    final profileLabel = reply.userId.isEmpty ? '' : '@${reply.userId}';
+    final children = _childReplies(reply.id);
+    final safeDepth = depth.clamp(0, 3).toDouble();
+    final replyKey = _replyKeys.putIfAbsent(reply.id, GlobalKey.new);
+
+    return Padding(
+      padding: EdgeInsets.only(left: safeDepth * 14.0, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AnimatedContainer(
+            key: replyKey,
+            duration: const Duration(milliseconds: 250),
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: highlighted
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.55)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: depth > 0
+                  ? Border(
+                      left: BorderSide(
+                        color: tertiaryTextColor.withValues(alpha: 0.35),
+                        width: 2,
+                      ),
+                    )
+                  : null,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: onReplyUserTap == null
+                      ? null
+                      : () => onReplyUserTap!(reply.profileId),
+                  customBorder: const CircleBorder(),
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundImage: reply.userAvatarUrl.isNotEmpty
+                        ? NetworkImage(reply.userAvatarUrl)
+                        : null,
+                    child: reply.userAvatarUrl.isEmpty
+                        ? const Icon(Icons.person, size: 17)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        onTap: onReplyUserTap == null
+                            ? null
+                            : () => onReplyUserTap!(reply.profileId),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 2,
+                          children: [
+                            Text(
+                              reply.username,
+                              style: TextStyle(
+                                color: primaryTextColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (profileLabel.isNotEmpty)
+                              Text(
+                                profileLabel,
+                                style: TextStyle(
+                                  color: tertiaryTextColor,
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        reply.message,
+                        style: TextStyle(
+                          color: primaryTextColor,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            _formatDate(reply.createdAt),
+                            style: TextStyle(
+                              color: tertiaryTextColor,
+                              fontSize: 9,
+                            ),
+                          ),
+                          if (onReply != null) ...[
+                            const SizedBox(width: 8),
+                            TextButton(
+                              onPressed: () => onReply!(reply),
+                              style: TextButton.styleFrom(
+                                foregroundColor: tertiaryTextColor,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                minimumSize: const Size(0, 26),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                '返信',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (final child in children)
+            _buildReplyThread(
+              context,
+              child,
+              primaryTextColor,
+              tertiaryTextColor,
+              depth: depth + 1,
+            ),
+        ],
       ),
     );
   }

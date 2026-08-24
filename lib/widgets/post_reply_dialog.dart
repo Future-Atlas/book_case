@@ -50,6 +50,8 @@ Future<void> showPostReplyLockedDialog({required BuildContext context}) {
 Future<bool> showPostReplyDialog({
   required BuildContext context,
   required String postId,
+  String? parentReplyId,
+  String? replyToUsername,
 }) async {
   final controller = TextEditingController();
   var isSubmitting = false;
@@ -62,7 +64,9 @@ Future<bool> showPostReplyDialog({
 
       return StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('返信する'),
+          title: Text(
+            replyToUsername == null ? '返信する' : '$replyToUsernameさんに返信',
+          ),
           content: SizedBox(
             width: contentWidth,
             child: Column(
@@ -113,6 +117,7 @@ Future<bool> showPostReplyDialog({
                       final error = await service.createPostReply(
                         postId: postId,
                         message: controller.text,
+                        parentReplyId: parentReplyId,
                       );
                       if (!dialogContext.mounted) return;
                       if (error == null) {

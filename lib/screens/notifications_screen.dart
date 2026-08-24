@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/social_models.dart';
 import '../services/supabase_service.dart';
+import 'post_detail_screen.dart';
 import 'user_profile_screen.dart';
 
 class NotificationBellButton extends StatefulWidget {
@@ -154,10 +155,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (mounted) await _load();
   }
 
+  Future<void> _openNotification(SocialNotification notification) async {
+    if ((notification.type == SocialNotificationType.reply ||
+            notification.type == SocialNotificationType.reaction) &&
+        notification.postId != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PostDetailScreen(
+            postId: notification.postId!,
+            highlightedReplyId:
+                notification.type == SocialNotificationType.reply
+                ? notification.replyId
+                : null,
+          ),
+        ),
+      );
+      if (mounted) await _load();
+      return;
+    }
+    await _openActorProfile(notification);
+  }
+
   String _message(SocialNotification notification) {
     switch (notification.type) {
       case SocialNotificationType.reaction:
         return '${notification.actorUsername}が、あなたの「${notification.bookTitle ?? '書籍'}」の投稿にリアクションを付けました';
+      case SocialNotificationType.reply:
+        return '${notification.actorUsername}があなたの「${notification.bookTitle ?? '書籍'}」の投稿に返信しました';
       case SocialNotificationType.follow:
         return '${notification.actorUsername}が、あなたをフォローしました';
       case SocialNotificationType.followRequest:
@@ -208,7 +232,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         : Theme.of(context).colorScheme.primaryContainer
                               .withValues(alpha: 0.24),
                     child: InkWell(
-                      onTap: () => _openActorProfile(notification),
+                      onTap: () => _openNotification(notification),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                         child: Row(
