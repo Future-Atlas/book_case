@@ -4,11 +4,19 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "supabase/**"
+      - ".github/workflows/supabase-deploy.yaml"
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: production-database
+    concurrency:
+      group: production-database
+      cancel-in-progress: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,7 +24,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: "stable"
+          flutter-version: "3.43.0"
           cache: true
 
       - name: Install dependencies
@@ -34,7 +42,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: "2.111.0"
 
       - name: Verify required DB files
         run: |

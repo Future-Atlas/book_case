@@ -1,6 +1,6 @@
-# BookCase
+# Sharemarium
 
-> A premium **Flutter** application for iOS, Android, and Web that showcases books, lets users write reviews, and stores data in **Supabase (PostgreSQL)**. The web version is hosted on **Vercel** with SEO‑friendly routing.
+> Sharemarium is a premium **Flutter** application for iOS, Android, and Web that showcases books, lets users write reviews, and stores data in **Supabase (PostgreSQL)**. The web version is hosted on **Vercel** with SEO‑friendly routing.
 
 ---
 
@@ -32,11 +32,11 @@
 ## Tech Stack
 
 - **Flutter** (stable channel) – UI framework.
-- **supabase_flutter ^2.14.1** – Supabase client.
+- **supabase_flutter ^2.17.2** – Supabase client.
 - **provider ^6.1.2** – State management.
 - **google_fonts ^6.0.0** – Premium typography.
 - **Vercel** – Hosting for the web build.
-- **Supabase CLI** – Local database & API.
+- **Supabase CLI 2.111.0** – Local database & API.
 
 ---
 
@@ -51,15 +51,19 @@
    ```bash
    flutter pub get
    ```
-3. **Start Supabase locally** (requires Docker)
+3. **Install the pinned Supabase CLI** (requires npm)
+   ```bash
+   npm install
+   ```
+4. **Start Supabase locally** (requires Docker)
    ```bash
    supabase start
    ```
    This launches Studio, REST, GraphQL, Edge Functions and the Postgres instance.
-4. **Create local runtime define file** from template and fill values:
+5. **Create local runtime define file** from template and fill values:
    - `env.example.json`
    - or `env.staging.example.json` / `env.production.example.json`
-5. **Run the app**
+6. **Run the app**
    ```bash
    flutter run -d chrome   # web
    # or
@@ -158,14 +162,14 @@ Runtime variables are passed via `--dart-define` and read by `String.fromEnviron
 
 - Runtime config is switched by `APP_ENV` (read in `lib/config/app_environment.dart`).
 - Production deploy: `.github/workflows/deploy.yaml` (push to `main`) with `APP_ENV=production`.
-- Staging deploy: `.github/workflows/deploy-staging.yaml` (push to `staging`) with `APP_ENV=staging`.
+- Staging deploy: `.github/workflows/deploy-staging.yaml` (push to `develop`) with `APP_ENV=staging`.
 - Example define files:
   - `env.production.example.json`
   - `env.staging.example.json`
 
 Recommended setup in GitHub:
 
-1. Create branch `staging` and use it for validation releases.
+1. Create branch `develop` and use it for staging validation releases.
 2. Add repository secrets for both workflows:
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
@@ -176,7 +180,8 @@ Recommended setup in GitHub:
    - `VERCEL_ORG_ID`
    - `VERCEL_PROJECT_ID`
    - `VERCEL_TOKEN`
-3. Keep production values in main deploy context and staging values in staging deploy context.
+3. Create a GitHub Environment named `production-database`, add required reviewers, and keep production database secrets scoped to it.
+4. Protect `main` in Settings -> Branches: require pull requests, require the `CI / flutter` status check, require the `production-database` environment for database deployment, and disallow direct pushes.
 
 Local build examples:
 
