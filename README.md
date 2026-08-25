@@ -31,7 +31,7 @@
 
 ## Tech Stack
 
-- **Flutter** (stable channel) – UI framework.
+- **Flutter 3.44.9** (stable channel) – UI framework.
 - **supabase_flutter ^2.17.2** – Supabase client.
 - **provider ^6.1.2** – State management.
 - **google_fonts ^6.0.0** – Premium typography.
