@@ -227,6 +227,13 @@ flutter pub get
 flutter run -d chrome   # web dev
 flutter build web        # production build
 
+# Vercel API tests
+npm ci
+npm run test:api
+
+# Supabase migration and RLS tests (requires Docker)
+supabase test db
+
 # Deploy (GitHub) – automatically runs on push to main
 # You can trigger manually with:
 git push origin main

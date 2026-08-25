@@ -75,7 +75,6 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Future<void> _openUserProfile(String profileId) async {
-    if (!await _ensureAuthenticated() || !mounted) return;
     final openInMainShell = widget.onOpenUserProfile;
     if (openInMainShell != null) {
       openInMainShell(profileId);

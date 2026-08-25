@@ -1,12 +1,7 @@
 const { requestRakuten } = require("./_rakuten_request");
 
-const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
-const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
-const RAKUTEN_REFERER =
-  process.env.RAKUTEN_REFERER || "https://www.sharemarium.com/";
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
-const requestCounts = new Map();
 
 const ENDPOINTS = {
   book: "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404",
@@ -14,11 +9,17 @@ const ENDPOINTS = {
     "https://openapi.rakuten.co.jp/services/api/BooksForeignBook/Search/20170404",
 };
 
-module.exports = async (req, res) => {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-    return res.status(405).json({ error: "method_not_allowed" });
-  }
+function createHandler({ request = requestRakuten, env = process.env } = {}) {
+  const appId = env.RAKUTEN_APP_ID || "";
+  const accessKey = env.RAKUTEN_ACCESS_KEY || "";
+  const referer = env.RAKUTEN_REFERER || "https://www.sharemarium.com/";
+  const requestCounts = new Map();
+
+  return async (req, res) => {
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET");
+      return res.status(405).json({ error: "method_not_allowed" });
+    }
 
   const forwardedFor = String(req.headers["x-forwarded-for"] || "");
   const realIp = String(req.headers["x-real-ip"] || "").trim();
@@ -35,12 +36,12 @@ module.exports = async (req, res) => {
     }
   }
 
-  if (!RAKUTEN_APP_ID || !RAKUTEN_ACCESS_KEY) {
-    return res.status(500).json({
-      error: "rakuten_credentials_missing",
-      message: "Rakuten credentials are not configured on the server.",
-    });
-  }
+    if (!appId || !accessKey) {
+      return res.status(500).json({
+        error: "rakuten_credentials_missing",
+        message: "Rakuten credentials are not configured on the server.",
+      });
+    }
 
   const endpoint = String(req.query.endpoint || "book");
   if (!Object.hasOwn(ENDPOINTS, endpoint)) {
@@ -64,8 +65,8 @@ module.exports = async (req, res) => {
 
   const query = new URLSearchParams({
     format: "json",
-    applicationId: RAKUTEN_APP_ID,
-    accessKey: RAKUTEN_ACCESS_KEY,
+    applicationId: appId,
+    accessKey,
   });
 
   for (const [key, value] of Object.entries(passthrough)) {
@@ -95,8 +96,8 @@ module.exports = async (req, res) => {
   const url = `${baseUrl}?${query.toString()}`;
 
   try {
-    const response = await requestRakuten(url, {
-      origin: RAKUTEN_REFERER,
+    const response = await request(url, {
+      origin: referer,
       userAgent:
         "Sharemarium-Rakuten-Proxy/1.0 (+https://www.sharemarium.com)",
     });
@@ -114,5 +115,10 @@ module.exports = async (req, res) => {
       error: "rakuten_proxy_failed",
       message: error instanceof Error ? error.message : String(error),
     });
-  }
-};
+    }
+  };
+}
+
+const handler = createHandler();
+handler.createHandler = createHandler;
+module.exports = handler;

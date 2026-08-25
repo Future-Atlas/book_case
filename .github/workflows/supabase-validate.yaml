@@ -49,6 +49,9 @@ jobs:
       - name: Reset local DB with migrations and seed
         run: supabase db reset
 
+      - name: Run RLS tests
+        run: supabase test db
+
       - name: Stop local Supabase services
         if: always()
         run: supabase stop
