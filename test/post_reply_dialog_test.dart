@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_application_1/services/input_security_service.dart';
-import 'package:flutter_application_1/widgets/post_reply_dialog.dart';
+import 'package:sharemarium/services/input_security_service.dart';
+import 'package:sharemarium/widgets/post_reply_dialog.dart';
 
 void main() {
   testWidgets('locked reply dialog shows the limited-content message', (

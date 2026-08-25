@@ -101,6 +101,11 @@ class SupabaseService extends ChangeNotifier {
 
   bool get isAuthenticated => _client?.auth.currentSession != null;
 
+  /// Shared write permission gate for authenticated-only actions.
+  /// Keep this as a convenience wrapper and keep the RLS boundary enforced in
+  /// Supabase itself.
+  bool get canWrite => isAuthenticated;
+
   User? get currentUser => _client?.auth.currentUser;
 
   // ----- AUTH -------------------------------------------------------------

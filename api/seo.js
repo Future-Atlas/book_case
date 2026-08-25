@@ -744,69 +744,114 @@ module.exports = async (req, res) => {
     let favorites = [];
     let hasReliableData = false;
     const isbnCache = new Map();
+    const requestedProfileId = (() => {
+      const match = decodedPath.match(/(?:\/users\/|\/user\/|\/profile\/)([^/?#]+)/i);
+      return match ? decodeURIComponent(match[1]) : "";
+    })();
 
     try {
-      const profiles = await supabaseGet(
-        "profiles?select=id,username,bio,read_count,followers_count,following_count&limit=1",
-      );
-      if (profiles && profiles.length > 0) {
-        hasReliableData = true;
-        const user = profiles[0];
-        username = user.username;
-        bio = user.bio || bio;
-        stats.read = user.read_count || stats.read;
-        stats.followers = user.followers_count || stats.followers;
-        stats.following = user.following_count || stats.following;
-
-        const fetchedPosts = await supabaseGet(
-          `posts?profile_id=eq.${user.id}&select=id,book_id,rating,comment,created_at&order=created_at.desc&limit=10`,
+      if (requestedProfileId) {
+        const profiles = await supabaseGet(
+          `profiles?id=eq.${encodeURIComponent(requestedProfileId)}&select=id,username,bio,read_count,followers_count,following_count,is_private,is_suspended` ,
         );
+        const user = Array.isArray(profiles) ? profiles[0] : null;
+        if (user) {
+          const isPublic = user.is_private !== true && user.is_suspended !== true;
+          if (!isPublic) {
+            const forbiddenHtml = renderPage({
+              title: "プロフィールは非公開です",
+              description: "指定されたプロフィールは公開範囲の条件を満たしていません。",
+              content: `<h2>プロフィールは非公開です</h2><p>このユーザーの公開プロフィールは表示できません。</p>`,
+              jsonLd: {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                name: "プロフィールは非公開です",
+                description: "指定されたプロフィールは公開範囲の条件を満たしていません。",
+                url: toAbsoluteUrl(decodedPath),
+              },
+              pagePath: decodedPath,
+              robots: "noindex,nofollow",
+            });
+            res.setHeader("Content-Type", "text/html; charset=utf-8");
+            setDiagnosticsHeader(res, diagnostics);
+            return res.status(404).send(forbiddenHtml);
+          }
 
-        if (fetchedPosts && fetchedPosts.length > 0) {
-          posts = await Promise.all(
-            fetchedPosts.map(async (p) => {
-              const rawBookId = p.book_id || "書籍ID未設定";
-              let resolved = isbnCache.get(rawBookId);
-              if (resolved === undefined) {
-                resolved = await resolveBookByIsbn(rawBookId, diagnostics);
-                isbnCache.set(rawBookId, resolved || null);
-              }
+          hasReliableData = true;
+          username = user.username;
+          bio = user.bio || bio;
+          stats.read = user.read_count || stats.read;
+          stats.followers = user.followers_count || stats.followers;
+          stats.following = user.following_count || stats.following;
 
-              return {
-                id: p.id,
-                username,
-                book_title: resolved?.title || rawBookId,
-                rating: p.rating,
-                comment: p.comment,
-                date: p.created_at
-                  ? new Date(p.created_at).toLocaleDateString("ja-JP")
-                  : "",
-              };
-            }),
+          const fetchedPosts = await supabaseGet(
+            `posts?profile_id=eq.${user.id}&select=id,book_id,rating,comment,created_at&order=created_at.desc&limit=10`,
           );
-        }
 
-        const favoriteRows = await supabaseGet(
-          `favorites?profile_id=eq.${user.id}&select=book_id&limit=20`,
-        );
+          if (Array.isArray(fetchedPosts) && fetchedPosts.length > 0) {
+            posts = await Promise.all(
+              fetchedPosts.map(async (p) => {
+                const rawBookId = p.book_id || "書籍ID未設定";
+                let resolved = isbnCache.get(rawBookId);
+                if (resolved === undefined) {
+                  resolved = await resolveBookByIsbn(rawBookId, diagnostics);
+                  isbnCache.set(rawBookId, resolved || null);
+                }
 
-        if (favoriteRows && favoriteRows.length > 0) {
-          favorites = await Promise.all(
-            favoriteRows.map(async (row) => {
-              const rawBookId = row.book_id || "書籍ID未設定";
-              let resolved = isbnCache.get(rawBookId);
-              if (resolved === undefined) {
-                resolved = await resolveBookByIsbn(rawBookId, diagnostics);
-                isbnCache.set(rawBookId, resolved || null);
-              }
+                return {
+                  id: p.id,
+                  username,
+                  book_title: resolved?.title || rawBookId,
+                  rating: p.rating,
+                  comment: p.comment,
+                  date: p.created_at
+                    ? new Date(p.created_at).toLocaleDateString("ja-JP")
+                    : "",
+                };
+              }),
+            );
+          }
 
-              return {
-                title: resolved?.title || rawBookId,
-                author: resolved?.author || "著者情報なし",
-                rating_avg: "-",
-              };
-            }),
+          const favoriteRows = await supabaseGet(
+            `favorites?profile_id=eq.${user.id}&select=book_id&limit=20`,
           );
+
+          if (Array.isArray(favoriteRows) && favoriteRows.length > 0) {
+            favorites = await Promise.all(
+              favoriteRows.map(async (row) => {
+                const rawBookId = row.book_id || "書籍ID未設定";
+                let resolved = isbnCache.get(rawBookId);
+                if (resolved === undefined) {
+                  resolved = await resolveBookByIsbn(rawBookId, diagnostics);
+                  isbnCache.set(rawBookId, resolved || null);
+                }
+
+                return {
+                  title: resolved?.title || rawBookId,
+                  author: resolved?.author || "著者情報なし",
+                  rating_avg: "-",
+                };
+              }),
+            );
+          }
+        } else {
+          const notFoundHtml = renderPage({
+            title: "ユーザーが見つかりません",
+            description: "指定されたユーザーは存在しません。",
+            content: `<h2>ユーザーが見つかりません</h2><p>指定されたURLに対応するプロフィールは存在しません。</p>`,
+            jsonLd: {
+              "@context": "https://schema.org",
+              "@type": "WebPage",
+              name: "ユーザーが見つかりません",
+              description: "指定されたユーザーは存在しません。",
+              url: toAbsoluteUrl(decodedPath),
+            },
+            pagePath: decodedPath,
+            robots: "noindex,nofollow",
+          });
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          setDiagnosticsHeader(res, diagnostics);
+          return res.status(404).send(notFoundHtml);
         }
       }
     } catch (err) {

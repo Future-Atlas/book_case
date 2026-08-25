@@ -263,8 +263,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   }
 
   int _screenIndexFromPath(String path) {
-    if (path.startsWith('/users/') && path.length > '/users/'.length) {
+    if ((path.startsWith('/users/') || path.startsWith('/user/') || path.startsWith('/profile/')) &&
+        path.length > '/users/'.length) {
       return 5;
+    }
+    if (path.startsWith('/book/') || path.startsWith('/genre/')) {
+      return 0;
     }
     switch (path) {
       case '/mypage':
@@ -378,7 +382,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     final index = _screenIndexFromPath(path);
     String? nextViewedProfileId;
     if (index == 5) {
-      final encodedProfileId = path.substring('/users/'.length);
+      final prefix = path.startsWith('/profile/')
+          ? '/profile/'
+          : path.startsWith('/user/')
+              ? '/user/'
+              : '/users/';
+      final encodedProfileId = path.substring(prefix.length);
       if (encodedProfileId.isNotEmpty) {
         nextViewedProfileId = Uri.decodeComponent(encodedProfileId);
       }

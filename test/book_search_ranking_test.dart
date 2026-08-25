@@ -1,6 +1,6 @@
-import 'package:flutter_application_1/models/book.dart';
-import 'package:flutter_application_1/api/rakuten_api.dart';
-import 'package:flutter_application_1/repositories/book_repository.dart';
+import 'package:sharemarium/models/book.dart';
+import 'package:sharemarium/api/rakuten_api.dart';
+import 'package:sharemarium/repositories/book_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Book _book({

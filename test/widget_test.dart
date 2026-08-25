@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_application_1/screens/profile_onboarding_screen.dart';
-import 'package:flutter_application_1/models/book.dart';
-import 'package:flutter_application_1/models/post.dart';
-import 'package:flutter_application_1/services/content_safety_service.dart';
+import 'package:sharemarium/screens/profile_onboarding_screen.dart';
+import 'package:sharemarium/models/book.dart';
+import 'package:sharemarium/models/post.dart';
+import 'package:sharemarium/services/content_safety_service.dart';
 
 void main() {
   group('個人情報変更用パスワード', () {

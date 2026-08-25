@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_application_1/models/post_reply.dart';
+import 'package:sharemarium/models/post_reply.dart';
 
 void main() {
   test('PostReply parses profile identity and parent reply', () {

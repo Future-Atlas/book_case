@@ -21,11 +21,11 @@
 
 ## Features
 
-- Cross‑platform UI built with **Flutter** (single codebase for iOS, Android, Web).
+- Cross‑platform UI built with **Flutter** (Web-first, with iOS / Android support planned but not yet production-targeted).
 - **Supabase** backend for authentication, storage, and Postgres data.
-- Premium design: Google Fonts, glass‑morphism style, dark / light themes, responsive layout.
+- Premium design: Google Fonts, dark / light themes, responsive layout.
 - SEO‑optimized web build using a Vercel Edge Function that serves static HTML to crawlers.
-- Mock data fallback for rapid prototyping, automatically switched off when valid Supabase credentials are present.
+- Public browsing remains available for read-only content while write actions require an authenticated user.
 
 ---
 
@@ -55,21 +55,28 @@
    ```bash
    npm install
    ```
-4. **Start Supabase locally** (requires Docker)
+4. **Create a local runtime define file from the template**
+   ```bash
+   cp env.example.json env.json
+   ```
+   Update the values for your local Supabase instance, then run:
+   ```bash
+   flutter run -d chrome \
+     --dart-define-from-file=env.json
+   ```
+5. **Start Supabase locally** (requires Docker)
    ```bash
    supabase start
    ```
    This launches Studio, REST, GraphQL, Edge Functions and the Postgres instance.
-5. **Create local runtime define file** from template and fill values:
-   - `env.example.json`
-   - or `env.staging.example.json` / `env.production.example.json`
 6. **Run the app**
    ```bash
-   flutter run -d chrome   # web
-   # or
-   flutter run              # iOS / Android emulator
+   flutter run -d chrome \
+     --dart-define-from-file=env.json
    ```
    You should see `Supabase initialized successfully.` in the console and real data from the local Supabase tables.
+
+> `env.json` is intentionally not tracked by Git; keep it local only.
 
 ---
 
@@ -98,22 +105,38 @@ The entry point (`lib/main.dart`) reads runtime variables with `String.fromEnvir
 ```dart
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-await supabaseService.initialize(url: supabaseUrl, anonKey: supabaseKey);
+await supabaseService.initialize(
+  url: supabaseUrl,
+  anonKey: supabaseKey,
+  redirectUrl: AppEnvironmentConfig.supabaseRedirectUrl,
+);
 ```
 
-When the keys are present, the service falls back to **real Supabase**; otherwise it uses the built‑in mock objects.
+The app is intentionally web-first and read-only public browsing is available even without login. Write actions remain behind authenticated checks and Supabase RLS.
 
 ---
 
-## Deploying to Vercel (Production)
+## Deploying to Vercel (Production / Staging)
 
-1. **Add environment variables in Vercel** (Project Settings → Environment Variables → Production):
-   - `SUPABASE_URL` – e.g. `https://your‑project.supabase.co`
-   - `SUPABASE_ANON_KEY` – the publishable key from the Supabase console.
-2. **GitHub Actions workflow** (`.github/workflows/deploy.yaml`) runs `flutter analyze` and `flutter test`, then builds/deploys on `main` pushes.
-3. **Rakuten API secret handling**: web clients call `/api/rakuten` (server-side proxy), so `RAKUTEN_ACCESS_KEY` is not embedded into Flutter web bundles.
-4. **Vercel configuration** – `vercel.json` contains rewrites that send crawler user‑agents to the SEO edge function (`/api/seo.js`).
-5. After the workflow finishes, visit the Vercel URL; you’ll see live data from the **cloud Supabase** instance.
+The repository uses GitHub Environments to separate deployment secrets:
+
+- `production`
+- `staging`
+
+1. **Add environment variables in GitHub** → repository settings → Environments:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_REDIRECT_URL`
+   - `VERCEL_ORG_ID`
+   - `VERCEL_PROJECT_ID`
+   - `VERCEL_TOKEN`
+2. **CI checks** are enforced in `.github/workflows/ci.yaml` for pull requests and pushes to `main` / `develop`.
+3. **Production deployment** is triggered by `.github/workflows/deploy.yaml` on `main` with the `production` environment.
+4. **Staging deployment** is triggered by `.github/workflows/deploy-staging.yaml` on `develop` with the `staging` environment.
+5. **Rakuten API secret handling**: web clients call `/api/rakuten` (server-side proxy), so `RAKUTEN_ACCESS_KEY` is not embedded into Flutter web bundles.
+6. **Vercel configuration** – `vercel.json` contains rewrites that send crawler user‑agents to the SEO edge function (`/api/seo.js`).
+
+> The project currently treats `develop` as the long-lived staging branch and preview target, which keeps the setup simpler for a personal project without adding an extra deployment topology.
 
 ---
 
@@ -148,58 +171,43 @@ book_case/
 
 ## Environment Variables
 
-| Variable                 | Description                                                                   | Example                                               |
-| ------------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `APP_ENV`                | App runtime environment label                                                 | `production`, `staging`, `development`                |
-| `SUPABASE_URL`           | Supabase project URL (local or cloud)                                         | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
-| `SUPABASE_ANON_KEY`      | Publishable (anon) key – **use the value that starts with `sb_publishable_`** | `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`      |
-| `SUPABASE_REDIRECT_URL`  | OAuth redirect URL for auth providers                                         | `https://www.sharemarium.com/`                        |
-| `RAKUTEN_PROXY_BASE_URL` | Optional absolute base URL for Rakuten proxy when app and API are split       | `https://api.sharemarium.com`                         |
+| Variable | Description | Example |
+| --- | --- | --- |
+| `APP_ENV` | Runtime environment label | `production`, `staging`, `development` |
+| `SUPABASE_URL` | Supabase project URL | `http://127.0.0.1:54321` or `https://xyz.supabase.co` |
+| `SUPABASE_ANON_KEY` | Publishable anon key | `sb_publishable_...` |
+| `SUPABASE_REDIRECT_URL` | OAuth redirect URL | `https://www.sharemarium.com/` |
+| `RAKUTEN_APP_ID` | Rakuten API application id used by server-side proxy | `xxxxxxxx` |
+| `RAKUTEN_ACCESS_KEY` | Rakuten API access key used by server-side proxy | `xxxxxxxx` |
+| `RAKUTEN_REFERER` | Origin used for Rakuten requests | `https://www.sharemarium.com/` |
 
-Runtime variables are passed via `--dart-define` and read by `String.fromEnvironment`.
+Runtime variables are passed via `--dart-define` or `--dart-define-from-file` and read by `String.fromEnvironment`.
+
+### Local env file example
+
+```bash
+cp env.example.json env.json
+flutter run -d chrome \
+  --dart-define-from-file=env.json
+```
+
+`env.json` must stay local and is intentionally excluded from Git.
 
 ### Environment Separation (Production / Staging)
 
-- Runtime config is switched by `APP_ENV` (read in `lib/config/app_environment.dart`).
-- Production deploy: `.github/workflows/deploy.yaml` (push to `main`) with `APP_ENV=production`.
-- Staging deploy: `.github/workflows/deploy-staging.yaml` (push to `develop`) with `APP_ENV=staging`.
-- Example define files:
-  - `env.production.example.json`
-  - `env.staging.example.json`
+- Runtime config is switched by `APP_ENV` in `lib/config/app_environment.dart`.
+- Production deploy: `.github/workflows/deploy.yaml` on `main` with `APP_ENV=production`.
+- Staging deploy: `.github/workflows/deploy-staging.yaml` on `develop` with `APP_ENV=staging`.
+- The repo now treats environment secrets as GitHub Environment-scoped values.
 
-Recommended setup in GitHub:
+### GitHub protection steps
 
-1. Create branch `develop` and use it for staging validation releases.
-2. Add repository secrets for both workflows:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_REDIRECT_URL`
-   - `RAKUTEN_APP_ID`
-   - `RAKUTEN_ACCESS_KEY`
-   - `RAKUTEN_REFERER`
-   - `VERCEL_ORG_ID`
-   - `VERCEL_PROJECT_ID`
-   - `VERCEL_TOKEN`
-3. Create a GitHub Environment named `production-database`, add required reviewers, and keep production database secrets scoped to it.
-4. Protect `main` in Settings -> Branches: require pull requests, require the `CI / flutter` status check, require the `production-database` environment for database deployment, and disallow direct pushes.
+See [docs/github_branch_protection.md](docs/github_branch_protection.md) for the required repository settings.
 
-Local build examples:
+### Current platform status
 
-```bash
-# production-like build
-flutter build web --release \
-   --dart-define=APP_ENV=production \
-   --dart-define=SUPABASE_URL=https://your-prod-project.supabase.co \
-   --dart-define=SUPABASE_ANON_KEY=sb_publishable_xxx \
-   --dart-define=SUPABASE_REDIRECT_URL=https://www.sharemarium.com/
-
-# staging-like build
-flutter build web --release \
-   --dart-define=APP_ENV=staging \
-   --dart-define=SUPABASE_URL=https://your-staging-project.supabase.co \
-   --dart-define=SUPABASE_ANON_KEY=sb_publishable_xxx \
-   --dart-define=SUPABASE_REDIRECT_URL=https://staging.sharemarium.com/
-```
+- Production target: Web
+- iOS / Android: in development, not yet production-targeted
 
 ---
 
