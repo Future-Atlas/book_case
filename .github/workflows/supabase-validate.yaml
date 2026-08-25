@@ -34,7 +34,7 @@ jobs:
         run: flutter build web
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: "2.111.0"
 
