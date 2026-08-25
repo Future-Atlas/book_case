@@ -188,24 +188,27 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     final profile = await service.fetchUserProfile(uid);
-    final relationship = await service.fetchProfileRelationship(uid);
+    final profileId = profile.id;
+    final relationship = await service.fetchProfileRelationship(profileId);
     final canLoadContent =
         relationship.isOwnProfile ||
         (!relationship.blockedEitherDirection &&
             (!profile.isPrivate ||
                 relationship.followStatus ==
                     FollowRelationshipStatus.accepted));
-    final posts = canLoadContent ? await service.fetchUserPosts(uid) : <Post>[];
+    final posts = canLoadContent
+        ? await service.fetchUserPosts(profileId)
+        : <Post>[];
     final replies = canLoadContent
         ? await service.fetchRepliesForPosts(
             posts.map((post) => post.id).toList(growable: false),
           )
         : <String, List<PostReply>>{};
     final colls = canLoadContent
-        ? await service.fetchUserCollections(uid)
+        ? await service.fetchUserCollections(profileId)
         : <Book>[];
     final favs = canLoadContent
-        ? await service.fetchUserFavorites(uid)
+        ? await service.fetchUserFavorites(profileId)
         : <Book>[];
     final postedBookIds = posts.map((post) => post.bookId).toSet();
     final visibleFavorites = favs

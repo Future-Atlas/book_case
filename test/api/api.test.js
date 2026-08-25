@@ -112,14 +112,21 @@ test("SEO handler returns noindex 404 for a missing profile", async () => {
   process.env.SUPABASE_URL = "https://supabase.example";
   process.env.SUPABASE_ANON_KEY = "public-key";
   const originalFetch = global.fetch;
-  global.fetch = async () =>
-    new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+  let requestedUrl = "";
+  global.fetch = async (url) => {
+    requestedUrl = String(url);
+    return new Response("[]", {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
   delete require.cache[require.resolve("../../api/seo")];
   const seo = require("../../api/seo");
   const res = responseRecorder();
   await seo({ query: { path: "/users/missing-user" } }, res);
   global.fetch = originalFetch;
   assert.equal(res.statusCode, 404);
+  assert.match(requestedUrl, /profiles\?user_id=eq\.missing-user/);
   assert.match(res.body, /ユーザーが見つかりません/);
   assert.match(res.body, /noindex/);
 });

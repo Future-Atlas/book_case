@@ -182,7 +182,7 @@ class MainNavigationShell extends StatefulWidget {
 }
 
 class _MainNavigationShellState extends State<MainNavigationShell>
-  with WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   static const Set<String> _transientQueryKeys = {
     'code',
     'state',
@@ -263,7 +263,9 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   }
 
   int _screenIndexFromPath(String path) {
-    if ((path.startsWith('/users/') || path.startsWith('/user/') || path.startsWith('/profile/')) &&
+    if ((path.startsWith('/users/') ||
+            path.startsWith('/user/') ||
+            path.startsWith('/profile/')) &&
         path.length > '/users/'.length) {
       return 5;
     }
@@ -310,9 +312,13 @@ class _MainNavigationShellState extends State<MainNavigationShell>
         return '/moderation';
       case 5:
         final profileId = _viewedProfileId;
-        return profileId == null || profileId.isEmpty
+        final publicUserId = _viewedProfileUserId;
+        final urlId = publicUserId == null || publicUserId.isEmpty
+            ? profileId
+            : publicUserId;
+        return urlId == null || urlId.isEmpty
             ? '/'
-            : '/users/${Uri.encodeComponent(profileId)}';
+            : '/users/${Uri.encodeComponent(urlId)}';
       case 6:
         return '/terms';
       case 7:
@@ -385,15 +391,16 @@ class _MainNavigationShellState extends State<MainNavigationShell>
       final prefix = path.startsWith('/profile/')
           ? '/profile/'
           : path.startsWith('/user/')
-              ? '/user/'
-              : '/users/';
+          ? '/user/'
+          : '/users/';
       final encodedProfileId = path.substring(prefix.length);
       if (encodedProfileId.isNotEmpty) {
         nextViewedProfileId = Uri.decodeComponent(encodedProfileId);
       }
     }
 
-    if (_currentScreenIndex != index || _viewedProfileId != nextViewedProfileId) {
+    if (_currentScreenIndex != index ||
+        _viewedProfileId != nextViewedProfileId) {
       setState(() {
         _currentScreenIndex = index;
         _viewedProfileId = nextViewedProfileId;
@@ -446,7 +453,9 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   }
 
   @override
-  Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
+  Future<bool> didPushRouteInformation(
+    RouteInformation routeInformation,
+  ) async {
     final uri = routeInformation.uri;
     _applyRouteFromUri(uri, replaceUrl: _hasTransientQuery(uri));
     return true;
@@ -460,6 +469,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
       _viewedProfileUserId = profile.userId;
       _viewedProfileColorKey = profile.pageColorKey;
     });
+    _syncBrowserUrlForScreen(5, replace: true);
   }
 
   Future<void> _openUserProfile(String profileId) async {

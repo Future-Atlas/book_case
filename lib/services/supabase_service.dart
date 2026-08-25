@@ -1700,11 +1700,11 @@ class SupabaseService extends ChangeNotifier {
   Future<UserProfile> fetchUserProfile(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        final response = await _client!
-            .from('profiles')
-            .select()
-            .eq('id', profileId)
-            .single();
+        var query = _client!.from('profiles').select();
+        query = _looksLikeUuid(profileId)
+            ? query.eq('id', profileId)
+            : query.eq('user_id', profileId.trim().toLowerCase());
+        final response = await query.single();
         final profile = UserProfile.fromJson(response);
         if (profileId == activeProfileId) {
           _activePageColorKey = ProfilePageColors.normalizeKey(
@@ -1728,6 +1728,12 @@ class SupabaseService extends ChangeNotifier {
       readCount: 0,
       isPrivate: false,
     );
+  }
+
+  bool _looksLikeUuid(String value) {
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());
   }
 
   // ----- USER COLLECTIONS & FAVORITES --------------------------------------

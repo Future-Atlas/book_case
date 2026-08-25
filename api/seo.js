@@ -446,6 +446,12 @@ function toAbsoluteUrl(pathname) {
   return `${SITE_URL}${normalized}`;
 }
 
+function looksLikeUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim(),
+  );
+}
+
 function faqStructuredData() {
   return {
     "@context": "https://schema.org",
@@ -751,8 +757,11 @@ module.exports = async (req, res) => {
 
     try {
       if (requestedProfileId) {
+        const profileFilter = looksLikeUuid(requestedProfileId)
+          ? `id=eq.${encodeURIComponent(requestedProfileId)}`
+          : `user_id=eq.${encodeURIComponent(requestedProfileId.toLowerCase())}`;
         const profiles = await supabaseGet(
-          `profiles?id=eq.${encodeURIComponent(requestedProfileId)}&select=id,username,bio,read_count,followers_count,following_count,is_private,is_suspended` ,
+          `profiles?${profileFilter}&select=id,username,user_id,bio,read_count,followers_count,following_count,is_private,is_suspended`,
         );
         const user = Array.isArray(profiles) ? profiles[0] : null;
         if (user) {
