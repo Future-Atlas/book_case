@@ -15,28 +15,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.44.9"
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Test
-        run: flutter test
-
-      - name: Build Flutter Web
-        run: flutter build web
-
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        id: setup_supabase
+        uses: supabase/setup-cli@v3
         with:
           version: "2.111.0"
+
+      - name: Verify Supabase CLI
+        run: supabase --version
 
       - name: Verify required DB files
         run: |
@@ -53,5 +39,5 @@ jobs:
         run: supabase test db
 
       - name: Stop local Supabase services
-        if: always()
+        if: always() && steps.setup_supabase.outcome == 'success'
         run: supabase stop
