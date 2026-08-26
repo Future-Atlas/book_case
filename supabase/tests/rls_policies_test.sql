@@ -60,12 +60,14 @@ select throws_ok(
   $$insert into public.posts (profile_id, book_id, rating, comment)
     values ('d3b07384-d113-4ec5-a587-f3e098a58f4a', 'rls-test', 3, 'rls-test')$$,
   '42501',
+  'permission denied for table posts',
   'guest cannot insert posts'
 );
 select throws_ok(
   $$insert into public.favorites (profile_id, book_id)
     values ('d3b07384-d113-4ec5-a587-f3e098a58f4a', 'rls-test')$$,
   '42501',
+  'permission denied for table favorites',
   'guest cannot insert favorites'
 );
 set local role postgres;
