@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#000000",
-    "description": "読書記録・本管理アプリ Sharemarium",
+    "description": "読書記録・本管理アプリ Sharemarium（シェアマリウム）",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

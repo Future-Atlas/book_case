@@ -15,13 +15,11 @@ import '../models/moderation_models.dart';
 import '../models/profile_page_color.dart';
 import 'content_safety_service.dart';
 import 'input_security_service.dart';
+import 'timeline_ranking_service.dart';
 
 enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
 
 class SupabaseService extends ChangeNotifier {
-  static const String guestSampleProfileId =
-      'd3b07384-d113-4ec5-a587-f3e098a58f4a';
-
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
   SupabaseService._internal();
@@ -1527,7 +1525,7 @@ class SupabaseService extends ChangeNotifier {
         final posts = _parsePostsSafely(data);
         final enriched = await _enrichPostsWithBookMetadata(posts);
         final visible = await _filterPostsForCurrentViewer(enriched);
-        return _sortTimelineByReactionScore(visible);
+        return _arrangeTimelinePosts(visible);
       } catch (e) {
         debugPrint('Error fetching timeline posts with profile join: $e');
         try {
@@ -1539,7 +1537,7 @@ class SupabaseService extends ChangeNotifier {
           final posts = _parsePostsSafely(fallback as List<dynamic>);
           final enriched = await _enrichPostsWithBookMetadata(posts);
           final visible = await _filterPostsForCurrentViewer(enriched);
-          return _sortTimelineByReactionScore(visible);
+          return _arrangeTimelinePosts(visible);
         } catch (fallbackError) {
           debugPrint('Error fetching timeline posts fallback: $fallbackError');
         }
@@ -1938,16 +1936,37 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
-  List<Post> _sortTimelineByReactionScore(Iterable<Post> posts) {
-    final sorted = List<Post>.of(posts);
-    sorted.sort((first, second) {
-      final scoreComparison = second.reactionScore.compareTo(
-        first.reactionScore,
-      );
-      if (scoreComparison != 0) return scoreComparison;
-      return second.createdAt.compareTo(first.createdAt);
-    });
-    return sorted;
+  Future<List<Post>> _arrangeTimelinePosts(Iterable<Post> posts) async {
+    final followedProfileIds = await _acceptedFollowingProfileIds();
+    return TimelineRankingService.arrange(
+      posts: posts,
+      followedProfileIds: followedProfileIds,
+    );
+  }
+
+  Future<Set<String>> _acceptedFollowingProfileIds() async {
+    final viewerId = activeProfileId;
+    if (!_isInitialized ||
+        _client == null ||
+        viewerId.isEmpty ||
+        !isAuthenticated) {
+      return const <String>{};
+    }
+
+    try {
+      final response = await _client!
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', viewerId)
+          .eq('status', 'accepted');
+      return (response as List<dynamic>)
+          .map((row) => row['following_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+    } catch (e) {
+      debugPrint('Error loading followed profiles for timeline: $e');
+      return const <String>{};
+    }
   }
 
   Future<List<Post>> _attachReactionState(List<Post> posts) async {

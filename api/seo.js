@@ -24,10 +24,11 @@ const RAKUTEN_FOREIGN_BOOK_API =
 const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
 const SITE_URL = "https://sharemarium.com";
 const SITE_NAME = "Sharemarium";
-const SITE_ALT_NAME = "Sharemarium";
-const SITE_TITLE = "Sharemarium | 読書レビューSNS";
+const SITE_ALT_NAME = "シェアマリウム";
+const SITE_BRAND = `${SITE_NAME}（${SITE_ALT_NAME}）`;
+const SITE_TITLE = "Sharemarium（シェアマリウム） | 読書レビューSNS";
 const TOP_DESCRIPTION =
-  "Sharemariumは、読んだ本や読みたい本を記録し、レビューや読書体験を共有できる読書レビューSNSです。";
+  "Sharemarium（シェアマリウム）は、読んだ本や読みたい本を記録し、レビューや読書体験を共有できる読書レビューSNSです。";
 const OG_IMAGE_URL = `${SITE_URL}/icons/Icon-512.png`;
 const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 
@@ -459,6 +460,14 @@ function faqStructuredData() {
     mainEntity: [
       {
         "@type": "Question",
+        name: "シェアマリウムとは何ですか？",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "シェアマリウムは英字でSharemariumと表記する、読書記録・本管理・レビュー共有のためのWebサービスです。",
+        },
+      },
+      {
+        "@type": "Question",
         name: "Sharemariumでは何ができますか？",
         acceptedAnswer: {
           "@type": "Answer",
@@ -540,7 +549,7 @@ function webApplicationStructuredData() {
     operatingSystem: "Web",
     inLanguage: "ja",
     description:
-      "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
+      "Sharemarium（シェアマリウム）は、読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
   };
 }
 
@@ -663,9 +672,11 @@ module.exports = async (req, res) => {
     extraJsonLd = [],
   }) => {
     const absoluteUrl = toAbsoluteUrl(pagePath);
-    const fullTitle = title.includes("Sharemarium")
-      ? title
-      : `${title} | Sharemarium`;
+    const fullTitle = title.includes(SITE_NAME)
+      ? title.includes(SITE_ALT_NAME)
+        ? title
+        : title.replace(SITE_NAME, SITE_BRAND)
+      : `${title} | ${SITE_BRAND}`;
     const jsonLdList = [
       organizationStructuredData(),
       jsonLd,
@@ -683,7 +694,7 @@ module.exports = async (req, res) => {
       <link rel="canonical" href="${absoluteUrl}">
         <meta property="og:title" content="${fullTitle}">
       <meta property="og:description" content="${description}">
-            <meta property="og:site_name" content="${SITE_NAME}">
+            <meta property="og:site_name" content="${SITE_BRAND}">
       <meta property="og:type" content="website">
             <meta property="og:locale" content="ja_JP">
       <meta property="og:url" content="${absoluteUrl}">
@@ -722,7 +733,7 @@ module.exports = async (req, res) => {
     </head>
     <body>
             <header>
-                <h1>${SITE_NAME} (${SITE_ALT_NAME})</h1>
+                <h1>${SITE_BRAND}</h1>
         <p>本のレビューと読書記録を管理できるアプリ</p>
       </header>
       <main>
@@ -735,7 +746,7 @@ module.exports = async (req, res) => {
         ${content}
       </main>
       <footer>
-        <p>© 2026 Sharemarium. All rights reserved.</p>
+        <p>© 2026 ${SITE_BRAND}. All rights reserved.</p>
       </footer>
     </body>
     </html>
@@ -1387,6 +1398,10 @@ module.exports = async (req, res) => {
   const faqHtml = `
             <h2>よくある質問</h2>
             <div class="post-card">
+                <strong>シェアマリウムとは何ですか？</strong>
+                <p>シェアマリウムは、英字でSharemariumと表記する、読書記録・本管理・レビュー共有のためのWebサービスです。</p>
+            </div>
+            <div class="post-card">
                 <strong>Sharemariumでは何ができますか？</strong>
                 <p>本の検索、レビュー投稿、読書記録の管理、タイムライン閲覧ができます。</p>
             </div>
@@ -1425,8 +1440,8 @@ module.exports = async (req, res) => {
     description: TOP_DESCRIPTION,
     content: `
             <section>
-            <h2>Sharemariumでできること</h2>
-            <p>Sharemariumは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録・本管理アプリです。読書履歴、感想、蔵書管理を一つのWeb本棚で行えます。</p>
+            <h2>Sharemarium（シェアマリウム）でできること</h2>
+            <p>Sharemarium（シェアマリウム）は、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録・本管理アプリです。読書履歴、感想、蔵書管理を一つのWeb本棚で行えます。</p>
             <h3>主な機能</h3>
             <ul>
                 <li>読んだ本の登録と読書履歴の保存</li>

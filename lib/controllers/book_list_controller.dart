@@ -74,7 +74,6 @@ class BookListController extends ChangeNotifier {
     final previous = timelinePosts[index];
     final updatedPosts = List<Post>.from(timelinePosts);
     updatedPosts[index] = previous.withToggledReaction(reaction);
-    _sortTimelinePosts(updatedPosts);
     timelinePosts = updatedPosts;
     notifyListeners();
     return previous;
@@ -86,19 +85,8 @@ class BookListController extends ChangeNotifier {
 
     final restoredPosts = List<Post>.from(timelinePosts);
     restoredPosts[index] = previous;
-    _sortTimelinePosts(restoredPosts);
     timelinePosts = restoredPosts;
     notifyListeners();
-  }
-
-  void _sortTimelinePosts(List<Post> posts) {
-    posts.sort((first, second) {
-      final scoreComparison = second.reactionScore.compareTo(
-        first.reactionScore,
-      );
-      if (scoreComparison != 0) return scoreComparison;
-      return second.createdAt.compareTo(first.createdAt);
-    });
   }
 
   // 初期化
