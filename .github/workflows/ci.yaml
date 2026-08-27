@@ -9,7 +9,9 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep an in-flight build running so a newer run on the same ref does not
+  # cancel `flutter build web --release` and report a misleading CI failure.
+  cancel-in-progress: false
 
 jobs:
   flutter:
