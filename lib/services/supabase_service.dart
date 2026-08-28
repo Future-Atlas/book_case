@@ -1548,6 +1548,53 @@ class SupabaseService extends ChangeNotifier {
     return [];
   }
 
+  Future<List<Post>> fetchPostsForBook(
+    String bookId, {
+    bool excludeCurrentUser = true,
+  }) async {
+    final normalizedBookId = bookId.trim();
+    if (!_isInitialized || _client == null || normalizedBookId.isEmpty) {
+      return [];
+    }
+
+    Future<List<Post>> prepare(List<dynamic> rows) async {
+      final parsed = _parsePostsSafely(rows);
+      final enriched = await _enrichPostsWithBookMetadata(parsed);
+      final visible = await _filterPostsForCurrentViewer(enriched);
+      final viewerId = activeProfileId;
+      final otherUsersPosts = excludeCurrentUser && viewerId.isNotEmpty
+          ? visible
+                .where((post) => post.profileId != viewerId)
+                .toList(growable: false)
+          : visible;
+      return _arrangeTimelinePosts(otherUsersPosts);
+    }
+
+    try {
+      final response = await _client!
+          .from('posts')
+          .select(
+            '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url, page_color)',
+          )
+          .eq('book_id', normalizedBookId)
+          .order('created_at', ascending: false);
+      return prepare(response as List<dynamic>);
+    } catch (e) {
+      debugPrint('Error fetching posts for book with profile join: $e');
+      try {
+        final fallback = await _client!
+            .from('posts')
+            .select('*')
+            .eq('book_id', normalizedBookId)
+            .order('created_at', ascending: false);
+        return prepare(fallback as List<dynamic>);
+      } catch (fallbackError) {
+        debugPrint('Error fetching posts for book fallback: $fallbackError');
+        return [];
+      }
+    }
+  }
+
   Future<Post?> fetchPostById(String postId) async {
     if (!_isInitialized || _client == null || postId.trim().isEmpty) {
       return null;

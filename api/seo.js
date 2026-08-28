@@ -28,7 +28,7 @@ const SITE_ALT_NAME = "シェアマリウム";
 const SITE_BRAND = `${SITE_NAME}（${SITE_ALT_NAME}）`;
 const SITE_TITLE = "Sharemarium（シェアマリウム） | 読書レビューSNS";
 const TOP_DESCRIPTION =
-  "Sharemarium（シェアマリウム）は、読んだ本や読みたい本を記録し、レビューや読書体験を共有できる読書レビューSNSです。";
+  "Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。";
 const OG_IMAGE_URL = `${SITE_URL}/icons/Icon-512.png`;
 const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 

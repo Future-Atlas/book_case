@@ -522,23 +522,38 @@ class _BookListScreenState extends State<BookListScreen> {
                         ],
                       );
 
-                      if (isNarrow) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            coverBlock,
-                            const SizedBox(height: 12),
-                            detailBlock,
-                          ],
-                        );
-                      }
+                      final bookInformation = isNarrow
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                coverBlock,
+                                const SizedBox(height: 12),
+                                detailBlock,
+                              ],
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                coverBlock,
+                                const SizedBox(width: 20),
+                                Expanded(child: detailBlock),
+                              ],
+                            );
 
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          coverBlock,
-                          const SizedBox(width: 20),
-                          Expanded(child: detailBlock),
+                          bookInformation,
+                          const SizedBox(height: 20),
+                          _BookPostsPanel(
+                            bookId: book.id,
+                            onUserTap: _openUserProfile,
+                            onReaction: (post, reaction) =>
+                                _toggleReaction(post.id, reaction),
+                            onReport: (post) => _reportPost(post.id),
+                            onReply: _replyToPost,
+                            onReplyReport: _reportReply,
+                          ),
                         ],
                       );
                     },
@@ -611,44 +626,49 @@ class _BookListScreenState extends State<BookListScreen> {
                           if (widget.initialGenre == null ||
                               widget.initialGenre == 'recommended')
                             _buildGenreSection(
-                            title: 'おすすめの本',
-                            bookList: _controller.recommendedBooks,
-                            pageNumber: _controller.recommendedPage,
-                            onLoadMore: _controller.loadMoreRecommended,
-                            onLoadPrevious: _controller.loadPreviousRecommended,
-                            canLoadPrevious:
-                                _controller.canLoadPreviousRecommended,
-                            isLoadingMore: _controller.isLoadingMoreRecommended,
-                            hasMore: _controller.hasMoreRecommended,
-                            isLoadingInitial: _controller.isLoadingRecommended,
-                          ),
+                              title: 'おすすめの本',
+                              bookList: _controller.recommendedBooks,
+                              pageNumber: _controller.recommendedPage,
+                              onLoadMore: _controller.loadMoreRecommended,
+                              onLoadPrevious:
+                                  _controller.loadPreviousRecommended,
+                              canLoadPrevious:
+                                  _controller.canLoadPreviousRecommended,
+                              isLoadingMore:
+                                  _controller.isLoadingMoreRecommended,
+                              hasMore: _controller.hasMoreRecommended,
+                              isLoadingInitial:
+                                  _controller.isLoadingRecommended,
+                            ),
                           if (widget.initialGenre == null) const AdBanner(),
                           if (widget.initialGenre == null ||
                               widget.initialGenre == 'western')
                             _buildGenreSection(
-                            title: '洋書',
-                            bookList: _controller.westernBooks,
-                            pageNumber: _controller.westernPage,
-                            onLoadMore: _controller.loadMoreWestern,
-                            onLoadPrevious: _controller.loadPreviousWestern,
-                            canLoadPrevious: _controller.canLoadPreviousWestern,
-                            isLoadingMore: _controller.isLoadingMoreWestern,
-                            hasMore: _controller.hasMoreWestern,
-                            isLoadingInitial: _controller.isLoadingWestern,
-                          ),
+                              title: '洋書',
+                              bookList: _controller.westernBooks,
+                              pageNumber: _controller.westernPage,
+                              onLoadMore: _controller.loadMoreWestern,
+                              onLoadPrevious: _controller.loadPreviousWestern,
+                              canLoadPrevious:
+                                  _controller.canLoadPreviousWestern,
+                              isLoadingMore: _controller.isLoadingMoreWestern,
+                              hasMore: _controller.hasMoreWestern,
+                              isLoadingInitial: _controller.isLoadingWestern,
+                            ),
                           if (widget.initialGenre == null ||
                               widget.initialGenre == 'popular')
                             _buildGenreSection(
-                            title: '人気作品',
-                            bookList: _controller.popularBooks,
-                            pageNumber: _controller.popularPage,
-                            onLoadMore: _controller.loadMorePopular,
-                            onLoadPrevious: _controller.loadPreviousPopular,
-                            canLoadPrevious: _controller.canLoadPreviousPopular,
-                            isLoadingMore: _controller.isLoadingMorePopular,
-                            hasMore: _controller.hasMorePopular,
-                            isLoadingInitial: _controller.isLoadingPopular,
-                          ),
+                              title: '人気作品',
+                              bookList: _controller.popularBooks,
+                              pageNumber: _controller.popularPage,
+                              onLoadMore: _controller.loadMorePopular,
+                              onLoadPrevious: _controller.loadPreviousPopular,
+                              canLoadPrevious:
+                                  _controller.canLoadPreviousPopular,
+                              isLoadingMore: _controller.isLoadingMorePopular,
+                              hasMore: _controller.hasMorePopular,
+                              isLoadingInitial: _controller.isLoadingPopular,
+                            ),
                           if (widget.initialGenre == null) ...[
                             const AdBanner(),
                             _buildSectionHeader('タイムライン'),
@@ -1319,6 +1339,176 @@ class _BookListScreenState extends State<BookListScreen> {
         textStyle: const TextStyle(fontSize: 11),
       ),
       child: Text(label),
+    );
+  }
+}
+
+class _BookPostsPanel extends StatefulWidget {
+  const _BookPostsPanel({
+    required this.bookId,
+    required this.onUserTap,
+    required this.onReaction,
+    required this.onReport,
+    required this.onReply,
+    required this.onReplyReport,
+  });
+
+  final String bookId;
+  final Future<void> Function(String profileId) onUserTap;
+  final Future<void> Function(Post post, PostReactionType reaction) onReaction;
+  final Future<void> Function(Post post) onReport;
+  final Future<void> Function(Post post, PostReply? parentReply) onReply;
+  final Future<void> Function(PostReply reply) onReplyReport;
+
+  @override
+  State<_BookPostsPanel> createState() => _BookPostsPanelState();
+}
+
+class _BookPostsPanelState extends State<_BookPostsPanel> {
+  final ScrollController _scrollController = ScrollController();
+  List<Post> _posts = const [];
+  Map<String, List<PostReply>> _replies = const {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void didUpdateWidget(covariant _BookPostsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.bookId != widget.bookId) _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load({bool showLoading = true}) async {
+    if (!mounted) return;
+    if (showLoading) setState(() => _isLoading = true);
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final posts = await service.fetchPostsForBook(widget.bookId);
+    final replies = await service.fetchRepliesForPosts(
+      posts.map((post) => post.id).toList(growable: false),
+    );
+    if (!mounted) return;
+    setState(() {
+      _posts = posts;
+      _replies = replies;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _toggleReaction(Post post, PostReactionType reaction) async {
+    final index = _posts.indexWhere((candidate) => candidate.id == post.id);
+    if (index < 0) return;
+    final optimisticPosts = List<Post>.from(_posts);
+    optimisticPosts[index] = post.withToggledReaction(reaction);
+    setState(() => _posts = optimisticPosts);
+    await widget.onReaction(post, reaction);
+    if (mounted) await _load(showLoading: false);
+  }
+
+  Future<void> _reply(Post post, PostReply? parentReply) async {
+    await widget.onReply(post, parentReply);
+    if (mounted) await _load(showLoading: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final panelHeight = (MediaQuery.sizeOf(context).height * 0.58)
+        .clamp(420.0, 560.0)
+        .toDouble();
+
+    return Container(
+      height: panelHeight,
+      padding: const EdgeInsets.fromLTRB(10, 12, 6, 8),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.black : Colors.white,
+        border: Border.all(
+          color: isDarkMode ? Colors.white : Colors.black,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, right: 8, bottom: 10),
+            child: Text(
+              'この本の投稿',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _posts.isEmpty
+                ? Center(
+                    child: Text(
+                      'この本に関する他のユーザーの投稿はまだありません。',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  )
+                : Scrollbar(
+                    controller: _scrollController,
+                    thumbVisibility: true,
+                    child: RefreshIndicator(
+                      onRefresh: () => _load(showLoading: false),
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(right: 8),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: _posts.length,
+                        itemBuilder: (context, index) {
+                          final post = _posts[index];
+                          final service = Provider.of<SupabaseService>(
+                            context,
+                            listen: false,
+                          );
+                          final currentProfileId = service.activeProfileId;
+                          return PostCard(
+                            key: ValueKey('book-${post.id}'),
+                            post: post,
+                            replies: _replies[post.id] ?? const [],
+                            concealSpoiler: post.profileId != currentProfileId,
+                            concealReplySpoiler: (reply) =>
+                                reply.profileId != currentProfileId,
+                            onUserTap: () => widget.onUserTap(post.profileId),
+                            onReaction: post.profileId == currentProfileId
+                                ? null
+                                : (reaction) => _toggleReaction(post, reaction),
+                            onReport: post.profileId == currentProfileId
+                                ? null
+                                : () => widget.onReport(post),
+                            onReply: (parentReply) => _reply(post, parentReply),
+                            onReplyReport: widget.onReplyReport,
+                            canReportReply: (reply) =>
+                                currentProfileId.isEmpty ||
+                                reply.profileId != currentProfileId,
+                            onReplyUserTap: widget.onUserTap,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
