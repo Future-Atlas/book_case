@@ -39,8 +39,10 @@ class ModerationReport {
     required this.reportedUserId,
     required this.reportedAccountSuspended,
     required this.postId,
+    required this.replyId,
     required this.bookId,
     required this.review,
+    required this.replyMessage,
     required this.category,
     required this.details,
     required this.status,
@@ -55,8 +57,10 @@ class ModerationReport {
   final String reportedUserId;
   final bool reportedAccountSuspended;
   final String? postId;
+  final String? replyId;
   final String bookId;
   final String review;
+  final String replyMessage;
   final ReportCategory category;
   final String details;
   final String status;
@@ -64,4 +68,5 @@ class ModerationReport {
   final DateTime createdAt;
 
   bool get isOpen => status == 'open';
+  bool get targetsReply => replyId != null || replyMessage.isNotEmpty;
 }

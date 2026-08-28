@@ -1262,7 +1262,7 @@ class SupabaseService extends ChangeNotifier {
           .from('notifications')
           .select(
             'id, type, actor_id, post_id, reply_id, read_at, created_at, '
-            'actor:profiles!notifications_actor_id_fkey(username, avatar_url), '
+            'actor:profiles!notifications_actor_id_fkey(username, user_id, avatar_url), '
             'post:posts!notifications_post_id_fkey(book_id, book_title)',
           )
           .eq('recipient_id', profileId)
@@ -1289,6 +1289,7 @@ class SupabaseService extends ChangeNotifier {
           'reaction' => SocialNotificationType.reaction,
           'reply' => SocialNotificationType.reply,
           'follow_request' => SocialNotificationType.followRequest,
+          'new_post' => SocialNotificationType.newPost,
           _ => SocialNotificationType.follow,
         };
         final actorId = row['actor_id']?.toString() ?? '';
@@ -1311,6 +1312,7 @@ class SupabaseService extends ChangeNotifier {
             type: type,
             actorId: actorId,
             actorUsername: actor?['username']?.toString() ?? 'ユーザー',
+            actorUserId: actor?['user_id']?.toString() ?? '',
             actorAvatarUrl: actor?['avatar_url']?.toString() ?? '',
             postId: row['post_id']?.toString(),
             replyId: row['reply_id']?.toString(),
@@ -1599,7 +1601,7 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('post_replies')
           .select(
-            'id, post_id, profile_id, parent_reply_id, message, created_at, '
+            'id, post_id, profile_id, parent_reply_id, message, has_spoiler, created_at, '
             'profiles:profiles!post_replies_profile_id_fkey(username, user_id, avatar_url)',
           )
           .inFilter('post_id', filteredIds)
@@ -1629,6 +1631,7 @@ class SupabaseService extends ChangeNotifier {
     required String postId,
     required String message,
     String? parentReplyId,
+    bool hasSpoiler = false,
   }) async {
     final profileId = activeProfileId;
     if (!_isInitialized || _client == null || profileId.isEmpty) {
@@ -1647,6 +1650,7 @@ class SupabaseService extends ChangeNotifier {
           'target_reply': parentReplyId == null
               ? null
               : int.tryParse(parentReplyId),
+          'reply_has_spoiler': hasSpoiler,
         },
       );
       return null;
@@ -2123,6 +2127,45 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> submitReplyReport({
+    required String replyId,
+    required ReportCategory category,
+    String details = '',
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    final numericReplyId = int.tryParse(replyId);
+    if (numericReplyId == null) return false;
+    final detailsError = InputSecurityService.validateSafeText(
+      details,
+      fieldLabel: '報告詳細',
+      required: false,
+      allowNewLines: true,
+      maxLength: 1000,
+    );
+    if (detailsError != null) return false;
+    try {
+      final normalizedDetails = InputSecurityService.normalizeText(
+        details,
+        allowNewLines: true,
+        maxLength: 1000,
+      );
+      await _client!.rpc(
+        'submit_reply_report',
+        params: {
+          'target_reply': numericReplyId,
+          'report_category': category.databaseValue,
+          'report_details': normalizedDetails.isEmpty
+              ? null
+              : normalizedDetails,
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting reply report: $e');
+      return false;
+    }
+  }
+
   Future<bool> isCurrentUserAdmin() async {
     if (!_isInitialized || _client == null || !isAuthenticated) return false;
     try {
@@ -2176,8 +2219,8 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('moderation_reports')
           .select(
-            'id, post_id, category, details, status, resolution, created_at, '
-            'post_snapshot, '
+            'id, post_id, reply_id, category, details, status, resolution, created_at, '
+            'post_snapshot, reply_snapshot, '
             'reporter:profiles!moderation_reports_reporter_id_fkey(username), '
             'reported:profiles!moderation_reports_reported_profile_id_fkey('
             'id, username, user_id, is_suspended)',
@@ -2190,6 +2233,8 @@ class SupabaseService extends ChangeNotifier {
         final reporter = row['reporter'] as Map<String, dynamic>?;
         final reported = row['reported'] as Map<String, dynamic>?;
         final snapshot = row['post_snapshot'] as Map<String, dynamic>? ?? {};
+        final replySnapshot =
+            row['reply_snapshot'] as Map<String, dynamic>? ?? {};
         return ModerationReport(
           id: (row['id'] as num).toInt(),
           reporterUsername: reporter?['username']?.toString() ?? '退会済みユーザー',
@@ -2201,8 +2246,10 @@ class SupabaseService extends ChangeNotifier {
           reportedUserId: reported?['user_id']?.toString() ?? '',
           reportedAccountSuspended: reported?['is_suspended'] == true,
           postId: row['post_id']?.toString(),
+          replyId: row['reply_id']?.toString(),
           bookId: snapshot['book_id']?.toString() ?? '',
           review: snapshot['review']?.toString() ?? '',
+          replyMessage: replySnapshot['message']?.toString() ?? '',
           category: ReportCategory.fromDatabase(row['category']?.toString()),
           details: row['details']?.toString() ?? '',
           status: row['status']?.toString() ?? 'open',
@@ -2243,6 +2290,21 @@ class SupabaseService extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Error deleting reported post: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteReportedReply(int reportId) async {
+    if (!_isInitialized || _client == null) return false;
+    try {
+      await _client!.rpc(
+        'admin_delete_reported_reply',
+        params: {'target_report': reportId},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting reported reply: $e');
       return false;
     }
   }

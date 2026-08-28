@@ -21,6 +21,7 @@ import 'screens/contact_screen.dart';
 import 'screens/profile_onboarding_screen.dart';
 import 'screens/moderation_screen.dart';
 import 'screens/account_suspension_gate.dart';
+import 'screens/notifications_screen.dart';
 
 enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 
@@ -613,7 +614,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
             : ownHeaderColor;
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
-        final headerSideWidth = 104.0;
+        final headerSideWidth = service.isAuthenticated ? 146.0 : 104.0;
 
         if (!service.isAuthenticated &&
             _currentScreenIndex == 1 &&
@@ -738,11 +739,11 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            // if (service.isAuthenticated)
-                            //   const SizedBox(
-                            //     width: 42,
-                            //     child: NotificationBellButton(),
-                            //   ),
+                            if (service.isAuthenticated)
+                              const SizedBox(
+                                width: 42,
+                                child: NotificationBellButton(),
+                              ),
                             SizedBox(
                               width: 104,
                               height: 36,

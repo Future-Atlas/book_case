@@ -16,6 +16,9 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final ValueChanged<PostReply?>? onReply;
+  final ValueChanged<PostReply>? onReplyReport;
+  final bool Function(PostReply reply)? canReportReply;
+  final bool Function(PostReply reply)? concealReplySpoiler;
   final ValueChanged<String>? onReplyUserTap;
   final List<PostReply> replies;
   final String? highlightedReplyId;
@@ -34,6 +37,9 @@ class PostCard extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onReply,
+    this.onReplyReport,
+    this.canReportReply,
+    this.concealReplySpoiler,
     this.onReplyUserTap,
     this.replies = const [],
     this.highlightedReplyId,
@@ -51,6 +57,7 @@ class _PostCardState extends State<PostCard> {
   bool _wasVisible = true;
   ScrollPosition? _scrollPosition;
   final Map<String, GlobalKey> _replyKeys = <String, GlobalKey>{};
+  final Set<String> _revealedReplySpoilerIds = <String>{};
 
   Post get post => widget.post;
   bool get showUserInfo => widget.showUserInfo;
@@ -62,6 +69,7 @@ class _PostCardState extends State<PostCard> {
   VoidCallback? get onEdit => widget.onEdit;
   VoidCallback? get onDelete => widget.onDelete;
   ValueChanged<PostReply?>? get onReply => widget.onReply;
+  ValueChanged<PostReply>? get onReplyReport => widget.onReplyReport;
   ValueChanged<String>? get onReplyUserTap => widget.onReplyUserTap;
   List<PostReply> get replies => widget.replies;
 
@@ -87,6 +95,12 @@ class _PostCardState extends State<PostCard> {
         oldWidget.concealSpoiler != widget.concealSpoiler) {
       _spoilerRevealed = false;
       _spoilerManuallyHidden = false;
+      _revealedReplySpoilerIds.clear();
+    } else if (oldWidget.replies != widget.replies) {
+      final currentReplyIds = widget.replies.map((reply) => reply.id).toSet();
+      _revealedReplySpoilerIds.removeWhere(
+        (replyId) => !currentReplyIds.contains(replyId),
+      );
     }
     if (oldWidget.highlightedReplyId != widget.highlightedReplyId ||
         oldWidget.replies.length != widget.replies.length) {
@@ -118,7 +132,9 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _updateVisibility() {
-    if (!mounted || !post.hasSpoiler) return;
+    if (!mounted || (!post.hasSpoiler && replies.every((r) => !r.hasSpoiler))) {
+      return;
+    }
     final item = context.findRenderObject();
     if (item is! RenderBox || !item.attached) return;
     final abstractViewport = RenderAbstractViewport.maybeOf(item);
@@ -132,10 +148,13 @@ class _PostCardState extends State<PostCard> {
         itemOffset.dy + item.size.height > 0;
 
     if (isVisible && !_wasVisible) {
-      if (_spoilerRevealed || _spoilerManuallyHidden) {
+      if (_spoilerRevealed ||
+          _spoilerManuallyHidden ||
+          _revealedReplySpoilerIds.isNotEmpty) {
         setState(() {
           _spoilerRevealed = false;
           _spoilerManuallyHidden = false;
+          _revealedReplySpoilerIds.clear();
         });
       }
     }
@@ -951,6 +970,10 @@ class _PostCardState extends State<PostCard> {
     final children = _childReplies(reply.id);
     final safeDepth = depth.clamp(0, 3).toDouble();
     final replyKey = _replyKeys.putIfAbsent(reply.id, GlobalKey.new);
+    final shouldConcealSpoiler =
+        reply.hasSpoiler && (widget.concealReplySpoiler?.call(reply) ?? true);
+    final replySpoilerRevealed =
+        !shouldConcealSpoiler || _revealedReplySpoilerIds.contains(reply.id);
 
     return Padding(
       padding: EdgeInsets.only(left: safeDepth * 14.0, bottom: 8),
@@ -1029,15 +1052,55 @@ class _PostCardState extends State<PostCard> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        reply.message,
-                        style: TextStyle(
-                          color: primaryTextColor,
-                          fontSize: 12,
-                          height: 1.4,
+                      if (reply.hasSpoiler)
+                        const Text(
+                          'ネタバレあり',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      Row(
+                      if (shouldConcealSpoiler && !replySpoilerRevealed)
+                        TextButton(
+                          onPressed: () {
+                            setState(
+                              () => _revealedReplySpoilerIds.add(reply.id),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 28),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('返信を読む'),
+                        )
+                      else ...[
+                        Text(
+                          reply.message,
+                          style: TextStyle(
+                            color: primaryTextColor,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (shouldConcealSpoiler)
+                          TextButton(
+                            onPressed: () {
+                              setState(
+                                () => _revealedReplySpoilerIds.remove(reply.id),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 28),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('返信を隠す'),
+                          ),
+                      ],
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             _formatDate(reply.createdAt),
@@ -1060,6 +1123,26 @@ class _PostCardState extends State<PostCard> {
                               ),
                               child: const Text(
                                 '返信',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ],
+                          if (onReplyReport != null &&
+                              (widget.canReportReply?.call(reply) ?? true)) ...[
+                            const SizedBox(width: 4),
+                            TextButton.icon(
+                              onPressed: () => onReplyReport!(reply),
+                              style: TextButton.styleFrom(
+                                foregroundColor: tertiaryTextColor,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                minimumSize: const Size(0, 26),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              icon: const Icon(Icons.flag_outlined, size: 13),
+                              label: const Text(
+                                '報告',
                                 style: TextStyle(fontSize: 10),
                               ),
                             ),

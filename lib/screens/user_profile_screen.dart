@@ -414,6 +414,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     await showPostReportDialog(context: context, postId: postId);
   }
 
+  Future<void> _reportReply(PostReply reply) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (!service.canWrite) {
+      final result = await Navigator.of(context).pushNamed('/login');
+      if (!mounted || (result != true && !service.canWrite)) return;
+    }
+    if (reply.profileId == service.activeProfileId) return;
+    await showReplyReportDialog(context: context, replyId: reply.id);
+  }
+
   Future<void> _replyToPost(Post post, [PostReply? parentReply]) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     final canReply = await service.canCreatePostReplies();
@@ -1012,6 +1022,21 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           favoriteLabel: _isFavorited(post.bookId) ? 'お気に入りから解除' : 'お気に入りに追加',
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
           onReply: (parentReply) => _replyToPost(post, parentReply),
+          onReplyReport: _reportReply,
+          concealReplySpoiler: (reply) {
+            final profileId = Provider.of<SupabaseService>(
+              context,
+              listen: false,
+            ).activeProfileId;
+            return profileId.isEmpty || reply.profileId != profileId;
+          },
+          canReportReply: (reply) {
+            final profileId = Provider.of<SupabaseService>(
+              context,
+              listen: false,
+            ).activeProfileId;
+            return profileId.isEmpty || reply.profileId != profileId;
+          },
           onReplyUserTap: _openReplyProfile,
         );
       },

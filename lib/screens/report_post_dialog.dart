@@ -7,6 +7,38 @@ import '../services/supabase_service.dart';
 Future<void> showPostReportDialog({
   required BuildContext context,
   required String postId,
+}) => _showReportDialog(
+  context: context,
+  title: '投稿を報告',
+  submit: (service, category, details) => service.submitPostReport(
+    postId: postId,
+    category: category,
+    details: details,
+  ),
+);
+
+Future<void> showReplyReportDialog({
+  required BuildContext context,
+  required String replyId,
+}) => _showReportDialog(
+  context: context,
+  title: '返信を報告',
+  submit: (service, category, details) => service.submitReplyReport(
+    replyId: replyId,
+    category: category,
+    details: details,
+  ),
+);
+
+Future<void> _showReportDialog({
+  required BuildContext context,
+  required String title,
+  required Future<bool> Function(
+    SupabaseService service,
+    ReportCategory category,
+    String details,
+  )
+  submit,
 }) async {
   var selected = ReportCategory.spam;
   final detailsController = TextEditingController();
@@ -16,7 +48,7 @@ Future<void> showPostReportDialog({
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
-        title: const Text('投稿を報告'),
+        title: Text(title),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -74,10 +106,10 @@ Future<void> showPostReportDialog({
                       dialogContext,
                       listen: false,
                     );
-                    final success = await service.submitPostReport(
-                      postId: postId,
-                      category: selected,
-                      details: detailsController.text,
+                    final success = await submit(
+                      service,
+                      selected,
+                      detailsController.text,
                     );
                     if (!dialogContext.mounted) return;
                     Navigator.of(dialogContext).pop(success);

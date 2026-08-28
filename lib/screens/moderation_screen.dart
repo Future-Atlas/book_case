@@ -59,6 +59,32 @@ class _ModerationScreenState extends State<ModerationScreen> {
     );
   }
 
+  Future<void> _deleteReply(ModerationReport report) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('返信を削除しますか？'),
+        content: const Text('この操作を行うと、対象の返信とその返信先の会話が削除されます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runAction(
+      report,
+      (service) => service.adminDeleteReportedReply(report.id),
+      successMessage: '返信を削除しました。',
+    );
+  }
+
   Future<void> _changeSuspension(ModerationReport report) async {
     var reason = '利用規約又はコミュニティガイドライン違反';
     if (!report.reportedAccountSuspended) {
@@ -270,6 +296,25 @@ class _ModerationScreenState extends State<ModerationScreen> {
             if (report.reportedUserId.isNotEmpty)
               Text('ユーザーID：@${report.reportedUserId}'),
             if (report.bookId.isNotEmpty) Text('書籍ID：${report.bookId}'),
+            if (report.targetsReply) ...[
+              const SizedBox(height: 8),
+              const Text(
+                '報告対象の返信',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  report.replyMessage.isEmpty ? '（削除済みの返信）' : report.replyMessage,
+                ),
+              ),
+            ],
             if (report.review.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
@@ -296,13 +341,22 @@ class _ModerationScreenState extends State<ModerationScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  FilledButton.icon(
-                    onPressed: processing || report.postId == null
-                        ? null
-                        : () => _deletePost(report),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('投稿削除'),
-                  ),
+                  if (report.targetsReply)
+                    FilledButton.icon(
+                      onPressed: processing || report.replyId == null
+                          ? null
+                          : () => _deleteReply(report),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('返信削除'),
+                    )
+                  else
+                    FilledButton.icon(
+                      onPressed: processing || report.postId == null
+                          ? null
+                          : () => _deletePost(report),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('投稿削除'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: processing || report.reportedProfileId.isEmpty
                         ? null

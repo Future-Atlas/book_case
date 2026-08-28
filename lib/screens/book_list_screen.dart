@@ -175,6 +175,13 @@ class _BookListScreenState extends State<BookListScreen> {
     await showPostReportDialog(context: context, postId: postId);
   }
 
+  Future<void> _reportReply(PostReply reply) async {
+    if (!await _ensureAuthenticated() || !mounted) return;
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (reply.profileId == service.activeProfileId) return;
+    await showReplyReportDialog(context: context, replyId: reply.id);
+  }
+
   Future<void> _replyToPost(Post post, [PostReply? parentReply]) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     final canReply = await service.canCreatePostReplies();
@@ -606,6 +613,7 @@ class _BookListScreenState extends State<BookListScreen> {
                             _buildGenreSection(
                             title: 'おすすめの本',
                             bookList: _controller.recommendedBooks,
+                            pageNumber: _controller.recommendedPage,
                             onLoadMore: _controller.loadMoreRecommended,
                             onLoadPrevious: _controller.loadPreviousRecommended,
                             canLoadPrevious:
@@ -620,6 +628,7 @@ class _BookListScreenState extends State<BookListScreen> {
                             _buildGenreSection(
                             title: '洋書',
                             bookList: _controller.westernBooks,
+                            pageNumber: _controller.westernPage,
                             onLoadMore: _controller.loadMoreWestern,
                             onLoadPrevious: _controller.loadPreviousWestern,
                             canLoadPrevious: _controller.canLoadPreviousWestern,
@@ -632,6 +641,7 @@ class _BookListScreenState extends State<BookListScreen> {
                             _buildGenreSection(
                             title: '人気作品',
                             bookList: _controller.popularBooks,
+                            pageNumber: _controller.popularPage,
                             onLoadMore: _controller.loadMorePopular,
                             onLoadPrevious: _controller.loadPreviousPopular,
                             canLoadPrevious: _controller.canLoadPreviousPopular,
@@ -770,6 +780,7 @@ class _BookListScreenState extends State<BookListScreen> {
   Widget _buildGenreSection({
     required String title,
     required List<Book> bookList,
+    required int pageNumber,
     required Future<void> Function() onLoadMore,
     required VoidCallback onLoadPrevious,
     required bool canLoadPrevious,
@@ -786,6 +797,7 @@ class _BookListScreenState extends State<BookListScreen> {
         ),
         _buildBookCarousel(
           bookList,
+          pageNumber: pageNumber,
           isLoadingInitial: isLoadingInitial,
           onLoadMore: onLoadMore,
           onLoadPrevious: onLoadPrevious,
@@ -835,6 +847,7 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Widget _buildBookCarousel(
     List<Book> bookList, {
+    required int pageNumber,
     required bool isLoadingInitial,
     required Future<void> Function() onLoadMore,
     required VoidCallback onLoadPrevious,
@@ -921,26 +934,25 @@ class _BookListScreenState extends State<BookListScreen> {
           if (canLoadPrevious)
             _buildCarouselPageButton(
               direction: AxisDirection.left,
-              tooltip: '前の10冊に戻る',
+              tooltip: '前の9冊に戻る',
               onPressed: onLoadPrevious,
             ),
           Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              physics: const BouncingScrollPhysics(),
-              itemCount: bookList.length,
-              itemBuilder: (context, index) => BookCard(
-                book: bookList[index],
-                marginRight: index == bookList.length - 1 ? 0 : 12,
-                onTap: () => _showBookDetailDialog(bookList[index]),
-              ),
+            child: _PagedBookScroller(
+              books: bookList,
+              pageNumber: pageNumber,
+              canLoadPrevious: canLoadPrevious,
+              hasMore: hasMore,
+              isLoadingMore: isLoadingMore,
+              onLoadNext: onLoadMore,
+              onLoadPrevious: onLoadPrevious,
+              onBookTap: _showBookDetailDialog,
             ),
           ),
           if (hasMore || isLoadingMore)
             _buildCarouselPageButton(
               direction: AxisDirection.right,
-              tooltip: '次の10冊を読み込む',
+              tooltip: '次の9冊を読み込む',
               isLoading: isLoadingMore,
               onPressed: isLoadingMore ? null : () => onLoadMore(),
             ),
@@ -1237,6 +1249,21 @@ class _BookListScreenState extends State<BookListScreen> {
                   ? null
                   : () => _reportPost(post.id),
               onReply: (parentReply) => _replyToPost(post, parentReply),
+              onReplyReport: _reportReply,
+              concealReplySpoiler: (reply) {
+                final profileId = Provider.of<SupabaseService>(
+                  context,
+                  listen: false,
+                ).activeProfileId;
+                return profileId.isEmpty || reply.profileId != profileId;
+              },
+              canReportReply: (reply) {
+                final profileId = Provider.of<SupabaseService>(
+                  context,
+                  listen: false,
+                ).activeProfileId;
+                return profileId.isEmpty || reply.profileId != profileId;
+              },
               onReplyUserTap: _openUserProfile,
             );
           },
@@ -1292,6 +1319,124 @@ class _BookListScreenState extends State<BookListScreen> {
         textStyle: const TextStyle(fontSize: 11),
       ),
       child: Text(label),
+    );
+  }
+}
+
+class _PagedBookScroller extends StatefulWidget {
+  const _PagedBookScroller({
+    required this.books,
+    required this.pageNumber,
+    required this.canLoadPrevious,
+    required this.hasMore,
+    required this.isLoadingMore,
+    required this.onLoadNext,
+    required this.onLoadPrevious,
+    required this.onBookTap,
+  });
+
+  final List<Book> books;
+  final int pageNumber;
+  final bool canLoadPrevious;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final Future<void> Function() onLoadNext;
+  final VoidCallback onLoadPrevious;
+  final ValueChanged<Book> onBookTap;
+
+  @override
+  State<_PagedBookScroller> createState() => _PagedBookScrollerState();
+}
+
+class _PagedBookScrollerState extends State<_PagedBookScroller> {
+  final ScrollController _scrollController = ScrollController();
+  bool _pageChangePending = false;
+  bool _landAtEndAfterChange = false;
+  double _overscrollDistance = 0;
+
+  @override
+  void didUpdateWidget(covariant _PagedBookScroller oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pageNumber != widget.pageNumber) {
+      _pageChangePending = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final target = _landAtEndAfterChange
+            ? _scrollController.position.maxScrollExtent
+            : _scrollController.position.minScrollExtent;
+        _scrollController.jumpTo(target);
+        _landAtEndAfterChange = false;
+      });
+    } else if (oldWidget.isLoadingMore && !widget.isLoadingMore) {
+      _pageChangePending = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadNextPage() async {
+    if (_pageChangePending || widget.isLoadingMore || !widget.hasMore) return;
+    _pageChangePending = true;
+    _landAtEndAfterChange = false;
+    await widget.onLoadNext();
+    if (mounted && !widget.isLoadingMore) _pageChangePending = false;
+  }
+
+  void _loadPreviousPage() {
+    if (_pageChangePending || !widget.canLoadPrevious) return;
+    _pageChangePending = true;
+    _landAtEndAfterChange = true;
+    widget.onLoadPrevious();
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.horizontal) return false;
+    if (notification is ScrollStartNotification) {
+      _overscrollDistance = 0;
+    } else if (notification is OverscrollNotification) {
+      _overscrollDistance += notification.overscroll;
+      if (_overscrollDistance >= 12) {
+        _loadNextPage();
+        _overscrollDistance = 0;
+      } else if (_overscrollDistance <= -12) {
+        _loadPreviousPage();
+        _overscrollDistance = 0;
+      }
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null &&
+        notification.scrollDelta != null) {
+      final delta = notification.scrollDelta!;
+      if (delta > 0 && notification.metrics.extentAfter <= 0.5) {
+        _loadNextPage();
+      } else if (delta < 0 && notification.metrics.extentBefore <= 0.5) {
+        _loadPreviousPage();
+      }
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: _handleScrollNotification,
+      child: ListView.builder(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        itemCount: widget.books.length,
+        itemBuilder: (context, index) => BookCard(
+          book: widget.books[index],
+          marginRight: index == widget.books.length - 1 ? 0 : 12,
+          onTap: () => widget.onBookTap(widget.books[index]),
+        ),
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../services/supabase_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_reply_dialog.dart';
 import 'user_profile_screen.dart';
+import 'report_post_dialog.dart';
 
 class PostDetailScreen extends StatefulWidget {
   const PostDetailScreen({
@@ -71,6 +72,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     ).showSnackBar(const SnackBar(content: Text('返信を投稿しました。')));
   }
 
+  Future<void> _reportReply(PostReply reply) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (!service.canWrite) {
+      final result = await Navigator.of(context).pushNamed('/login');
+      if (!mounted || (result != true && !service.canWrite)) return;
+    }
+    if (reply.profileId == service.activeProfileId) return;
+    await showReplyReportDialog(context: context, replyId: reply.id);
+  }
+
   Future<void> _openProfile(String profileId) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -103,6 +114,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   onUserTap: () => _openProfile(post.profileId),
                   onReplyUserTap: _openProfile,
                   onReply: _reply,
+                  onReplyReport: _reportReply,
+                  concealReplySpoiler: (reply) =>
+                      reply.profileId != service.activeProfileId,
+                  canReportReply: (reply) =>
+                      service.activeProfileId.isEmpty ||
+                      reply.profileId != service.activeProfileId,
                 ),
               ],
             ),
