@@ -197,6 +197,19 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   String? _viewedProfileId;
   String? _viewedProfileUserId;
   String? _viewedProfileColorKey;
+
+  String? _genreFromPath(String path) {
+    if (path == '/genre/recommended') return 'recommended';
+    if (path == '/genre/western') return 'western';
+    if (path == '/genre/popular') return 'popular';
+    return null;
+  }
+
+  String? _bookSlugFromPath(String path) {
+    if (!path.startsWith('/book/')) return null;
+    final slug = path.substring('/book/'.length).split('/').first;
+    return slug.isEmpty ? null : Uri.decodeComponent(slug);
+  }
   bool _isOpeningLogin = false;
 
   Uri _normalizedFragmentUri(String fragment) {
@@ -780,6 +793,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                         ? BookListScreen(
                             key: const ValueKey('BookListScreen'),
                             onOpenUserProfile: _openUserProfile,
+                            initialGenre: _genreFromPath(
+                              _currentAppPathFromUri(Uri.base),
+                            ),
+                            initialBookSlug: _bookSlugFromPath(
+                              _currentAppPathFromUri(Uri.base),
+                            ),
                           )
                         : _currentScreenIndex == 1
                         ? UserProfileScreen(

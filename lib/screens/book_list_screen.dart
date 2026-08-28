@@ -15,9 +15,16 @@ import 'report_post_dialog.dart';
 import 'user_profile_screen.dart';
 
 class BookListScreen extends StatefulWidget {
-  const BookListScreen({super.key, this.onOpenUserProfile});
+  const BookListScreen({
+    super.key,
+    this.onOpenUserProfile,
+    this.initialGenre,
+    this.initialBookSlug,
+  });
 
   final ValueChanged<String>? onOpenUserProfile;
+  final String? initialGenre;
+  final String? initialBookSlug;
 
   @override
   State<BookListScreen> createState() => _BookListScreenState();
@@ -27,12 +34,57 @@ class _BookListScreenState extends State<BookListScreen> {
   late final BookListController _controller;
   final ScrollController _timelineScrollController = ScrollController();
   final Set<String> _pendingReactionPostIds = <String>{};
+  bool _openedInitialBook = false;
 
   @override
   void initState() {
     super.initState();
     _controller = BookListController();
     _controller.initialize(context);
+  }
+
+  String? _titleForBookSlug(String slug) {
+    const titles = {
+      'konbini-ningen': 'コンビニ人間',
+      'fune-wo-amu': '舟を編む',
+      'midnight-library': 'The Midnight Library',
+      'atomic-habits': 'Atomic Habits',
+      'baton-wa-watasareta': 'そして、バトンは渡された',
+      'nanji-hoshi-no-gotoku': '汝、星のごとく',
+    };
+    return titles[slug];
+  }
+
+  void _openInitialBookIfReady() {
+    final slug = widget.initialBookSlug;
+    if (_openedInitialBook || slug == null || slug.isEmpty) return;
+    final title = _titleForBookSlug(slug);
+    if (title == null) return;
+    final loadedBooks = <Book>[
+      ..._controller.recommendedBooks,
+      ..._controller.westernBooks,
+      ..._controller.popularBooks,
+    ];
+    Book? book;
+    for (final candidate in loadedBooks) {
+      if (candidate.title.trim().toLowerCase() == title.toLowerCase()) {
+        book = candidate;
+        break;
+      }
+    }
+    if (book == null) return;
+    _openedInitialBook = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _showBookDetailDialog(book!);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant BookListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialBookSlug != widget.initialBookSlug) {
+      _openedInitialBook = false;
+    }
   }
 
   @override
@@ -527,6 +579,7 @@ class _BookListScreenState extends State<BookListScreen> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        _openInitialBookIfReady();
         return Container(
           width: double.infinity,
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -548,7 +601,9 @@ class _BookListScreenState extends State<BookListScreen> {
                         if (_controller.searchQuery.isNotEmpty)
                           _buildSearchResults()
                         else ...[
-                          _buildGenreSection(
+                          if (widget.initialGenre == null ||
+                              widget.initialGenre == 'recommended')
+                            _buildGenreSection(
                             title: 'おすすめの本',
                             bookList: _controller.recommendedBooks,
                             onLoadMore: _controller.loadMoreRecommended,
@@ -559,8 +614,10 @@ class _BookListScreenState extends State<BookListScreen> {
                             hasMore: _controller.hasMoreRecommended,
                             isLoadingInitial: _controller.isLoadingRecommended,
                           ),
-                          const AdBanner(),
-                          _buildGenreSection(
+                          if (widget.initialGenre == null) const AdBanner(),
+                          if (widget.initialGenre == null ||
+                              widget.initialGenre == 'western')
+                            _buildGenreSection(
                             title: '洋書',
                             bookList: _controller.westernBooks,
                             onLoadMore: _controller.loadMoreWestern,
@@ -570,7 +627,9 @@ class _BookListScreenState extends State<BookListScreen> {
                             hasMore: _controller.hasMoreWestern,
                             isLoadingInitial: _controller.isLoadingWestern,
                           ),
-                          _buildGenreSection(
+                          if (widget.initialGenre == null ||
+                              widget.initialGenre == 'popular')
+                            _buildGenreSection(
                             title: '人気作品',
                             bookList: _controller.popularBooks,
                             onLoadMore: _controller.loadMorePopular,
@@ -580,9 +639,11 @@ class _BookListScreenState extends State<BookListScreen> {
                             hasMore: _controller.hasMorePopular,
                             isLoadingInitial: _controller.isLoadingPopular,
                           ),
-                          const AdBanner(),
-                          _buildSectionHeader('タイムライン'),
-                          _buildTimeline(),
+                          if (widget.initialGenre == null) ...[
+                            const AdBanner(),
+                            _buildSectionHeader('タイムライン'),
+                            _buildTimeline(),
+                          ],
                         ],
                         _buildFooter(),
                       ],
@@ -1201,8 +1262,36 @@ class _BookListScreenState extends State<BookListScreen> {
             'Powered by Supabase & PostgreSQL',
             style: TextStyle(color: Colors.grey[400], fontSize: 9),
           ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            runSpacing: 2,
+            children: [
+              _footerLink('プライバシー', '/privacy'),
+              _footerLink('利用規約', '/terms'),
+              _footerLink('ガイドライン', '/community-guidelines'),
+              _footerLink('権利侵害・通報', '/infringement-policy'),
+              _footerLink('外部送信', '/external-transmission'),
+              _footerLink('お問い合わせ', '/contact'),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _footerLink(String label, String route) {
+    return TextButton(
+      onPressed: () => Navigator.of(context).pushNamed(route),
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.grey[600],
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11),
+      ),
+      child: Text(label),
     );
   }
 }

@@ -931,7 +931,8 @@ module.exports = async (req, res) => {
         name: escapeHtml(username),
         description: escapeHtml(bio),
       },
-      robots: "noindex,nofollow",
+      pagePath: decodedPath,
+      robots: "index,follow",
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
