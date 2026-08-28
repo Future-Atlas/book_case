@@ -1,6 +1,6 @@
-import 'package:flutter_application_1/models/post.dart';
-import 'package:flutter_application_1/models/social_models.dart';
-import 'package:flutter_application_1/services/timeline_ranking_service.dart';
+import 'package:sharemarium/models/post.dart';
+import 'package:sharemarium/models/social_models.dart';
+import 'package:sharemarium/services/timeline_ranking_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
