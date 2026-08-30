@@ -332,6 +332,12 @@ function toAbsoluteUrl(pathname) {
   return `${SITE_URL}${normalized}`;
 }
 
+function canonicalProfilePath(profileId) {
+  const rawId = String(profileId || "").trim();
+  if (!rawId) return "/users";
+  return `/users/${encodeURIComponent(rawId)}`;
+}
+
 function looksLikeUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     String(value || "").trim(),
@@ -636,6 +642,7 @@ module.exports = async (req, res) => {
       );
       return match ? decodeURIComponent(match[1]) : "";
     })();
+    const canonicalProfileUrl = canonicalProfilePath(requestedProfileId || "");
 
     try {
       if (requestedProfileId) {
@@ -661,9 +668,9 @@ module.exports = async (req, res) => {
                 name: "プロフィールは非公開です",
                 description:
                   "指定されたプロフィールは公開範囲の条件を満たしていません。",
-                url: toAbsoluteUrl(decodedPath),
+                url: toAbsoluteUrl(canonicalProfileUrl),
               },
-              pagePath: decodedPath,
+              pagePath: canonicalProfileUrl,
               robots: "noindex,nofollow",
             });
             res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -738,9 +745,9 @@ module.exports = async (req, res) => {
               "@type": "WebPage",
               name: "ユーザーが見つかりません",
               description: "指定されたユーザーは存在しません。",
-              url: toAbsoluteUrl(decodedPath),
+              url: toAbsoluteUrl(canonicalProfileUrl),
             },
-            pagePath: decodedPath,
+            pagePath: canonicalProfileUrl,
             robots: "noindex,nofollow",
           });
           res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -782,6 +789,9 @@ module.exports = async (req, res) => {
       )
       .join("");
 
+    const canonicalPath = canonicalProfilePath(
+      user?.user_id || user?.username || requestedProfileId || "",
+    );
     const html = renderPage({
       title: `${escapeHtml(username)} のプロフィール`,
       description: buildProfileDescription(username, stats),
@@ -805,7 +815,7 @@ module.exports = async (req, res) => {
         name: escapeHtml(username),
         description: escapeHtml(bio),
       },
-      pagePath: decodedPath,
+      pagePath: canonicalPath,
       robots: "index,follow",
     });
 

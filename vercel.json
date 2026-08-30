@@ -41,6 +41,34 @@
       }
     },
     {
+      "src": "/user$",
+      "status": 308,
+      "headers": {
+        "Location": "/users"
+      }
+    },
+    {
+      "src": "/user/(.*)",
+      "status": 308,
+      "headers": {
+        "Location": "/users/$1"
+      }
+    },
+    {
+      "src": "/profile$",
+      "status": 308,
+      "headers": {
+        "Location": "/users"
+      }
+    },
+    {
+      "src": "/profile/(.*)",
+      "status": 308,
+      "headers": {
+        "Location": "/users/$1"
+      }
+    },
+    {
       "src": "/(.*)",
       "has": [
         {
