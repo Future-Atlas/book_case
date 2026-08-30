@@ -549,14 +549,13 @@ class _MainNavigationShellState extends State<MainNavigationShell>
         if (_isAdmin) _setCurrentScreenIndex(4);
         break;
       case _HeaderMenuAction.logout:
-        // Temporarily disable logout action for public browsing mode.
-        // final service = Provider.of<SupabaseService>(context, listen: false);
-        // await service.signOut();
-        // if (!mounted) return;
+        final service = Provider.of<SupabaseService>(context, listen: false);
+        await service.signOut();
+        if (!mounted) return;
         _goToBookList();
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('公開閲覧モードです。')));
+        ).showSnackBar(const SnackBar(content: Text('ログアウトしました。')));
         break;
     }
   }
@@ -704,16 +703,17 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                                     ),
                                   ),
                                 ),
-                              // PopupMenuItem(
-                              //   value: _HeaderMenuAction.logout,
-                              //   child: Text(
-                              //     'ログアウト',
-                              //     style: TextStyle(
-                              //       fontSize: 28 / 2,
-                              //       color: popupMenuTextColor,
-                              //     ),
-                              //   ),
-                              // ),
+                              if (service.isAuthenticated)
+                                PopupMenuItem(
+                                  value: _HeaderMenuAction.logout,
+                                  child: Text(
+                                    'ログアウト',
+                                    style: TextStyle(
+                                      fontSize: 28 / 2,
+                                      color: popupMenuTextColor,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),

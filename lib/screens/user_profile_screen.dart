@@ -605,15 +605,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   ? [
                       IconButton(
                         icon: const Icon(Icons.logout),
+                        tooltip: 'ログアウト',
                         onPressed: () async {
-                          // Temporarily disable logout action for
-                          // public browsing mode.
-                          // final service = Provider.of<SupabaseService>(
-                          //   context,
-                          //   listen: false,
-                          // );
-                          // await service.signOut();
-                          // if (!mounted) return;
+                          final service = Provider.of<SupabaseService>(
+                            context,
+                            listen: false,
+                          );
+                          await service.signOut();
+                          if (!mounted) return;
                           widget.onBack();
                         },
                       ),
