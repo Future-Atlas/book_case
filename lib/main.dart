@@ -211,6 +211,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     final slug = path.substring('/book/'.length).split('/').first;
     return slug.isEmpty ? null : Uri.decodeComponent(slug);
   }
+
   bool _isOpeningLogin = false;
 
   Uri _normalizedFragmentUri(String fragment) {
@@ -740,9 +741,11 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             if (service.isAuthenticated)
-                              const SizedBox(
+                              SizedBox(
                                 width: 42,
-                                child: NotificationBellButton(),
+                                child: NotificationBellButton(
+                                  onOpenProfile: _openUserProfile,
+                                ),
                               ),
                             SizedBox(
                               width: 104,

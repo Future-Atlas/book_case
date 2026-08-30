@@ -808,20 +808,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
             const SizedBox(height: 16),
 
-            // Bio comment box
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: profileBackgroundColor,
-              child: Text(
-                _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません。',
-                style: TextStyle(
-                  fontSize: isDesktopLayout ? 18 : 12,
-                  color: profileTextColor,
-                  height: 1.4,
+            if (_profile!.bio.isNotEmpty || _isOwnProfile)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: profileBackgroundColor,
+                child: Text(
+                  _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません',
+                  style: TextStyle(
+                    fontSize: isDesktopLayout ? 18 : 12,
+                    color: profileTextColor,
+                    height: 1.4,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

@@ -14,10 +14,12 @@ class PostDetailScreen extends StatefulWidget {
     super.key,
     required this.postId,
     this.highlightedReplyId,
+    this.onOpenProfile,
   });
 
   final String postId;
   final String? highlightedReplyId;
+  final ValueChanged<String>? onOpenProfile;
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -83,6 +85,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Future<void> _openProfile(String profileId) async {
+    final openInMainShell = widget.onOpenProfile;
+    if (openInMainShell != null) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      openInMainShell(profileId);
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (routeContext) => UserProfileScreen(

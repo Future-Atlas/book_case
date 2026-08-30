@@ -57,6 +57,26 @@ Deno.serve(async (request) => {
     return response({ error: recordError?.message ?? 'Unable to record deletion' }, 500)
   }
 
+  const { data: auditId, error: auditError } = await admin.rpc(
+    'prepare_deleted_account_record',
+    {
+      target_profile: targetProfileId,
+      deletion_kind: 'admin',
+      deleting_admin: caller.id,
+      deletion_notes: reason || 'Administrator account deletion',
+    },
+  )
+  if (auditError || !auditId) {
+    await admin.rpc('cancel_admin_account_deletion_record', {
+      denial_record: denialId,
+      deleting_admin: caller.id,
+    })
+    return response(
+      { error: auditError?.message ?? 'Unable to record account deletion' },
+      500,
+    )
+  }
+
   const { data: openReports } = await admin
     .from('moderation_reports')
     .select('id')
@@ -69,8 +89,19 @@ Deno.serve(async (request) => {
       denial_record: denialId,
       deleting_admin: caller.id,
     })
+    await admin.rpc('finalize_deleted_account_record', {
+      audit_record: auditId,
+      succeeded: false,
+      failure_message: deleteError.message,
+    })
     return response({ error: deleteError.message }, 500)
   }
+
+  await admin.rpc('finalize_deleted_account_record', {
+    audit_record: auditId,
+    succeeded: true,
+    failure_message: null,
+  })
 
   const reportIds = (openReports ?? []).map((report) => report.id)
   if (reportIds.length > 0) {
