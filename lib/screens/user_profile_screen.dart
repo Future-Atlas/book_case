@@ -43,6 +43,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Map<String, List<PostReply>> _postReplies = {};
   List<Book> _collections = [];
   List<Book> _favorites = [];
+  int _favoriteLimit = SupabaseService.standardFavoriteLimit;
   List<Book> _searchResults = [];
   bool _isLoading = true;
   bool _isSearchPanelOpen = false;
@@ -206,6 +207,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final favs = canLoadContent
         ? await service.fetchUserFavorites(profileId)
         : <Book>[];
+    final favoriteLimit = relationship.isOwnProfile
+        ? await service.fetchCurrentFavoriteLimit()
+        : SupabaseService.standardFavoriteLimit;
     final postedBookIds = posts.map((post) => post.bookId).toSet();
     final visibleFavorites = favs
         .where((book) => postedBookIds.contains(book.id))
@@ -219,6 +223,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         _postReplies = replies;
         _collections = colls;
         _favorites = visibleFavorites;
+        _favoriteLimit = favoriteLimit;
         _isLoading = false;
       });
     }
@@ -466,7 +471,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final message = switch (result) {
       FavoriteToggleResult.added => 'お気に入りに登録しました。',
       FavoriteToggleResult.removed => 'お気に入りから解除しました。',
-      FavoriteToggleResult.limitReached => 'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
+      FavoriteToggleResult.standardLimitReached =>
+        '通常利用ではお気に入りは3冊までです。サブスクでは12冊まで登録できます。',
+      FavoriteToggleResult.subscriberLimitReached =>
+        'お気に入りは12冊までです。登録済みの本と入れ替えてください。',
       FavoriteToggleResult.requiresRead => '読了（投稿）した本のみお気に入りに追加できます。',
       FavoriteToggleResult.failed => 'お気に入りを更新できませんでした。',
     };
@@ -1100,7 +1108,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
           child: Text(
-            '${_favorites.length}冊/12冊',
+            _isOwnProfile
+                ? '${_favorites.length}冊/$_favoriteLimit冊'
+                : '${_favorites.length}冊',
             style: const TextStyle(
               color: Colors.black,
               fontSize: 22,
