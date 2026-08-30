@@ -18,7 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isSubmitting = false;
 
   // Providers can be enabled here after their Supabase OAuth setup is ready.
-  final Set<String> _enabledLoginProviders = {'x'};
+  final Set<String> _enabledLoginProviders = {'x', 'google'};
 
   Future<bool> _showTermsDialog() async {
     var agreedTerms = false;
@@ -227,7 +227,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     SizedBox(
                       width: 280,
                       child: Text(
-                        '現在利用できるログイン方法はXです。Googleログインは近日追加予定です。',
+                        '現在利用できるログイン方法はX・Googleです。',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
