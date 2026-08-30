@@ -94,6 +94,34 @@ test("sitemap returns XML and hides non-production pages from robots", async () 
   else process.env.VERCEL_ENV = previous;
 });
 
+test("production sitemap omits fixed sample book URLs", async () => {
+  process.env.VERCEL_ENV = "production";
+  delete require.cache[require.resolve("../../api/sitemap")];
+  const sitemap = require("../../api/sitemap");
+  const res = responseRecorder();
+  await sitemap({}, res);
+  assert.equal(res.statusCode, 200);
+  assert.doesNotMatch(res.body, /\/book\/konbini-ningen/);
+  assert.doesNotMatch(res.body, /\/book\/midnight-library/);
+  delete process.env.VERCEL_ENV;
+});
+
+test("production SEO disables sample fallback by default", async () => {
+  process.env.VERCEL_ENV = "production";
+  delete process.env.SEO_ENABLE_SAMPLE_BOOK_FALLBACK;
+  delete require.cache[require.resolve("../../api/seo")];
+  const seo = require("../../api/seo");
+  const res = responseRecorder();
+  await seo({ query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.doesNotMatch(
+    res.body,
+    /コンビニ人間|The Midnight Library|Atomic Habits/,
+  );
+  delete process.env.VERCEL_ENV;
+  delete process.env.SEO_ENABLE_SAMPLE_BOOK_FALLBACK;
+});
+
 test("SEO handler renders the public home page", async () => {
   process.env.VERCEL_ENV = "preview";
   delete process.env.SUPABASE_URL;
@@ -138,7 +166,9 @@ test("SEO handler returns noindex 404 for a private profile", async () => {
   const originalFetch = global.fetch;
   global.fetch = async () =>
     new Response(
-      JSON.stringify([{ id: "private-user", username: "private", is_private: true }]),
+      JSON.stringify([
+        { id: "private-user", username: "private", is_private: true },
+      ]),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   delete require.cache[require.resolve("../../api/seo")];
