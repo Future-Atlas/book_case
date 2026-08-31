@@ -65,6 +65,25 @@ Deno.serve(async (request) => {
     )
   }
 
+  const { data: auditId, error: auditError } = await admin.rpc(
+    'prepare_deleted_account_record',
+    {
+      target_profile: userData.user.id,
+      deletion_kind: 'self',
+      deleting_admin: null,
+      deletion_notes: 'User-requested account withdrawal',
+    },
+  )
+  if (auditError || !auditId) {
+    await admin.rpc('cancel_self_account_deletion', {
+      target_profile: userData.user.id,
+    })
+    return Response.json(
+      { error: auditError?.message ?? 'Unable to record account deletion' },
+      { status: 500, headers: corsHeaders },
+    )
+  }
+
   const { error: deleteError } = await admin.auth.admin.deleteUser(
     userData.user.id,
   )
@@ -72,11 +91,22 @@ Deno.serve(async (request) => {
     await admin.rpc('cancel_self_account_deletion', {
       target_profile: userData.user.id,
     })
+    await admin.rpc('finalize_deleted_account_record', {
+      audit_record: auditId,
+      succeeded: false,
+      failure_message: deleteError.message,
+    })
     return Response.json(
       { error: deleteError.message },
       { status: 500, headers: corsHeaders },
     )
   }
+
+  await admin.rpc('finalize_deleted_account_record', {
+    audit_record: auditId,
+    succeeded: true,
+    failure_message: null,
+  })
 
   return Response.json({ deleted: true }, { headers: corsHeaders })
 })

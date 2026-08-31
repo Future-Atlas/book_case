@@ -211,6 +211,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     final slug = path.substring('/book/'.length).split('/').first;
     return slug.isEmpty ? null : Uri.decodeComponent(slug);
   }
+
   bool _isOpeningLogin = false;
 
   Uri _normalizedFragmentUri(String fragment) {
@@ -549,14 +550,13 @@ class _MainNavigationShellState extends State<MainNavigationShell>
         if (_isAdmin) _setCurrentScreenIndex(4);
         break;
       case _HeaderMenuAction.logout:
-        // Temporarily disable logout action for public browsing mode.
-        // final service = Provider.of<SupabaseService>(context, listen: false);
-        // await service.signOut();
-        // if (!mounted) return;
+        final service = Provider.of<SupabaseService>(context, listen: false);
+        await service.signOut();
+        if (!mounted) return;
         _goToBookList();
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('公開閲覧モードです。')));
+        ).showSnackBar(const SnackBar(content: Text('ログアウトしました。')));
         break;
     }
   }
@@ -704,16 +704,17 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                                     ),
                                   ),
                                 ),
-                              // PopupMenuItem(
-                              //   value: _HeaderMenuAction.logout,
-                              //   child: Text(
-                              //     'ログアウト',
-                              //     style: TextStyle(
-                              //       fontSize: 28 / 2,
-                              //       color: popupMenuTextColor,
-                              //     ),
-                              //   ),
-                              // ),
+                              if (service.isAuthenticated)
+                                PopupMenuItem(
+                                  value: _HeaderMenuAction.logout,
+                                  child: Text(
+                                    'ログアウト',
+                                    style: TextStyle(
+                                      fontSize: 28 / 2,
+                                      color: popupMenuTextColor,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -740,9 +741,11 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             if (service.isAuthenticated)
-                              const SizedBox(
+                              SizedBox(
                                 width: 42,
-                                child: NotificationBellButton(),
+                                child: NotificationBellButton(
+                                  onOpenProfile: _openUserProfile,
+                                ),
                               ),
                             SizedBox(
                               width: 104,

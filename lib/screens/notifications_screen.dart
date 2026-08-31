@@ -9,7 +9,9 @@ import 'post_detail_screen.dart';
 import 'user_profile_screen.dart';
 
 class NotificationBellButton extends StatefulWidget {
-  const NotificationBellButton({super.key});
+  const NotificationBellButton({super.key, this.onOpenProfile});
+
+  final ValueChanged<String>? onOpenProfile;
 
   @override
   State<NotificationBellButton> createState() => _NotificationBellButtonState();
@@ -50,9 +52,12 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
   }
 
   Future<void> _openNotifications() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            NotificationsScreen(onOpenProfile: widget.onOpenProfile),
+      ),
+    );
     if (mounted) await _refresh();
   }
 
@@ -85,7 +90,9 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
 }
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.onOpenProfile});
+
+  final ValueChanged<String>? onOpenProfile;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -144,6 +151,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _openActorProfile(SocialNotification notification) async {
+    final openInMainShell = widget.onOpenProfile;
+    if (openInMainShell != null) {
+      Navigator.of(context).pop();
+      openInMainShell(notification.actorId);
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => UserProfileScreen(
@@ -164,6 +177,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         MaterialPageRoute<void>(
           builder: (_) => PostDetailScreen(
             postId: notification.postId!,
+            onOpenProfile: widget.onOpenProfile,
             highlightedReplyId:
                 notification.type == SocialNotificationType.reply
                 ? notification.replyId

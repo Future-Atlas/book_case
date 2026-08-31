@@ -17,9 +17,19 @@ import 'content_safety_service.dart';
 import 'input_security_service.dart';
 import 'timeline_ranking_service.dart';
 
-enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
+enum FavoriteToggleResult {
+  added,
+  removed,
+  standardLimitReached,
+  subscriberLimitReached,
+  requiresRead,
+  failed,
+}
 
 class SupabaseService extends ChangeNotifier {
+  static const int standardFavoriteLimit = 3;
+  static const int subscriberFavoriteLimit = 12;
+
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
   SupabaseService._internal();
@@ -689,6 +699,18 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> canUseAllPageColors() async {
+    if (!_isInitialized || _client == null || activeProfileId.isEmpty) {
+      return false;
+    }
+    try {
+      return await _client!.rpc('current_user_can_use_all_page_colors') == true;
+    } catch (e) {
+      debugPrint('Error checking page-color entitlement: $e');
+      return false;
+    }
+  }
+
   Future<String?> updatePublicProfile({
     required String username,
     required String userId,
@@ -738,6 +760,9 @@ class SupabaseService extends ChangeNotifier {
       notifyListeners();
       return null;
     } on PostgrestException catch (e) {
+      if (e.message.contains('page_color_subscription_required')) {
+        return 'このページカラーはサブスク限定です。';
+      }
       if (e.message.contains('USER_ID_IMMUTABLE')) {
         return 'ユーザーIDは登録後に変更できません。';
       }
@@ -2655,6 +2680,7 @@ class SupabaseService extends ChangeNotifier {
       debugPrint('Cannot toggle favorite: no authenticated user.');
       return FavoriteToggleResult.failed;
     }
+    var favoriteLimit = standardFavoriteLimit;
     if (_isInitialized && _client != null) {
       try {
         // Determine if already favorited
@@ -2682,13 +2708,16 @@ class SupabaseService extends ChangeNotifier {
           if ((postRows as List<dynamic>).isEmpty) {
             return FavoriteToggleResult.requiresRead;
           }
+          favoriteLimit = await fetchCurrentFavoriteLimit();
           final existingFavorites = await _client!
               .from('favorites')
               .select('book_id')
               .eq('profile_id', profileId)
-              .limit(12);
-          if ((existingFavorites as List<dynamic>).length >= 12) {
-            return FavoriteToggleResult.limitReached;
+              .limit(favoriteLimit);
+          if ((existingFavorites as List<dynamic>).length >= favoriteLimit) {
+            return favoriteLimit == subscriberFavoriteLimit
+                ? FavoriteToggleResult.subscriberLimitReached
+                : FavoriteToggleResult.standardLimitReached;
           }
           await _client!.from('favorites').insert({
             'profile_id': profileId,
@@ -2700,7 +2729,9 @@ class SupabaseService extends ChangeNotifier {
       } catch (e) {
         debugPrint('Error toggling favorite in Supabase: $e');
         if (e.toString().contains('favorite_limit_reached')) {
-          return FavoriteToggleResult.limitReached;
+          return favoriteLimit == subscriberFavoriteLimit
+              ? FavoriteToggleResult.subscriberLimitReached
+              : FavoriteToggleResult.standardLimitReached;
         }
         if (e.toString().contains('favorite_requires_post')) {
           return FavoriteToggleResult.requiresRead;
@@ -2709,6 +2740,24 @@ class SupabaseService extends ChangeNotifier {
     }
     debugPrint('Supabase not initialized – favorite not toggled.');
     return FavoriteToggleResult.failed;
+  }
+
+  Future<int> fetchCurrentFavoriteLimit() async {
+    if (!_isInitialized || _client == null || activeProfileId.isEmpty) {
+      return standardFavoriteLimit;
+    }
+    try {
+      final response = await _client!.rpc('current_user_favorite_limit');
+      final parsed = response is num
+          ? response.toInt()
+          : int.tryParse(response?.toString() ?? '');
+      return parsed == subscriberFavoriteLimit
+          ? subscriberFavoriteLimit
+          : standardFavoriteLimit;
+    } catch (e) {
+      debugPrint('Error fetching favorite limit from Supabase: $e');
+      return standardFavoriteLimit;
+    }
   }
 
   @override

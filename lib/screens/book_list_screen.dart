@@ -209,7 +209,10 @@ class _BookListScreenState extends State<BookListScreen> {
     final message = switch (result) {
       FavoriteToggleResult.added => 'お気に入りに登録しました。',
       FavoriteToggleResult.removed => 'お気に入りから解除しました。',
-      FavoriteToggleResult.limitReached => 'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
+      FavoriteToggleResult.standardLimitReached =>
+        '通常利用ではお気に入りは3冊までです。サブスクでは12冊まで登録できます。',
+      FavoriteToggleResult.subscriberLimitReached =>
+        'お気に入りは12冊までです。登録済みの本と入れ替えてください。',
       FavoriteToggleResult.requiresRead => '読了（投稿）した本のみお気に入りに追加できます。',
       FavoriteToggleResult.failed => 'お気に入りを更新できませんでした。',
     };
