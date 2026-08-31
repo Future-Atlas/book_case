@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../widgets/book_card.dart';
-import '../widgets/ad_banner.dart';
 import '../widgets/post_card.dart';
 import '../controllers/book_list_controller.dart';
 import '../models/book.dart';
@@ -643,7 +642,6 @@ class _BookListScreenState extends State<BookListScreen> {
                               isLoadingInitial:
                                   _controller.isLoadingRecommended,
                             ),
-                          if (widget.initialGenre == null) const AdBanner(),
                           if (widget.initialGenre == null ||
                               widget.initialGenre == 'western')
                             _buildGenreSection(
@@ -673,7 +671,6 @@ class _BookListScreenState extends State<BookListScreen> {
                               isLoadingInitial: _controller.isLoadingPopular,
                             ),
                           if (widget.initialGenre == null) ...[
-                            const AdBanner(),
                             _buildSectionHeader('タイムライン'),
                             _buildTimeline(),
                           ],

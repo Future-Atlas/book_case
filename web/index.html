@@ -53,19 +53,9 @@
       name="twitter:image"
       content="https://sharemarium.com/icons/Icon-512.png"
     />
-    <link
-      rel="preconnect"
-      href="https://pagead2.googlesyndication.com"
-      crossorigin
-    />
-    <link
-      rel="preconnect"
-      href="https://googleads.g.doubleclick.net"
-      crossorigin
-    />
     <script>
       (() => {
-        const allowedPath = /^\/(?:$|genre\/(?:recommended|western|popular))$/;
+        const allowedPath = /^\/$/;
         const adClient = "ca-pub-3052085512168272";
         const adScriptUrl =
           "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" +
@@ -73,8 +63,13 @@
 
         let adScriptLoaded = false;
 
+        function normalizedPath() {
+          return (window.location.pathname || "/").replace(/\/+$/, "") || "/";
+        }
+
         function hasMeaningfulContent() {
-          const text = (document.body ? document.body.innerText : "")
+          if (!document.body) return false;
+          const text = (document.body.innerText || document.body.textContent || "")
             .replace(/\s+/g, " ")
             .trim();
           if (text.length < 120) return false;
@@ -82,10 +77,8 @@
         }
 
         function shouldLoadAds() {
-          const pathname =
-            (window.location.pathname || "/").replace(/\/+$/, "") || "/";
           return (
-            allowedPath.test(pathname) &&
+            allowedPath.test(normalizedPath()) &&
             hasMeaningfulContent() &&
             window.__sharemariumAdsAllowed !== false
           );
@@ -103,14 +96,57 @@
           script.crossOrigin = "anonymous";
           script.dataset.adsense = "1";
           document.head.appendChild(script);
+          return true;
         }
 
-        if (!shouldLoadAds()) {
-          return;
+        let adCheckTimer = 0;
+        let contentObserver = null;
+
+        function scheduleAdCheck() {
+          if (adCheckTimer) {
+            window.clearTimeout(adCheckTimer);
+          }
+          adCheckTimer = window.setTimeout(() => {
+            adCheckTimer = 0;
+            if (loadAdsIfAllowed() && contentObserver) {
+              contentObserver.disconnect();
+              contentObserver = null;
+            }
+          }, 0);
         }
 
-        loadAdsIfAllowed();
-        window.addEventListener("popstate", loadAdsIfAllowed, {
+        function observeFlutterContent() {
+          if (!document.body || contentObserver) return;
+          contentObserver = new MutationObserver(scheduleAdCheck);
+          contentObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+          });
+        }
+
+        function checkAfterDomReady() {
+          observeFlutterContent();
+          scheduleAdCheck();
+          window.setTimeout(scheduleAdCheck, 1000);
+          window.setTimeout(scheduleAdCheck, 3000);
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", checkAfterDomReady, {
+            once: true,
+          });
+        } else {
+          checkAfterDomReady();
+        }
+
+        window.addEventListener("load", scheduleAdCheck, {
+          passive: true,
+        });
+        window.addEventListener("pageshow", scheduleAdCheck, {
+          passive: true,
+        });
+        window.addEventListener("popstate", scheduleAdCheck, {
           passive: true,
         });
 
@@ -119,13 +155,13 @@
 
         window.history.pushState = function (...args) {
           const result = originalPushState.apply(this, args);
-          loadAdsIfAllowed();
+          scheduleAdCheck();
           return result;
         };
 
         window.history.replaceState = function (...args) {
           const result = originalReplaceState.apply(this, args);
-          loadAdsIfAllowed();
+          scheduleAdCheck();
           return result;
         };
       })();

@@ -1086,12 +1086,13 @@ module.exports = async (req, res) => {
       books = [];
     }
 
+    const hasGenreBooks = books.length > 0;
     const detailLinks = "";
 
     const html = renderPage({
       title: `${genreSection}一覧`,
       description: buildGenreDescription(genreSection, books),
-      enableAds: books.length > 0,
+      enableAds: false,
       content: `
         <h2>${genreSection}について</h2>
         <p>Sharemariumが注目する${genreSection}を一覧で紹介します。</p>
@@ -1114,7 +1115,7 @@ module.exports = async (req, res) => {
         itemListStructuredData(genreSection, books, decodedPath),
       ],
       pagePath: decodedPath,
-      robots: "index,follow",
+      robots: hasGenreBooks ? "index,follow" : "noindex,nofollow",
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
