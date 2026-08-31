@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 function responseRecorder() {
@@ -179,4 +181,17 @@ test("SEO handler returns noindex 404 for a private profile", async () => {
   assert.equal(res.statusCode, 404);
   assert.match(res.body, /プロフィールは非公開です/);
   assert.match(res.body, /noindex/);
+});
+
+test("web HTML loads AdSense only on approved content routes with substantive content", () => {
+  const html = fs.readFileSync(
+    path.join(__dirname, "../../web/index.html"),
+    "utf8",
+  );
+
+  assert.match(html, /allowedPath/);
+  assert.match(html, /hasMeaningfulContent/);
+  assert.match(html, /__sharemariumAdsAllowed !== false/);
+  assert.match(html, /window\.location\.pathname/);
+  assert.match(html, /popstate|pushState|replaceState/);
 });

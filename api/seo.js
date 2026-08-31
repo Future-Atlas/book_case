@@ -545,6 +545,7 @@ module.exports = async (req, res) => {
     robots,
     pagePath = "/",
     extraJsonLd = [],
+    enableAds = false,
   }) => {
     const absoluteUrl = toAbsoluteUrl(pagePath);
     const fullTitle = title.includes(SITE_NAME)
@@ -583,6 +584,27 @@ module.exports = async (req, res) => {
       <link rel="icon" type="image/svg+xml" sizes="any" href="${SITE_URL}/favicon.svg">
       <link rel="shortcut icon" href="${SITE_URL}/favicon.png">
       <link rel="apple-touch-icon" sizes="192x192" href="${SITE_URL}/icons/Icon-192.png">
+      <script>
+        window.__sharemariumAdsAllowed = ${enableAds ? "true" : "false"};
+      </script>
+      ${
+        enableAds
+          ? `
+      <script>
+        (function() {
+          if (!window.__sharemariumAdsAllowed) return;
+          const existing = document.querySelector('script[data-adsense]');
+          if (existing) return;
+          const script = document.createElement('script');
+          script.async = true;
+          script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3052085512168272';
+          script.crossOrigin = 'anonymous';
+          script.dataset.adsense = '1';
+          document.head.appendChild(script);
+        })();
+      </script>`
+          : ""
+      }
       ${jsonLdList
         .map(
           (item) =>
@@ -1069,6 +1091,7 @@ module.exports = async (req, res) => {
     const html = renderPage({
       title: `${genreSection}一覧`,
       description: buildGenreDescription(genreSection, books),
+      enableAds: books.length > 0,
       content: `
         <h2>${genreSection}について</h2>
         <p>Sharemariumが注目する${genreSection}を一覧で紹介します。</p>
@@ -1242,9 +1265,16 @@ module.exports = async (req, res) => {
             </ul>
         `;
 
+  const canShowAdsOnHome =
+    recommendedBooks.length > 0 ||
+    westernBooks.length > 0 ||
+    popularBooks.length > 0 ||
+    recentPosts.length > 0;
+
   const html = renderPage({
     title: SITE_TITLE,
     description: TOP_DESCRIPTION,
+    enableAds: canShowAdsOnHome,
     content: `
             <section>
             <h2>Sharemarium（シェアマリウム）でできること</h2>

@@ -24,7 +24,10 @@
     />
     <meta name="robots" content="index,follow" />
     <link rel="canonical" href="https://sharemarium.com/" />
-    <meta property="og:title" content="Sharemarium（シェアマリウム） | 読書記録・本管理アプリ" />
+    <meta
+      property="og:title"
+      content="Sharemarium（シェアマリウム） | 読書記録・本管理アプリ"
+    />
     <meta
       property="og:description"
       content="Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。"
@@ -38,7 +41,10 @@
       content="https://sharemarium.com/icons/Icon-512.png"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sharemarium（シェアマリウム） | 読書記録・本管理アプリ" />
+    <meta
+      name="twitter:title"
+      content="Sharemarium（シェアマリウム） | 読書記録・本管理アプリ"
+    />
     <meta
       name="twitter:description"
       content="Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。"
@@ -57,11 +63,73 @@
       href="https://googleads.g.doubleclick.net"
       crossorigin
     />
-    <script
-      async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3052085512168272"
-      crossorigin="anonymous"
-    ></script>
+    <script>
+      (() => {
+        const allowedPath = /^\/(?:$|genre\/(?:recommended|western|popular))$/;
+        const adClient = "ca-pub-3052085512168272";
+        const adScriptUrl =
+          "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" +
+          adClient;
+
+        let adScriptLoaded = false;
+
+        function hasMeaningfulContent() {
+          const text = (document.body ? document.body.innerText : "")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (text.length < 120) return false;
+          return /(Sharemarium|おすすめの本|洋書|人気作品)/.test(text);
+        }
+
+        function shouldLoadAds() {
+          const pathname =
+            (window.location.pathname || "/").replace(/\/+$/, "") || "/";
+          return (
+            allowedPath.test(pathname) &&
+            hasMeaningfulContent() &&
+            window.__sharemariumAdsAllowed !== false
+          );
+        }
+
+        function loadAdsIfAllowed() {
+          if (!shouldLoadAds() || adScriptLoaded) {
+            return;
+          }
+
+          adScriptLoaded = true;
+          const script = document.createElement("script");
+          script.async = true;
+          script.src = adScriptUrl;
+          script.crossOrigin = "anonymous";
+          script.dataset.adsense = "1";
+          document.head.appendChild(script);
+        }
+
+        if (!shouldLoadAds()) {
+          return;
+        }
+
+        loadAdsIfAllowed();
+        window.addEventListener("popstate", loadAdsIfAllowed, {
+          passive: true,
+        });
+
+        const originalPushState = window.history.pushState;
+        const originalReplaceState = window.history.replaceState;
+
+        window.history.pushState = function (...args) {
+          const result = originalPushState.apply(this, args);
+          loadAdsIfAllowed();
+          return result;
+        };
+
+        window.history.replaceState = function (...args) {
+          const result = originalReplaceState.apply(this, args);
+          loadAdsIfAllowed();
+          return result;
+        };
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -98,11 +166,7 @@
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Sharemarium" />
-    <link
-      rel="apple-touch-icon"
-      sizes="192x192"
-      href="/icons/Icon-192.png"
-    />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/Icon-192.png" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" sizes="48x48" />
