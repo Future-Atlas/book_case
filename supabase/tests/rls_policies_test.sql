@@ -101,8 +101,8 @@ select results_eq($$select profile_id, book_id from public.favorites where profi
 select is_empty($$select profile_id from public.favorites where profile_id = '00000000-0000-4000-8000-000000000103'::uuid$$, 'anon cannot read private favorites');
 select results_eq($$select id from public.post_replies where id = 900000000101$$, $$values (900000000101::bigint)$$, 'anon can read replies visible through a public post and public replier');
 select is_empty($$select id from public.post_replies where id = 900000000103$$, 'anon cannot read replies on private profile content');
-select is_empty($$select id from public.notifications where id = 910000000101$$, 'anon cannot read notifications');
-select is_empty($$select blocker_id from public.blocks where blocker_id = '00000000-0000-4000-8000-000000000101'::uuid$$, 'anon cannot read block settings');
+select throws_ok($$select id from public.notifications where id = 910000000101$$, '42501', 'anon cannot read notifications');
+select throws_ok($$select blocker_id from public.blocks where blocker_id = '00000000-0000-4000-8000-000000000101'::uuid$$, '42501', 'anon cannot read block settings');
 select throws_ok($$insert into public.posts (profile_id, book_id, rating, comment, book_title) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-write', 3, 'anon write', 'Anon Write')$$, '42501', 'anon cannot insert posts');
 select throws_ok($$insert into public.favorites (profile_id, book_id) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-fav')$$, '42501', 'anon cannot insert favorites');
 select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'anon reply', null::bigint, false)$$, '42501', 'anon cannot create replies through reply RPC');
