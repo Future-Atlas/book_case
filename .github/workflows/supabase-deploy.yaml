@@ -67,9 +67,17 @@ jobs:
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
-      - name: Deploy security edge function
+      - name: Deploy edge functions
         run: |
-          supabase functions deploy session-guard --project-ref "$SUPABASE_PROJECT_ID"
+          functions=(
+            session-guard
+            delete-account
+            admin-delete-account
+          )
+
+          for function_name in "${functions[@]}"; do
+            supabase functions deploy "$function_name" --project-ref "$SUPABASE_PROJECT_ID"
+          done
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
