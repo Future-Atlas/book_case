@@ -1542,7 +1542,11 @@ class _PagedBookScrollerState extends State<_PagedBookScroller> {
   final ScrollController _scrollController = ScrollController();
   bool _pageChangePending = false;
   bool _landAtEndAfterChange = false;
+  bool _isRepositioningAfterPageChange = false;
   double _overscrollDistance = 0;
+
+  bool get _showDesktopScrollbar =>
+      mounted && MediaQuery.sizeOf(context).width >= 768;
 
   @override
   void didUpdateWidget(covariant _PagedBookScroller oldWidget) {
@@ -1554,7 +1558,16 @@ class _PagedBookScrollerState extends State<_PagedBookScroller> {
         final target = _landAtEndAfterChange
             ? _scrollController.position.maxScrollExtent
             : _scrollController.position.minScrollExtent;
-        _scrollController.jumpTo(target);
+        _isRepositioningAfterPageChange = true;
+        _scrollController
+            .animateTo(
+              target,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+            )
+            .whenComplete(() {
+              if (mounted) _isRepositioningAfterPageChange = false;
+            });
         _landAtEndAfterChange = false;
       });
     } else if (oldWidget.isLoadingMore && !widget.isLoadingMore) {
@@ -1605,28 +1618,52 @@ class _PagedBookScrollerState extends State<_PagedBookScroller> {
       } else if (delta < 0 && notification.metrics.extentBefore <= 0.5) {
         _loadPreviousPage();
       }
+    } else if (notification is ScrollEndNotification &&
+        !_isRepositioningAfterPageChange) {
+      if (notification.metrics.extentAfter <= 0.5 &&
+          notification.metrics.extentBefore > 0.5) {
+        _loadNextPage();
+      } else if (notification.metrics.extentBefore <= 0.5 &&
+          notification.metrics.extentAfter > 0.5) {
+        _loadPreviousPage();
+      }
     }
     return false;
   }
 
   @override
   Widget build(BuildContext context) {
+    final list = ListView.builder(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      padding: EdgeInsets.only(bottom: _showDesktopScrollbar ? 12 : 0),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      itemCount: widget.books.length,
+      itemBuilder: (context, index) => BookCard(
+        book: widget.books[index],
+        marginRight: index == widget.books.length - 1 ? 0 : 12,
+        onTap: () => widget.onBookTap(widget.books[index]),
+      ),
+    );
+
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
-      child: ListView.builder(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        itemCount: widget.books.length,
-        itemBuilder: (context, index) => BookCard(
-          book: widget.books[index],
-          marginRight: index == widget.books.length - 1 ? 0 : 12,
-          onTap: () => widget.onBookTap(widget.books[index]),
-        ),
-      ),
+      child: _showDesktopScrollbar
+          ? Scrollbar(
+              controller: _scrollController,
+              thumbVisibility: true,
+              trackVisibility: true,
+              interactive: true,
+              thickness: 8,
+              radius: const Radius.circular(4),
+              notificationPredicate: (notification) =>
+                  notification.metrics.axis == Axis.horizontal,
+              child: list,
+            )
+          : list,
     );
   }
 }
