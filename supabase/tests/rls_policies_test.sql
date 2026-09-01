@@ -101,12 +101,12 @@ select results_eq($$select profile_id, book_id from public.favorites where profi
 select is_empty($$select profile_id from public.favorites where profile_id = '00000000-0000-4000-8000-000000000103'::uuid$$, 'anon cannot read private favorites');
 select results_eq($$select id from public.post_replies where id = 900000000101$$, $$values (900000000101::bigint)$$, 'anon can read replies visible through a public post and public replier');
 select is_empty($$select id from public.post_replies where id = 900000000103$$, 'anon cannot read replies on private profile content');
-select throws_ok($$select id from public.notifications where id = 910000000101$$, '42501', 'anon cannot read notifications');
-select throws_ok($$select blocker_id from public.blocks where blocker_id = '00000000-0000-4000-8000-000000000101'::uuid$$, '42501', 'anon cannot read block settings');
-select throws_ok($$insert into public.posts (profile_id, book_id, rating, comment, book_title) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-write', 3, 'anon write', 'Anon Write')$$, '42501', 'anon cannot insert posts');
-select throws_ok($$insert into public.favorites (profile_id, book_id) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-fav')$$, '42501', 'anon cannot insert favorites');
-select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'anon reply', null::bigint, false)$$, '42501', 'anon cannot create replies through reply RPC');
-select throws_ok($$insert into public.notifications (recipient_id, actor_id, type) values ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000102', 'follow')$$, '42501', 'anon cannot create notifications directly');
+select throws_ok($$select id from public.notifications where id = 910000000101$$, '42501', 'permission denied for table notifications', 'anon cannot read notifications');
+select throws_ok($$select blocker_id from public.blocks where blocker_id = '00000000-0000-4000-8000-000000000101'::uuid$$, '42501', 'permission denied for table blocks', 'anon cannot read block settings');
+select throws_ok($$insert into public.posts (profile_id, book_id, rating, comment, book_title) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-write', 3, 'anon write', 'Anon Write')$$, '42501', 'permission denied for table posts', 'anon cannot insert posts');
+select throws_ok($$insert into public.favorites (profile_id, book_id) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-fav')$$, '42501', 'permission denied for table favorites', 'anon cannot insert favorites');
+select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'anon reply', null::bigint, false)$$, '42501', 'permission denied for function create_post_reply', 'anon cannot create replies through reply RPC');
+select throws_ok($$insert into public.notifications (recipient_id, actor_id, type) values ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000102', 'follow')$$, '42501', 'permission denied for table notifications', 'anon cannot create notifications directly');
 
 reset role;
 select set_config('request.jwt.claim.role', '', true);
@@ -134,22 +134,22 @@ select results_eq($$with rows as (update public.profiles set bio = 'should not u
 select results_eq($$with rows as (update public.profiles set is_private = false where id = '00000000-0000-4000-8000-000000000103'::uuid returning 1) select count(*)::bigint from rows$$, $$values (0::bigint)$$, 'privacy setting is mutable only by the owner');
 select results_eq($$with rows as (update public.posts set comment = 'should not update other post' where id = '10000000-0000-4000-8000-000000000103'::uuid returning 1) select count(*)::bigint from rows$$, $$values (0::bigint)$$, 'authenticated user cannot update another user post');
 select results_eq($$with rows as (delete from public.posts where id = '10000000-0000-4000-8000-000000000103'::uuid returning 1) select count(*)::bigint from rows$$, $$values (0::bigint)$$, 'authenticated user cannot delete another user post');
-select throws_ok($$insert into public.notifications (recipient_id, actor_id, type) values ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000102', 'follow')$$, '42501', 'authenticated user cannot create notifications directly');
-select results_eq($$select id from public.notifications order by id$$, $$values (910000000101::bigint)$$, 'authenticated user reads only own notifications');
+select throws_ok($$insert into public.notifications (recipient_id, actor_id, type) values ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000102', 'follow')$$, '42501', 'permission denied for table notifications', 'authenticated user cannot create notifications directly');
+select results_eq($$select id from public.notifications where id = 910000000101$$, $$values (910000000101::bigint)$$, 'authenticated user reads only own notifications');
 select lives_ok($$update public.notifications set read_at = timezone('utc'::text, now()) where id = 910000000101$$, 'notification recipient can mark own notification read');
 select results_eq($$with rows as (update public.notifications set read_at = timezone('utc'::text, now()) where id = 910000000102 returning 1) select count(*)::bigint from rows$$, $$values (0::bigint)$$, 'authenticated user cannot update another user notification');
 select results_eq($$select blocker_id, blocked_id from public.blocks$$, $$values ('00000000-0000-4000-8000-000000000101'::uuid, '00000000-0000-4000-8000-000000000105'::uuid)$$, 'authenticated user can read blocks they created');
 select lives_ok($$select public.unblock_profile('00000000-0000-4000-8000-000000000105'::uuid)$$, 'authenticated user can unblock own block target through RPC');
 select is_empty($$select blocker_id from public.blocks where blocked_id = '00000000-0000-4000-8000-000000000105'::uuid$$, 'unblock RPC removes only caller-owned block row');
 select lives_ok($$select public.block_profile('00000000-0000-4000-8000-000000000105'::uuid)$$, 'authenticated user can create own block through RPC');
-select throws_ok($$insert into public.blocks (blocker_id, blocked_id) values ('00000000-0000-4000-8000-000000000102', '00000000-0000-4000-8000-000000000103')$$, '42501', 'authenticated user cannot create arbitrary block rows directly');
+select throws_ok($$insert into public.blocks (blocker_id, blocked_id) values ('00000000-0000-4000-8000-000000000102', '00000000-0000-4000-8000-000000000103')$$, '42501', 'permission denied for table blocks', 'authenticated user cannot create arbitrary block rows directly');
 select is_empty($$select * from public.moderation_reports$$, 'non-admin authenticated user cannot read moderation reports');
-select throws_ok($$update public.moderation_reports set status = 'resolved' where id = 920000000101$$, '42501', 'non-admin authenticated user cannot update moderation reports directly');
-select throws_ok($$select public.admin_resolve_report(920000000101, 'not admin')$$, 'P0001', 'non-admin authenticated user cannot execute admin resolve RPC successfully');
-select throws_ok($$select public.admin_set_account_suspension('00000000-0000-4000-8000-000000000102'::uuid, true, 'not admin')$$, 'P0001', 'non-admin authenticated user cannot execute admin suspension RPC successfully');
+select throws_ok($$update public.moderation_reports set status = 'resolved' where id = 920000000101$$, '42501', 'permission denied for table moderation_reports', 'non-admin authenticated user cannot update moderation reports directly');
+select throws_ok($$select public.admin_resolve_report(920000000101, 'not admin')$$, 'P0001', 'Administrator access required', 'non-admin authenticated user cannot execute admin resolve RPC successfully');
+select throws_ok($$select public.admin_set_account_suspension('00000000-0000-4000-8000-000000000102'::uuid, true, 'not admin')$$, 'P0001', 'Administrator access required', 'non-admin authenticated user cannot execute admin suspension RPC successfully');
 select is_empty($$select * from public.adult_content_terms$$, 'non-admin authenticated user cannot read adult content terms');
-select throws_ok($$select * from public.privacy_password_credentials$$, '42501', 'authenticated user cannot read privacy password credentials directly');
-select throws_ok($$select * from public.privacy_password_recovery_requests$$, '42501', 'authenticated user cannot read privacy password recovery requests directly');
+select throws_ok($$select * from public.privacy_password_credentials$$, '42501', 'permission denied for table privacy_password_credentials', 'authenticated user cannot read privacy password credentials directly');
+select throws_ok($$select * from public.privacy_password_recovery_requests$$, '42501', 'permission denied for table privacy_password_recovery_requests', 'authenticated user cannot read privacy password recovery requests directly');
 
 reset role;
 select set_config('request.jwt.claim.role', '', true);
@@ -168,19 +168,19 @@ select is_empty($$select id from public.posts where id = '10000000-0000-4000-800
 select is_empty($$select profile_id from public.favorites where profile_id = '00000000-0000-4000-8000-000000000103'::uuid$$, 'authenticated non-follower cannot read private profile favorites');
 select is_empty($$select id from public.post_replies where id = 900000000103$$, 'authenticated non-follower cannot read private post replies');
 select lives_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'allowed reply', null::bigint, false)$$, 'entitled authenticated user can create a reply on visible post through RPC');
-select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000103'::uuid, 'hidden reply', null::bigint, false)$$, 'P0002', 'authenticated user cannot reply to a hidden private post');
+select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000103'::uuid, 'hidden reply', null::bigint, false)$$, 'P0002', 'Target post is not available', 'authenticated user cannot reply to a hidden private post');
 select lives_ok($$delete from public.post_replies where id = 900000000101$$, 'reply owner can delete own reply');
 select results_eq($$with rows as (delete from public.post_replies where id = 900000000103 returning 1) select count(*)::bigint from rows$$, $$values (0::bigint)$$, 'authenticated user cannot delete another user reply');
-select throws_ok($$update public.post_replies set message = 'reply edits are intentionally unsupported' where id = 900000000103$$, '42501', 'authenticated user cannot update replies because no update path is granted');
+select throws_ok($$update public.post_replies set message = 'reply edits are intentionally unsupported' where id = 900000000103$$, '42501', 'permission denied for table post_replies', 'authenticated user cannot update replies because no update path is granted');
 select lives_ok($$select public.submit_post_report('10000000-0000-4000-8000-000000000101'::uuid, 'harassment', 'valid report')$$, 'authenticated user can submit a report for another user post through RPC');
-select throws_ok($$select public.submit_post_report('10000000-0000-4000-8000-000000000101'::uuid, 'not_a_category', 'invalid report')$$, 'P0001', 'report RPC rejects invalid categories');
+select throws_ok($$select public.submit_post_report('10000000-0000-4000-8000-000000000101'::uuid, 'not_a_category', 'invalid report')$$, 'P0001', 'Invalid report category', 'report RPC rejects invalid categories');
 
 reset role;
 select set_config('request.jwt.claim.role', '', true);
 select set_config('request.jwt.claim.sub', '', true);
 select test_auth('authenticated', '00000000-0000-4000-8000-000000000104');
 
-select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'not entitled', null::bigint, false)$$, '42501', 'authenticated user without reply entitlement cannot create replies');
+select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'not entitled', null::bigint, false)$$, '42501', 'Reply entitlement is required', 'authenticated user without reply entitlement cannot create replies');
 select results_eq($$select id from public.moderation_reports where id = 920000000101$$, $$values (920000000101::bigint)$$, 'admin can read moderation reports');
 select results_eq($$select term from public.adult_content_terms where term = 'rls-admin-only-term'$$, $$values ('rls-admin-only-term'::text)$$, 'admin can read moderation-only adult content terms');
 select lives_ok($$select public.admin_resolve_report(920000000101, 'reviewed by admin')$$, 'admin can resolve reports through admin RPC');
