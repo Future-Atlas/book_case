@@ -9,7 +9,9 @@ import 'post_detail_screen.dart';
 import 'user_profile_screen.dart';
 
 class NotificationBellButton extends StatefulWidget {
-  const NotificationBellButton({super.key});
+  const NotificationBellButton({super.key, this.onOpenProfile});
+
+  final ValueChanged<String>? onOpenProfile;
 
   @override
   State<NotificationBellButton> createState() => _NotificationBellButtonState();
@@ -50,9 +52,12 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
   }
 
   Future<void> _openNotifications() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            NotificationsScreen(onOpenProfile: widget.onOpenProfile),
+      ),
+    );
     if (mounted) await _refresh();
   }
 
@@ -85,7 +90,9 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
 }
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.onOpenProfile});
+
+  final ValueChanged<String>? onOpenProfile;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
@@ -144,6 +151,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _openActorProfile(SocialNotification notification) async {
+    final openInMainShell = widget.onOpenProfile;
+    if (openInMainShell != null) {
+      Navigator.of(context).pop();
+      openInMainShell(notification.actorId);
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => UserProfileScreen(
@@ -157,12 +170,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _openNotification(SocialNotification notification) async {
     if ((notification.type == SocialNotificationType.reply ||
-            notification.type == SocialNotificationType.reaction) &&
+            notification.type == SocialNotificationType.reaction ||
+            notification.type == SocialNotificationType.newPost) &&
         notification.postId != null) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => PostDetailScreen(
             postId: notification.postId!,
+            onOpenProfile: widget.onOpenProfile,
             highlightedReplyId:
                 notification.type == SocialNotificationType.reply
                 ? notification.replyId
@@ -177,15 +192,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   String _message(SocialNotification notification) {
+    final actor = notification.actorUserId.isEmpty
+        ? '${notification.actorUsername}さん'
+        : '${notification.actorUsername}（@${notification.actorUserId}）さん';
+    final bookTitle = notification.bookTitle ?? '書籍';
     switch (notification.type) {
       case SocialNotificationType.reaction:
-        return '${notification.actorUsername}が、あなたの「${notification.bookTitle ?? '書籍'}」の投稿にリアクションを付けました';
+        return '$actorがあなたの『$bookTitle』の投稿にリアクションしました';
       case SocialNotificationType.reply:
-        return '${notification.actorUsername}があなたの「${notification.bookTitle ?? '書籍'}」の投稿に返信しました';
+        return '$actorがあなたの『$bookTitle』の投稿に返信しました';
       case SocialNotificationType.follow:
-        return '${notification.actorUsername}が、あなたをフォローしました';
+        return '$actorがあなたをフォローしました';
       case SocialNotificationType.followRequest:
-        return '${notification.actorUsername}から、あなたにフォローリクエストが届いています';
+        return '$actorからあなたにフォローリクエストが届いています';
+      case SocialNotificationType.newPost:
+        return '$actorが『$bookTitle』の感想を投稿しました';
     }
   }
 

@@ -15,12 +15,20 @@ import '../models/moderation_models.dart';
 import '../models/profile_page_color.dart';
 import 'content_safety_service.dart';
 import 'input_security_service.dart';
+import 'timeline_ranking_service.dart';
 
-enum FavoriteToggleResult { added, removed, limitReached, requiresRead, failed }
+enum FavoriteToggleResult {
+  added,
+  removed,
+  standardLimitReached,
+  subscriberLimitReached,
+  requiresRead,
+  failed,
+}
 
 class SupabaseService extends ChangeNotifier {
-  static const String guestSampleProfileId =
-      'd3b07384-d113-4ec5-a587-f3e098a58f4a';
+  static const int standardFavoriteLimit = 3;
+  static const int subscriberFavoriteLimit = 12;
 
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
@@ -691,6 +699,18 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> canUseAllPageColors() async {
+    if (!_isInitialized || _client == null || activeProfileId.isEmpty) {
+      return false;
+    }
+    try {
+      return await _client!.rpc('current_user_can_use_all_page_colors') == true;
+    } catch (e) {
+      debugPrint('Error checking page-color entitlement: $e');
+      return false;
+    }
+  }
+
   Future<String?> updatePublicProfile({
     required String username,
     required String userId,
@@ -740,6 +760,9 @@ class SupabaseService extends ChangeNotifier {
       notifyListeners();
       return null;
     } on PostgrestException catch (e) {
+      if (e.message.contains('page_color_subscription_required')) {
+        return 'このページカラーはサブスク限定です。';
+      }
       if (e.message.contains('USER_ID_IMMUTABLE')) {
         return 'ユーザーIDは登録後に変更できません。';
       }
@@ -1264,7 +1287,7 @@ class SupabaseService extends ChangeNotifier {
           .from('notifications')
           .select(
             'id, type, actor_id, post_id, reply_id, read_at, created_at, '
-            'actor:profiles!notifications_actor_id_fkey(username, avatar_url), '
+            'actor:profiles!notifications_actor_id_fkey(username, user_id, avatar_url), '
             'post:posts!notifications_post_id_fkey(book_id, book_title)',
           )
           .eq('recipient_id', profileId)
@@ -1291,6 +1314,7 @@ class SupabaseService extends ChangeNotifier {
           'reaction' => SocialNotificationType.reaction,
           'reply' => SocialNotificationType.reply,
           'follow_request' => SocialNotificationType.followRequest,
+          'new_post' => SocialNotificationType.newPost,
           _ => SocialNotificationType.follow,
         };
         final actorId = row['actor_id']?.toString() ?? '';
@@ -1313,6 +1337,7 @@ class SupabaseService extends ChangeNotifier {
             type: type,
             actorId: actorId,
             actorUsername: actor?['username']?.toString() ?? 'ユーザー',
+            actorUserId: actor?['user_id']?.toString() ?? '',
             actorAvatarUrl: actor?['avatar_url']?.toString() ?? '',
             postId: row['post_id']?.toString(),
             replyId: row['reply_id']?.toString(),
@@ -1527,7 +1552,7 @@ class SupabaseService extends ChangeNotifier {
         final posts = _parsePostsSafely(data);
         final enriched = await _enrichPostsWithBookMetadata(posts);
         final visible = await _filterPostsForCurrentViewer(enriched);
-        return _sortTimelineByReactionScore(visible);
+        return _arrangeTimelinePosts(visible);
       } catch (e) {
         debugPrint('Error fetching timeline posts with profile join: $e');
         try {
@@ -1539,13 +1564,60 @@ class SupabaseService extends ChangeNotifier {
           final posts = _parsePostsSafely(fallback as List<dynamic>);
           final enriched = await _enrichPostsWithBookMetadata(posts);
           final visible = await _filterPostsForCurrentViewer(enriched);
-          return _sortTimelineByReactionScore(visible);
+          return _arrangeTimelinePosts(visible);
         } catch (fallbackError) {
           debugPrint('Error fetching timeline posts fallback: $fallbackError');
         }
       }
     }
     return [];
+  }
+
+  Future<List<Post>> fetchPostsForBook(
+    String bookId, {
+    bool excludeCurrentUser = true,
+  }) async {
+    final normalizedBookId = bookId.trim();
+    if (!_isInitialized || _client == null || normalizedBookId.isEmpty) {
+      return [];
+    }
+
+    Future<List<Post>> prepare(List<dynamic> rows) async {
+      final parsed = _parsePostsSafely(rows);
+      final enriched = await _enrichPostsWithBookMetadata(parsed);
+      final visible = await _filterPostsForCurrentViewer(enriched);
+      final viewerId = activeProfileId;
+      final otherUsersPosts = excludeCurrentUser && viewerId.isNotEmpty
+          ? visible
+                .where((post) => post.profileId != viewerId)
+                .toList(growable: false)
+          : visible;
+      return _arrangeTimelinePosts(otherUsersPosts);
+    }
+
+    try {
+      final response = await _client!
+          .from('posts')
+          .select(
+            '*, profiles:profiles!posts_profile_id_fkey(username, avatar_url, page_color)',
+          )
+          .eq('book_id', normalizedBookId)
+          .order('created_at', ascending: false);
+      return prepare(response as List<dynamic>);
+    } catch (e) {
+      debugPrint('Error fetching posts for book with profile join: $e');
+      try {
+        final fallback = await _client!
+            .from('posts')
+            .select('*')
+            .eq('book_id', normalizedBookId)
+            .order('created_at', ascending: false);
+        return prepare(fallback as List<dynamic>);
+      } catch (fallbackError) {
+        debugPrint('Error fetching posts for book fallback: $fallbackError');
+        return [];
+      }
+    }
   }
 
   Future<Post?> fetchPostById(String postId) async {
@@ -1601,7 +1673,7 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('post_replies')
           .select(
-            'id, post_id, profile_id, parent_reply_id, message, created_at, '
+            'id, post_id, profile_id, parent_reply_id, message, has_spoiler, created_at, '
             'profiles:profiles!post_replies_profile_id_fkey(username, user_id, avatar_url)',
           )
           .inFilter('post_id', filteredIds)
@@ -1631,6 +1703,7 @@ class SupabaseService extends ChangeNotifier {
     required String postId,
     required String message,
     String? parentReplyId,
+    bool hasSpoiler = false,
   }) async {
     final profileId = activeProfileId;
     if (!_isInitialized || _client == null || profileId.isEmpty) {
@@ -1649,6 +1722,7 @@ class SupabaseService extends ChangeNotifier {
           'target_reply': parentReplyId == null
               ? null
               : int.tryParse(parentReplyId),
+          'reply_has_spoiler': hasSpoiler,
         },
       );
       return null;
@@ -1700,11 +1774,11 @@ class SupabaseService extends ChangeNotifier {
   Future<UserProfile> fetchUserProfile(String profileId) async {
     if (_isInitialized && _client != null) {
       try {
-        final response = await _client!
-            .from('profiles')
-            .select()
-            .eq('id', profileId)
-            .single();
+        var query = _client!.from('profiles').select();
+        query = _looksLikeUuid(profileId)
+            ? query.eq('id', profileId)
+            : query.eq('user_id', profileId.trim().toLowerCase());
+        final response = await query.single();
         final profile = UserProfile.fromJson(response);
         if (profileId == activeProfileId) {
           _activePageColorKey = ProfilePageColors.normalizeKey(
@@ -1728,6 +1802,12 @@ class SupabaseService extends ChangeNotifier {
       readCount: 0,
       isPrivate: false,
     );
+  }
+
+  bool _looksLikeUuid(String value) {
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(value.trim());
   }
 
   // ----- USER COLLECTIONS & FAVORITES --------------------------------------
@@ -1932,16 +2012,37 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
-  List<Post> _sortTimelineByReactionScore(Iterable<Post> posts) {
-    final sorted = List<Post>.of(posts);
-    sorted.sort((first, second) {
-      final scoreComparison = second.reactionScore.compareTo(
-        first.reactionScore,
-      );
-      if (scoreComparison != 0) return scoreComparison;
-      return second.createdAt.compareTo(first.createdAt);
-    });
-    return sorted;
+  Future<List<Post>> _arrangeTimelinePosts(Iterable<Post> posts) async {
+    final followedProfileIds = await _acceptedFollowingProfileIds();
+    return TimelineRankingService.arrange(
+      posts: posts,
+      followedProfileIds: followedProfileIds,
+    );
+  }
+
+  Future<Set<String>> _acceptedFollowingProfileIds() async {
+    final viewerId = activeProfileId;
+    if (!_isInitialized ||
+        _client == null ||
+        viewerId.isEmpty ||
+        !isAuthenticated) {
+      return const <String>{};
+    }
+
+    try {
+      final response = await _client!
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', viewerId)
+          .eq('status', 'accepted');
+      return (response as List<dynamic>)
+          .map((row) => row['following_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+    } catch (e) {
+      debugPrint('Error loading followed profiles for timeline: $e');
+      return const <String>{};
+    }
   }
 
   Future<List<Post>> _attachReactionState(List<Post> posts) async {
@@ -2098,6 +2199,45 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<bool> submitReplyReport({
+    required String replyId,
+    required ReportCategory category,
+    String details = '',
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) return false;
+    final numericReplyId = int.tryParse(replyId);
+    if (numericReplyId == null) return false;
+    final detailsError = InputSecurityService.validateSafeText(
+      details,
+      fieldLabel: '報告詳細',
+      required: false,
+      allowNewLines: true,
+      maxLength: 1000,
+    );
+    if (detailsError != null) return false;
+    try {
+      final normalizedDetails = InputSecurityService.normalizeText(
+        details,
+        allowNewLines: true,
+        maxLength: 1000,
+      );
+      await _client!.rpc(
+        'submit_reply_report',
+        params: {
+          'target_reply': numericReplyId,
+          'report_category': category.databaseValue,
+          'report_details': normalizedDetails.isEmpty
+              ? null
+              : normalizedDetails,
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error submitting reply report: $e');
+      return false;
+    }
+  }
+
   Future<bool> isCurrentUserAdmin() async {
     if (!_isInitialized || _client == null || !isAuthenticated) return false;
     try {
@@ -2151,8 +2291,8 @@ class SupabaseService extends ChangeNotifier {
       final response = await _client!
           .from('moderation_reports')
           .select(
-            'id, post_id, category, details, status, resolution, created_at, '
-            'post_snapshot, '
+            'id, post_id, reply_id, category, details, status, resolution, created_at, '
+            'post_snapshot, reply_snapshot, '
             'reporter:profiles!moderation_reports_reporter_id_fkey(username), '
             'reported:profiles!moderation_reports_reported_profile_id_fkey('
             'id, username, user_id, is_suspended)',
@@ -2165,6 +2305,8 @@ class SupabaseService extends ChangeNotifier {
         final reporter = row['reporter'] as Map<String, dynamic>?;
         final reported = row['reported'] as Map<String, dynamic>?;
         final snapshot = row['post_snapshot'] as Map<String, dynamic>? ?? {};
+        final replySnapshot =
+            row['reply_snapshot'] as Map<String, dynamic>? ?? {};
         return ModerationReport(
           id: (row['id'] as num).toInt(),
           reporterUsername: reporter?['username']?.toString() ?? '退会済みユーザー',
@@ -2176,8 +2318,10 @@ class SupabaseService extends ChangeNotifier {
           reportedUserId: reported?['user_id']?.toString() ?? '',
           reportedAccountSuspended: reported?['is_suspended'] == true,
           postId: row['post_id']?.toString(),
+          replyId: row['reply_id']?.toString(),
           bookId: snapshot['book_id']?.toString() ?? '',
           review: snapshot['review']?.toString() ?? '',
+          replyMessage: replySnapshot['message']?.toString() ?? '',
           category: ReportCategory.fromDatabase(row['category']?.toString()),
           details: row['details']?.toString() ?? '',
           status: row['status']?.toString() ?? 'open',
@@ -2218,6 +2362,21 @@ class SupabaseService extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Error deleting reported post: $e');
+      return false;
+    }
+  }
+
+  Future<bool> adminDeleteReportedReply(int reportId) async {
+    if (!_isInitialized || _client == null) return false;
+    try {
+      await _client!.rpc(
+        'admin_delete_reported_reply',
+        params: {'target_report': reportId},
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting reported reply: $e');
       return false;
     }
   }
@@ -2521,6 +2680,7 @@ class SupabaseService extends ChangeNotifier {
       debugPrint('Cannot toggle favorite: no authenticated user.');
       return FavoriteToggleResult.failed;
     }
+    var favoriteLimit = standardFavoriteLimit;
     if (_isInitialized && _client != null) {
       try {
         // Determine if already favorited
@@ -2548,13 +2708,16 @@ class SupabaseService extends ChangeNotifier {
           if ((postRows as List<dynamic>).isEmpty) {
             return FavoriteToggleResult.requiresRead;
           }
+          favoriteLimit = await fetchCurrentFavoriteLimit();
           final existingFavorites = await _client!
               .from('favorites')
               .select('book_id')
               .eq('profile_id', profileId)
-              .limit(12);
-          if ((existingFavorites as List<dynamic>).length >= 12) {
-            return FavoriteToggleResult.limitReached;
+              .limit(favoriteLimit);
+          if ((existingFavorites as List<dynamic>).length >= favoriteLimit) {
+            return favoriteLimit == subscriberFavoriteLimit
+                ? FavoriteToggleResult.subscriberLimitReached
+                : FavoriteToggleResult.standardLimitReached;
           }
           await _client!.from('favorites').insert({
             'profile_id': profileId,
@@ -2566,7 +2729,9 @@ class SupabaseService extends ChangeNotifier {
       } catch (e) {
         debugPrint('Error toggling favorite in Supabase: $e');
         if (e.toString().contains('favorite_limit_reached')) {
-          return FavoriteToggleResult.limitReached;
+          return favoriteLimit == subscriberFavoriteLimit
+              ? FavoriteToggleResult.subscriberLimitReached
+              : FavoriteToggleResult.standardLimitReached;
         }
         if (e.toString().contains('favorite_requires_post')) {
           return FavoriteToggleResult.requiresRead;
@@ -2575,6 +2740,24 @@ class SupabaseService extends ChangeNotifier {
     }
     debugPrint('Supabase not initialized – favorite not toggled.');
     return FavoriteToggleResult.failed;
+  }
+
+  Future<int> fetchCurrentFavoriteLimit() async {
+    if (!_isInitialized || _client == null || activeProfileId.isEmpty) {
+      return standardFavoriteLimit;
+    }
+    try {
+      final response = await _client!.rpc('current_user_favorite_limit');
+      final parsed = response is num
+          ? response.toInt()
+          : int.tryParse(response?.toString() ?? '');
+      return parsed == subscriberFavoriteLimit
+          ? subscriberFavoriteLimit
+          : standardFavoriteLimit;
+    } catch (e) {
+      debugPrint('Error fetching favorite limit from Supabase: $e');
+      return standardFavoriteLimit;
+    }
   }
 
   @override

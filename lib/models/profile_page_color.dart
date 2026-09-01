@@ -16,6 +16,7 @@ class ProfilePageColors {
   const ProfilePageColors._();
 
   static const String defaultKey = 'yellow';
+  static const Set<String> standardKeys = {'blue', 'yellow', 'green'};
 
   static const List<ProfilePageColorOption> options = [
     ProfilePageColorOption(key: 'red', label: '赤', color: Color(0xFFD00303)),

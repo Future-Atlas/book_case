@@ -9,18 +9,19 @@ import 'services/theme_service.dart';
 import 'models/profile_page_color.dart';
 import 'screens/book_list_screen.dart';
 import 'screens/user_profile_screen.dart';
-// import 'screens/auth_screen.dart';
+import 'screens/auth_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/community_guidelines_screen.dart';
 import 'screens/infringement_policy_screen.dart';
 import 'screens/external_transmission_screen.dart';
-// import 'screens/legal_consent_screen.dart';
+import 'screens/legal_consent_screen.dart';
 import 'screens/account_settings_screen.dart';
 import 'screens/contact_screen.dart';
-// import 'screens/profile_onboarding_screen.dart';
+import 'screens/profile_onboarding_screen.dart';
 import 'screens/moderation_screen.dart';
-// import 'screens/account_suspension_gate.dart';
+import 'screens/account_suspension_gate.dart';
+import 'screens/notifications_screen.dart';
 
 enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 
@@ -143,8 +144,7 @@ class MyApp extends StatelessWidget {
       ),
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       routes: {
-        // Auth route is temporarily disabled for public browsing mode.
-        // '/login': (context) => const AuthScreen(),
+        '/login': (context) => const AuthScreen(),
         '/terms': (context) => const TermsScreen(),
         '/privacy': (context) => const PrivacyPolicyScreen(),
         '/community-guidelines': (context) => const CommunityGuidelinesScreen(),
@@ -154,22 +154,17 @@ class MyApp extends StatelessWidget {
         '/contact': (context) => const ContactScreen(),
       },
       onUnknownRoute: (_) => MaterialPageRoute<void>(
-        // Auth/onboarding gates are temporarily disabled for public browsing.
-        // builder: (_) => const AccountSuspensionGate(
-        //   child: LegalConsentGate(
-        //     child: ProfileOnboardingGate(child: MainNavigationShell()),
-        //   ),
-        // ),
-        builder: (_) => const MainNavigationShell(),
+        builder: (_) => const AccountSuspensionGate(
+          child: LegalConsentGate(
+            child: ProfileOnboardingGate(child: MainNavigationShell()),
+          ),
+        ),
       ),
-
-      // Auth/onboarding gates are temporarily disabled for public browsing.
-      // home: const AccountSuspensionGate(
-      //   child: LegalConsentGate(
-      //     child: ProfileOnboardingGate(child: MainNavigationShell()),
-      //   ),
-      // ),
-      home: const MainNavigationShell(),
+      home: const AccountSuspensionGate(
+        child: LegalConsentGate(
+          child: ProfileOnboardingGate(child: MainNavigationShell()),
+        ),
+      ),
     );
   }
 }
@@ -182,7 +177,7 @@ class MainNavigationShell extends StatefulWidget {
 }
 
 class _MainNavigationShellState extends State<MainNavigationShell>
-  with WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   static const Set<String> _transientQueryKeys = {
     'code',
     'state',
@@ -203,6 +198,21 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   String? _viewedProfileId;
   String? _viewedProfileUserId;
   String? _viewedProfileColorKey;
+
+  String? _genreFromPath(String path) {
+    if (path == '/genre/recommended') return 'recommended';
+    if (path == '/genre/western') return 'western';
+    if (path == '/genre/popular') return 'popular';
+    return null;
+  }
+
+  String? _bookSlugFromPath(String path) {
+    if (!path.startsWith('/book/')) return null;
+    final slug = path.substring('/book/'.length).split('/').first;
+    return slug.isEmpty ? null : Uri.decodeComponent(slug);
+  }
+
+  bool _isOpeningLogin = false;
 
   Uri _normalizedFragmentUri(String fragment) {
     var value = fragment;
@@ -263,7 +273,9 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   }
 
   int _screenIndexFromPath(String path) {
-    if ((path.startsWith('/users/') || path.startsWith('/user/') || path.startsWith('/profile/')) &&
+    if ((path.startsWith('/users/') ||
+            path.startsWith('/user/') ||
+            path.startsWith('/profile/')) &&
         path.length > '/users/'.length) {
       return 5;
     }
@@ -310,9 +322,13 @@ class _MainNavigationShellState extends State<MainNavigationShell>
         return '/moderation';
       case 5:
         final profileId = _viewedProfileId;
-        return profileId == null || profileId.isEmpty
+        final publicUserId = _viewedProfileUserId;
+        final urlId = publicUserId == null || publicUserId.isEmpty
+            ? profileId
+            : publicUserId;
+        return urlId == null || urlId.isEmpty
             ? '/'
-            : '/users/${Uri.encodeComponent(profileId)}';
+            : '/users/${Uri.encodeComponent(urlId)}';
       case 6:
         return '/terms';
       case 7:
@@ -385,15 +401,16 @@ class _MainNavigationShellState extends State<MainNavigationShell>
       final prefix = path.startsWith('/profile/')
           ? '/profile/'
           : path.startsWith('/user/')
-              ? '/user/'
-              : '/users/';
+          ? '/user/'
+          : '/users/';
       final encodedProfileId = path.substring(prefix.length);
       if (encodedProfileId.isNotEmpty) {
         nextViewedProfileId = Uri.decodeComponent(encodedProfileId);
       }
     }
 
-    if (_currentScreenIndex != index || _viewedProfileId != nextViewedProfileId) {
+    if (_currentScreenIndex != index ||
+        _viewedProfileId != nextViewedProfileId) {
       setState(() {
         _currentScreenIndex = index;
         _viewedProfileId = nextViewedProfileId;
@@ -446,7 +463,9 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   }
 
   @override
-  Future<bool> didPushRouteInformation(RouteInformation routeInformation) async {
+  Future<bool> didPushRouteInformation(
+    RouteInformation routeInformation,
+  ) async {
     final uri = routeInformation.uri;
     _applyRouteFromUri(uri, replaceUrl: _hasTransientQuery(uri));
     return true;
@@ -460,6 +479,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
       _viewedProfileUserId = profile.userId;
       _viewedProfileColorKey = profile.pageColorKey;
     });
+    _syncBrowserUrlForScreen(5, replace: true);
   }
 
   Future<void> _openUserProfile(String profileId) async {
@@ -480,17 +500,21 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   }
 
   Future<void> _goToProfile() async {
-    // Temporarily disable login requirement for browsing.
-    // final service = Provider.of<SupabaseService>(context, listen: false);
-    // if (!service.isAuthenticated) {
-    //   final result = await Navigator.of(context).pushNamed('/login');
-    //   if (result != true && !service.isAuthenticated) {
-    //     return;
-    //   }
-    // }
-    //
-    // await service.ensureCurrentUserProfile();
-    // if (!mounted) return;
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (!service.isAuthenticated) {
+      if (_isOpeningLogin) return;
+      _isOpeningLogin = true;
+      final result = await Navigator.of(context).pushNamed('/login');
+      _isOpeningLogin = false;
+      if (!mounted) return;
+      if (result != true && !service.isAuthenticated) {
+        if (_currentScreenIndex == 1) _goToBookList();
+        return;
+      }
+    }
+
+    await service.ensureCurrentUserProfile();
+    if (!mounted) return;
     _viewedProfileId = null;
     _viewedProfileUserId = null;
     _viewedProfileColorKey = null;
@@ -526,14 +550,13 @@ class _MainNavigationShellState extends State<MainNavigationShell>
         if (_isAdmin) _setCurrentScreenIndex(4);
         break;
       case _HeaderMenuAction.logout:
-        // Temporarily disable logout action for public browsing mode.
-        // final service = Provider.of<SupabaseService>(context, listen: false);
-        // await service.signOut();
-        // if (!mounted) return;
+        final service = Provider.of<SupabaseService>(context, listen: false);
+        await service.signOut();
+        if (!mounted) return;
         _goToBookList();
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('公開閲覧モードです。')));
+        ).showSnackBar(const SnackBar(content: Text('ログアウトしました。')));
         break;
     }
   }
@@ -591,17 +614,15 @@ class _MainNavigationShellState extends State<MainNavigationShell>
             : ownHeaderColor;
         final menuIconColor = isDarkMode ? Colors.white : Colors.black;
         final popupMenuTextColor = isDarkMode ? Colors.black : Colors.black;
-        final headerSideWidth = 104.0;
+        final headerSideWidth = service.isAuthenticated ? 146.0 : 104.0;
 
-        // Temporarily disable auth-loss redirect behavior.
-        // if (!service.isAuthenticated &&
-        //     (_currentScreenIndex == 1 || _currentScreenIndex == 4)) {
-        //   WidgetsBinding.instance.addPostFrameCallback((_) {
-        //     if (mounted) {
-        //       _goToBookList();
-        //     }
-        //   });
-        // }
+        if (!service.isAuthenticated &&
+            _currentScreenIndex == 1 &&
+            !_isOpeningLogin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _goToProfile();
+          });
+        }
 
         return Scaffold(
           body: SafeArea(
@@ -683,16 +704,17 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                                     ),
                                   ),
                                 ),
-                              // PopupMenuItem(
-                              //   value: _HeaderMenuAction.logout,
-                              //   child: Text(
-                              //     'ログアウト',
-                              //     style: TextStyle(
-                              //       fontSize: 28 / 2,
-                              //       color: popupMenuTextColor,
-                              //     ),
-                              //   ),
-                              // ),
+                              if (service.isAuthenticated)
+                                PopupMenuItem(
+                                  value: _HeaderMenuAction.logout,
+                                  child: Text(
+                                    'ログアウト',
+                                    style: TextStyle(
+                                      fontSize: 28 / 2,
+                                      color: popupMenuTextColor,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -718,11 +740,13 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            // if (service.isAuthenticated)
-                            //   const SizedBox(
-                            //     width: 42,
-                            //     child: NotificationBellButton(),
-                            //   ),
+                            if (service.isAuthenticated)
+                              SizedBox(
+                                width: 42,
+                                child: NotificationBellButton(
+                                  onOpenProfile: _openUserProfile,
+                                ),
+                              ),
                             SizedBox(
                               width: 104,
                               height: 36,
@@ -773,6 +797,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
                         ? BookListScreen(
                             key: const ValueKey('BookListScreen'),
                             onOpenUserProfile: _openUserProfile,
+                            initialGenre: _genreFromPath(
+                              _currentAppPathFromUri(Uri.base),
+                            ),
+                            initialBookSlug: _bookSlugFromPath(
+                              _currentAppPathFromUri(Uri.base),
+                            ),
                           )
                         : _currentScreenIndex == 1
                         ? UserProfileScreen(

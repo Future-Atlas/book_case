@@ -256,6 +256,7 @@ class _PublicAccountSettingsScreenState
   bool _loading = true;
   bool _saving = false;
   bool _updatingAvatar = false;
+  bool _canUseAllPageColors = false;
 
   @override
   void didChangeDependencies() {
@@ -264,10 +265,13 @@ class _PublicAccountSettingsScreenState
   }
 
   Future<void> _load() async {
-    final data = await Provider.of<SupabaseService>(
-      context,
-      listen: false,
-    ).fetchCurrentSettingsData();
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final results = await Future.wait<dynamic>([
+      service.fetchCurrentSettingsData(),
+      service.canUseAllPageColors(),
+    ]);
+    final data = results[0] as Map<String, dynamic>?;
+    final canUseAllPageColors = results[1] == true;
     if (!mounted) return;
     _usernameController.text = data?['username']?.toString() ?? '';
     _userIdController.text = data?['user_id']?.toString() ?? '';
@@ -278,6 +282,7 @@ class _PublicAccountSettingsScreenState
       _pageColorKey = ProfilePageColors.normalizeKey(
         data?['page_color']?.toString(),
       );
+      _canUseAllPageColors = canUseAllPageColors;
       _loading = false;
     });
   }
@@ -374,7 +379,7 @@ class _PublicAccountSettingsScreenState
         ),
         const SizedBox(height: 4),
         Text(
-          'ヘッダーと投稿の外枠に使用され、他のユーザーにも表示されます。',
+          'ヘッダーと投稿の外枠に使用され、他のユーザーにも表示されます。全14色はサブスク特典です。',
           style: TextStyle(
             fontSize: 12,
             color: theme.colorScheme.onSurface.withValues(alpha: 0.68),
@@ -386,13 +391,25 @@ class _PublicAccountSettingsScreenState
           runSpacing: 12,
           children: ProfilePageColors.options.map((option) {
             final selected = option.key == _pageColorKey;
+            final locked =
+                !_canUseAllPageColors &&
+                !ProfilePageColors.standardKeys.contains(option.key);
             return Semantics(
               button: true,
               selected: selected,
-              label: '${option.label}を選択',
+              enabled: !locked,
+              label: locked ? '${option.label}はサブスク限定' : '${option.label}を選択',
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),
-                onTap: () => setState(() => _pageColorKey = option.key),
+                onTap: () {
+                  if (locked) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('このページカラーはサブスク限定です。')),
+                    );
+                    return;
+                  }
+                  setState(() => _pageColorKey = option.key);
+                },
                 child: SizedBox(
                   width: 70,
                   child: Column(
@@ -413,7 +430,16 @@ class _PublicAccountSettingsScreenState
                             width: selected ? 3 : 1,
                           ),
                         ),
-                        child: selected
+                        child: locked
+                            ? const Icon(
+                                Icons.lock,
+                                color: Colors.white,
+                                size: 21,
+                                shadows: [
+                                  Shadow(color: Colors.black87, blurRadius: 4),
+                                ],
+                              )
+                            : selected
                             ? const Icon(
                                 Icons.check,
                                 color: Colors.white,

@@ -43,6 +43,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Map<String, List<PostReply>> _postReplies = {};
   List<Book> _collections = [];
   List<Book> _favorites = [];
+  int _favoriteLimit = SupabaseService.standardFavoriteLimit;
   List<Book> _searchResults = [];
   bool _isLoading = true;
   bool _isSearchPanelOpen = false;
@@ -167,11 +168,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     final service = Provider.of<SupabaseService>(context, listen: false);
-    final uid =
-        widget.profileId ??
-        (service.activeProfileId.isNotEmpty
-            ? service.activeProfileId
-            : SupabaseService.guestSampleProfileId);
+    final uid = widget.profileId ?? service.activeProfileId;
 
     if (uid.isEmpty) {
       if (mounted) {
@@ -188,25 +185,31 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     }
 
     final profile = await service.fetchUserProfile(uid);
-    final relationship = await service.fetchProfileRelationship(uid);
+    final profileId = profile.id;
+    final relationship = await service.fetchProfileRelationship(profileId);
     final canLoadContent =
         relationship.isOwnProfile ||
         (!relationship.blockedEitherDirection &&
             (!profile.isPrivate ||
                 relationship.followStatus ==
                     FollowRelationshipStatus.accepted));
-    final posts = canLoadContent ? await service.fetchUserPosts(uid) : <Post>[];
+    final posts = canLoadContent
+        ? await service.fetchUserPosts(profileId)
+        : <Post>[];
     final replies = canLoadContent
         ? await service.fetchRepliesForPosts(
             posts.map((post) => post.id).toList(growable: false),
           )
         : <String, List<PostReply>>{};
     final colls = canLoadContent
-        ? await service.fetchUserCollections(uid)
+        ? await service.fetchUserCollections(profileId)
         : <Book>[];
     final favs = canLoadContent
-        ? await service.fetchUserFavorites(uid)
+        ? await service.fetchUserFavorites(profileId)
         : <Book>[];
+    final favoriteLimit = relationship.isOwnProfile
+        ? await service.fetchCurrentFavoriteLimit()
+        : SupabaseService.standardFavoriteLimit;
     final postedBookIds = posts.map((post) => post.bookId).toSet();
     final visibleFavorites = favs
         .where((book) => postedBookIds.contains(book.id))
@@ -220,6 +223,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         _postReplies = replies;
         _collections = colls;
         _favorites = visibleFavorites;
+        _favoriteLimit = favoriteLimit;
         _isLoading = false;
       });
     }
@@ -415,6 +419,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     await showPostReportDialog(context: context, postId: postId);
   }
 
+  Future<void> _reportReply(PostReply reply) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    if (!service.canWrite) {
+      final result = await Navigator.of(context).pushNamed('/login');
+      if (!mounted || (result != true && !service.canWrite)) return;
+    }
+    if (reply.profileId == service.activeProfileId) return;
+    await showReplyReportDialog(context: context, replyId: reply.id);
+  }
+
   Future<void> _replyToPost(Post post, [PostReply? parentReply]) async {
     final service = Provider.of<SupabaseService>(context, listen: false);
     final canReply = await service.canCreatePostReplies();
@@ -457,7 +471,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final message = switch (result) {
       FavoriteToggleResult.added => 'お気に入りに登録しました。',
       FavoriteToggleResult.removed => 'お気に入りから解除しました。',
-      FavoriteToggleResult.limitReached => 'もうこれ以上は登録できません。登録済みの本と入れ替えてください。',
+      FavoriteToggleResult.standardLimitReached =>
+        '通常利用ではお気に入りは3冊までです。サブスクでは12冊まで登録できます。',
+      FavoriteToggleResult.subscriberLimitReached =>
+        'お気に入りは12冊までです。登録済みの本と入れ替えてください。',
       FavoriteToggleResult.requiresRead => '読了（投稿）した本のみお気に入りに追加できます。',
       FavoriteToggleResult.failed => 'お気に入りを更新できませんでした。',
     };
@@ -596,15 +613,14 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                   ? [
                       IconButton(
                         icon: const Icon(Icons.logout),
+                        tooltip: 'ログアウト',
                         onPressed: () async {
-                          // Temporarily disable logout action for
-                          // public browsing mode.
-                          // final service = Provider.of<SupabaseService>(
-                          //   context,
-                          //   listen: false,
-                          // );
-                          // await service.signOut();
-                          // if (!mounted) return;
+                          final service = Provider.of<SupabaseService>(
+                            context,
+                            listen: false,
+                          );
+                          await service.signOut();
+                          if (!mounted) return;
                           widget.onBack();
                         },
                       ),
@@ -792,20 +808,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
             const SizedBox(height: 16),
 
-            // Bio comment box
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: profileBackgroundColor,
-              child: Text(
-                _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません。',
-                style: TextStyle(
-                  fontSize: isDesktopLayout ? 18 : 12,
-                  color: profileTextColor,
-                  height: 1.4,
+            if (_profile!.bio.isNotEmpty || _isOwnProfile)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: profileBackgroundColor,
+                child: Text(
+                  _profile!.bio.isNotEmpty ? _profile!.bio : '自己紹介はまだ登録されていません',
+                  style: TextStyle(
+                    fontSize: isDesktopLayout ? 18 : 12,
+                    color: profileTextColor,
+                    height: 1.4,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1013,6 +1029,21 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           favoriteLabel: _isFavorited(post.bookId) ? 'お気に入りから解除' : 'お気に入りに追加',
           onReport: _isOwnProfile ? null : () => _reportPost(post.id),
           onReply: (parentReply) => _replyToPost(post, parentReply),
+          onReplyReport: _reportReply,
+          concealReplySpoiler: (reply) {
+            final profileId = Provider.of<SupabaseService>(
+              context,
+              listen: false,
+            ).activeProfileId;
+            return profileId.isEmpty || reply.profileId != profileId;
+          },
+          canReportReply: (reply) {
+            final profileId = Provider.of<SupabaseService>(
+              context,
+              listen: false,
+            ).activeProfileId;
+            return profileId.isEmpty || reply.profileId != profileId;
+          },
           onReplyUserTap: _openReplyProfile,
         );
       },
@@ -1077,7 +1108,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
           child: Text(
-            '${_favorites.length}冊/12冊',
+            _isOwnProfile
+                ? '${_favorites.length}冊/$_favoriteLimit冊'
+                : '${_favorites.length}冊',
             style: const TextStyle(
               color: Colors.black,
               fontSize: 22,

@@ -43,8 +43,8 @@ values
   ('00000000-0000-4000-8000-000000000101', 'RLS Owner', 'rls_owner', 'public owner', false, 'yellow'),
   ('00000000-0000-4000-8000-000000000102', 'RLS Other', 'rls_other', 'public other', false, 'blue'),
   ('00000000-0000-4000-8000-000000000103', 'RLS Private', 'rls_private', 'private owner', true, 'green'),
-  ('00000000-0000-4000-8000-000000000104', 'RLS Admin', 'rls_admin', 'admin owner', false, 'red'),
-  ('00000000-0000-4000-8000-000000000105', 'RLS Blocked', 'rls_blocked', 'blocked owner', false, 'gray');
+  ('00000000-0000-4000-8000-000000000104', 'RLS Admin', 'rls_admin', 'admin owner', false, 'yellow'),
+  ('00000000-0000-4000-8000-000000000105', 'RLS Blocked', 'rls_blocked', 'blocked owner', false, 'green');
 
 insert into public.app_admins (profile_id) values ('00000000-0000-4000-8000-000000000104');
 
@@ -105,7 +105,7 @@ select is_empty($$select id from public.notifications where id = 910000000101$$,
 select is_empty($$select blocker_id from public.blocks where blocker_id = '00000000-0000-4000-8000-000000000101'::uuid$$, 'anon cannot read block settings');
 select throws_ok($$insert into public.posts (profile_id, book_id, rating, comment, book_title) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-write', 3, 'anon write', 'Anon Write')$$, '42501', 'anon cannot insert posts');
 select throws_ok($$insert into public.favorites (profile_id, book_id) values ('00000000-0000-4000-8000-000000000101', 'rls-anon-fav')$$, '42501', 'anon cannot insert favorites');
-select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'anon reply', null::bigint)$$, '42501', 'anon cannot create replies through reply RPC');
+select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'anon reply', null::bigint, false)$$, '42501', 'anon cannot create replies through reply RPC');
 select throws_ok($$insert into public.notifications (recipient_id, actor_id, type) values ('00000000-0000-4000-8000-000000000101', '00000000-0000-4000-8000-000000000102', 'follow')$$, '42501', 'anon cannot create notifications directly');
 
 reset role;
@@ -167,8 +167,8 @@ select test_auth('authenticated', '00000000-0000-4000-8000-000000000102');
 select is_empty($$select id from public.posts where id = '10000000-0000-4000-8000-000000000103'::uuid$$, 'authenticated non-follower cannot read private profile post');
 select is_empty($$select profile_id from public.favorites where profile_id = '00000000-0000-4000-8000-000000000103'::uuid$$, 'authenticated non-follower cannot read private profile favorites');
 select is_empty($$select id from public.post_replies where id = 900000000103$$, 'authenticated non-follower cannot read private post replies');
-select lives_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'allowed reply', null::bigint)$$, 'entitled authenticated user can create a reply on visible post through RPC');
-select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000103'::uuid, 'hidden reply', null::bigint)$$, 'P0002', 'authenticated user cannot reply to a hidden private post');
+select lives_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'allowed reply', null::bigint, false)$$, 'entitled authenticated user can create a reply on visible post through RPC');
+select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000103'::uuid, 'hidden reply', null::bigint, false)$$, 'P0002', 'authenticated user cannot reply to a hidden private post');
 select lives_ok($$delete from public.post_replies where id = 900000000101$$, 'reply owner can delete own reply');
 select results_eq($$with rows as (delete from public.post_replies where id = 900000000103 returning 1) select count(*)::bigint from rows$$, $$values (0::bigint)$$, 'authenticated user cannot delete another user reply');
 select throws_ok($$update public.post_replies set message = 'reply edits are intentionally unsupported' where id = 900000000103$$, '42501', 'authenticated user cannot update replies because no update path is granted');
@@ -180,7 +180,7 @@ select set_config('request.jwt.claim.role', '', true);
 select set_config('request.jwt.claim.sub', '', true);
 select test_auth('authenticated', '00000000-0000-4000-8000-000000000104');
 
-select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'not entitled', null::bigint)$$, '42501', 'authenticated user without reply entitlement cannot create replies');
+select throws_ok($$select public.create_post_reply('10000000-0000-4000-8000-000000000101'::uuid, 'not entitled', null::bigint, false)$$, '42501', 'authenticated user without reply entitlement cannot create replies');
 select results_eq($$select id from public.moderation_reports where id = 920000000101$$, $$values (920000000101::bigint)$$, 'admin can read moderation reports');
 select results_eq($$select term from public.adult_content_terms where term = 'rls-admin-only-term'$$, $$values ('rls-admin-only-term'::text)$$, 'admin can read moderation-only adult content terms');
 select lives_ok($$select public.admin_resolve_report(920000000101, 'reviewed by admin')$$, 'admin can resolve reports through admin RPC');
@@ -192,11 +192,11 @@ select set_config('request.jwt.claim.sub', '', true);
 
 select ok((select prosecdef from pg_proc where oid = 'public.is_current_user_admin()'::regprocedure), 'admin check function is security definer');
 select ok((select prosecdef from pg_proc where oid = 'public.submit_post_report(uuid,text,text)'::regprocedure), 'report submission RPC is security definer');
-select ok((select prosecdef from pg_proc where oid = 'public.create_post_reply(uuid,text,bigint)'::regprocedure), 'reply creation RPC is security definer');
+select ok((select prosecdef from pg_proc where oid = 'public.create_post_reply(uuid,text,bigint,boolean)'::regprocedure), 'reply creation RPC is security definer');
 select ok(not has_function_privilege('anon', 'public.admin_delete_reported_post(bigint)', 'execute'), 'anon cannot execute admin post deletion RPC');
 select ok(has_function_privilege('authenticated', 'public.admin_delete_reported_post(bigint)', 'execute'), 'authenticated users reach the admin RPC authorization check');
-select ok(not has_function_privilege('anon', 'public.create_post_reply(uuid,text,bigint)', 'execute'), 'anon cannot execute reply creation RPC');
-select ok(has_function_privilege('authenticated', 'public.create_post_reply(uuid,text,bigint)', 'execute'), 'authenticated users reach the reply RPC authorization check');
+select ok(not has_function_privilege('anon', 'public.create_post_reply(uuid,text,bigint,boolean)', 'execute'), 'anon cannot execute reply creation RPC');
+select ok(has_function_privilege('authenticated', 'public.create_post_reply(uuid,text,bigint,boolean)', 'execute'), 'authenticated users reach the reply RPC authorization check');
 
 select * from finish();
 rollback;

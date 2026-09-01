@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 function responseRecorder() {
@@ -94,6 +96,34 @@ test("sitemap returns XML and hides non-production pages from robots", async () 
   else process.env.VERCEL_ENV = previous;
 });
 
+test("production sitemap omits fixed sample book URLs", async () => {
+  process.env.VERCEL_ENV = "production";
+  delete require.cache[require.resolve("../../api/sitemap")];
+  const sitemap = require("../../api/sitemap");
+  const res = responseRecorder();
+  await sitemap({}, res);
+  assert.equal(res.statusCode, 200);
+  assert.doesNotMatch(res.body, /\/book\/konbini-ningen/);
+  assert.doesNotMatch(res.body, /\/book\/midnight-library/);
+  delete process.env.VERCEL_ENV;
+});
+
+test("production SEO disables sample fallback by default", async () => {
+  process.env.VERCEL_ENV = "production";
+  delete process.env.SEO_ENABLE_SAMPLE_BOOK_FALLBACK;
+  delete require.cache[require.resolve("../../api/seo")];
+  const seo = require("../../api/seo");
+  const res = responseRecorder();
+  await seo({ query: {} }, res);
+  assert.equal(res.statusCode, 200);
+  assert.doesNotMatch(
+    res.body,
+    /コンビニ人間|The Midnight Library|Atomic Habits/,
+  );
+  delete process.env.VERCEL_ENV;
+  delete process.env.SEO_ENABLE_SAMPLE_BOOK_FALLBACK;
+});
+
 test("SEO handler renders the public home page", async () => {
   process.env.VERCEL_ENV = "preview";
   delete process.env.SUPABASE_URL;
@@ -112,14 +142,21 @@ test("SEO handler returns noindex 404 for a missing profile", async () => {
   process.env.SUPABASE_URL = "https://supabase.example";
   process.env.SUPABASE_ANON_KEY = "public-key";
   const originalFetch = global.fetch;
-  global.fetch = async () =>
-    new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+  let requestedUrl = "";
+  global.fetch = async (url) => {
+    requestedUrl = String(url);
+    return new Response("[]", {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
   delete require.cache[require.resolve("../../api/seo")];
   const seo = require("../../api/seo");
   const res = responseRecorder();
   await seo({ query: { path: "/users/missing-user" } }, res);
   global.fetch = originalFetch;
   assert.equal(res.statusCode, 404);
+  assert.match(requestedUrl, /profiles\?user_id=eq\.missing-user/);
   assert.match(res.body, /ユーザーが見つかりません/);
   assert.match(res.body, /noindex/);
 });
@@ -131,7 +168,9 @@ test("SEO handler returns noindex 404 for a private profile", async () => {
   const originalFetch = global.fetch;
   global.fetch = async () =>
     new Response(
-      JSON.stringify([{ id: "private-user", username: "private", is_private: true }]),
+      JSON.stringify([
+        { id: "private-user", username: "private", is_private: true },
+      ]),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   delete require.cache[require.resolve("../../api/seo")];
@@ -142,4 +181,122 @@ test("SEO handler returns noindex 404 for a private profile", async () => {
   assert.equal(res.statusCode, 404);
   assert.match(res.body, /プロフィールは非公開です/);
   assert.match(res.body, /noindex/);
+});
+
+test("web HTML loads AdSense only on approved content routes with substantive content", () => {
+  const html = fs.readFileSync(
+    path.join(__dirname, "../../web/index.html"),
+    "utf8",
+  );
+
+  assert.match(html, /allowedPath/);
+  assert.match(html, /const allowedPath = \/\^\\\/\$\//);
+  assert.match(html, /hasMeaningfulContent/);
+  assert.match(html, /__sharemariumAdsAllowed !== false/);
+  assert.match(html, /window\.location\.pathname/);
+  assert.match(html, /DOMContentLoaded/);
+  assert.match(html, /MutationObserver/);
+  assert.match(html, /setTimeout\(scheduleAdCheck, 3000\)/);
+  assert.match(html, /popstate|pushState|replaceState/);
+  assert.doesNotMatch(html, /if \(!shouldLoadAds\(\)\) \{\s*return;\s*\}/);
+});
+
+test("genre SEO pages never enable AdSense even when books are available", async () => {
+  process.env.VERCEL_ENV = "production";
+  process.env.RAKUTEN_APP_ID = "app";
+  process.env.RAKUTEN_ACCESS_KEY = "key";
+  process.env.RAKUTEN_REFERER = "https://sharemarium.com";
+
+  const requestModulePath = require.resolve("../../api/_rakuten_request");
+  const originalRequestModule = require.cache[requestModulePath];
+  require.cache[requestModulePath] = {
+    id: requestModulePath,
+    filename: requestModulePath,
+    loaded: true,
+    exports: {
+      requestRakuten: async () => ({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            Items: [
+              {
+                Item: {
+                  title: "Sharemarium Test Book",
+                  author: "Test Author",
+                  itemCaption: "A test book for SEO rendering.",
+                },
+              },
+            ],
+          }),
+      }),
+    },
+  };
+
+  delete require.cache[require.resolve("../../api/seo")];
+  const seo = require("../../api/seo");
+
+  for (const pathName of ["/genre/recommended", "/genre/western", "/genre/popular"]) {
+    const res = responseRecorder();
+    await seo({ query: { path: pathName } }, res);
+    assert.equal(res.statusCode, 200);
+    assert.match(res.body, /index,follow/);
+    assert.doesNotMatch(res.body, /pagead2\.googlesyndication\.com/);
+    assert.doesNotMatch(res.body, /__sharemariumAdsAllowed = true/);
+  }
+
+  if (originalRequestModule) {
+    require.cache[requestModulePath] = originalRequestModule;
+  } else {
+    delete require.cache[requestModulePath];
+  }
+  delete require.cache[require.resolve("../../api/seo")];
+  delete process.env.VERCEL_ENV;
+  delete process.env.RAKUTEN_APP_ID;
+  delete process.env.RAKUTEN_ACCESS_KEY;
+  delete process.env.RAKUTEN_REFERER;
+});
+
+test("genre SEO pages are noindex when no books are available", async () => {
+  process.env.VERCEL_ENV = "production";
+  delete process.env.RAKUTEN_APP_ID;
+  delete process.env.RAKUTEN_ACCESS_KEY;
+  delete require.cache[require.resolve("../../api/seo")];
+  const seo = require("../../api/seo");
+
+  const res = responseRecorder();
+  await seo({ query: { path: "/genre/recommended" } }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /noindex,nofollow/);
+  assert.doesNotMatch(res.body, /pagead2\.googlesyndication\.com/);
+  delete process.env.VERCEL_ENV;
+});
+
+test("Flutter placeholder ad banner is not rendered", () => {
+  const screen = fs.readFileSync(
+    path.join(__dirname, "../../lib/screens/book_list_screen.dart"),
+    "utf8",
+  );
+  const bannerPath = path.join(__dirname, "../../lib/widgets/ad_banner.dart");
+
+  assert.doesNotMatch(screen, /AdBanner|ad_banner/);
+  assert.equal(fs.existsSync(bannerPath), false);
+});
+
+test("AdSense crawlers use the SEO HTML routing", () => {
+  const vercel = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "../../vercel.json"), "utf8"),
+  );
+  const crawlerRoutes = vercel.routes.filter((route) =>
+    route.has?.some((condition) => condition.key === "user-agent"),
+  );
+
+  assert.equal(crawlerRoutes.length, 2);
+  for (const route of crawlerRoutes) {
+    const userAgentPattern = route.has[0].value;
+    assert.match(userAgentPattern, /\[Gg\]ooglebot/);
+    assert.match(userAgentPattern, /Mediapartners-Google/);
+    assert.match(userAgentPattern, /Google-Display-Ads-Bot/);
+  }
 });

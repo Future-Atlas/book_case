@@ -20,16 +20,19 @@
     <meta content="IE=Edge" http-equiv="X-UA-Compatible" />
     <meta
       name="description"
-      content="Sharemariumは、読んだ本や読みたい本を登録し、読書履歴・感想・蔵書をまとめて管理できる読書記録Webアプリです。"
+      content="Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。"
     />
     <meta name="robots" content="index,follow" />
     <link rel="canonical" href="https://sharemarium.com/" />
-    <meta property="og:title" content="Sharemarium | 読書記録・本管理アプリ" />
+    <meta
+      property="og:title"
+      content="Sharemarium（シェアマリウム） | 読書記録・本管理アプリ"
+    />
     <meta
       property="og:description"
-      content="Sharemariumは、読書履歴や蔵書、読みたい本をまとめて管理できる読書記録Webアプリです。"
+      content="Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。"
     />
-    <meta property="og:site_name" content="Sharemarium" />
+    <meta property="og:site_name" content="Sharemarium（シェアマリウム）" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ja_JP" />
     <meta property="og:url" content="https://sharemarium.com/" />
@@ -38,46 +41,158 @@
       content="https://sharemarium.com/icons/Icon-512.png"
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sharemarium | 読書記録・本管理アプリ" />
+    <meta
+      name="twitter:title"
+      content="Sharemarium（シェアマリウム） | 読書記録・本管理アプリ"
+    />
     <meta
       name="twitter:description"
-      content="読んだ本、読みたい本、読書履歴をまとめて管理できる読書記録Webアプリです。"
+      content="Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。"
     />
     <meta
       name="twitter:image"
       content="https://sharemarium.com/icons/Icon-512.png"
     />
-    <link
-      rel="preconnect"
-      href="https://pagead2.googlesyndication.com"
-      crossorigin
-    />
-    <link
-      rel="preconnect"
-      href="https://googleads.g.doubleclick.net"
-      crossorigin
-    />
-    <script
-      async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3052085512168272"
-      crossorigin="anonymous"
-    ></script>
+    <script>
+      (() => {
+        const allowedPath = /^\/$/;
+        const adClient = "ca-pub-3052085512168272";
+        const adScriptUrl =
+          "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" +
+          adClient;
+
+        let adScriptLoaded = false;
+
+        function normalizedPath() {
+          return (window.location.pathname || "/").replace(/\/+$/, "") || "/";
+        }
+
+        function hasMeaningfulContent() {
+          if (!document.body) return false;
+          const text = (document.body.innerText || document.body.textContent || "")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (text.length < 120) return false;
+          return /(Sharemarium|おすすめの本|洋書|人気作品)/.test(text);
+        }
+
+        function shouldLoadAds() {
+          return (
+            allowedPath.test(normalizedPath()) &&
+            hasMeaningfulContent() &&
+            window.__sharemariumAdsAllowed !== false
+          );
+        }
+
+        function loadAdsIfAllowed() {
+          if (!shouldLoadAds() || adScriptLoaded) {
+            return;
+          }
+
+          adScriptLoaded = true;
+          const script = document.createElement("script");
+          script.async = true;
+          script.src = adScriptUrl;
+          script.crossOrigin = "anonymous";
+          script.dataset.adsense = "1";
+          document.head.appendChild(script);
+          return true;
+        }
+
+        let adCheckTimer = 0;
+        let contentObserver = null;
+
+        function scheduleAdCheck() {
+          if (adCheckTimer) {
+            window.clearTimeout(adCheckTimer);
+          }
+          adCheckTimer = window.setTimeout(() => {
+            adCheckTimer = 0;
+            if (loadAdsIfAllowed() && contentObserver) {
+              contentObserver.disconnect();
+              contentObserver = null;
+            }
+          }, 0);
+        }
+
+        function observeFlutterContent() {
+          if (!document.body || contentObserver) return;
+          contentObserver = new MutationObserver(scheduleAdCheck);
+          contentObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+          });
+        }
+
+        function checkAfterDomReady() {
+          observeFlutterContent();
+          scheduleAdCheck();
+          window.setTimeout(scheduleAdCheck, 1000);
+          window.setTimeout(scheduleAdCheck, 3000);
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", checkAfterDomReady, {
+            once: true,
+          });
+        } else {
+          checkAfterDomReady();
+        }
+
+        window.addEventListener("load", scheduleAdCheck, {
+          passive: true,
+        });
+        window.addEventListener("pageshow", scheduleAdCheck, {
+          passive: true,
+        });
+        window.addEventListener("popstate", scheduleAdCheck, {
+          passive: true,
+        });
+
+        const originalPushState = window.history.pushState;
+        const originalReplaceState = window.history.replaceState;
+
+        window.history.pushState = function (...args) {
+          const result = originalPushState.apply(this, args);
+          scheduleAdCheck();
+          return result;
+        };
+
+        window.history.replaceState = function (...args) {
+          const result = originalReplaceState.apply(this, args);
+          scheduleAdCheck();
+          return result;
+        };
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "Sharemarium",
-        "alternateName": "Sharemarium",
+        "alternateName": "シェアマリウム",
         "url": "https://sharemarium.com/",
         "applicationCategory": "LifestyleApplication",
         "operatingSystem": "Web",
         "inLanguage": "ja",
-        "description": "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
+        "description": "Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。",
+        "slogan": "読んだ本を記録して、感想をみんなと共有しよう。あなただけの本棚を、Sharemarium（シェアマリウム）で。",
         "potentialAction": {
           "@type": "SearchAction",
           "target": "https://sharemarium.com/?seo_preview=1&path={search_term_string}",
           "query-input": "required name=search_term_string"
         }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Sharemarium",
+        "alternateName": "シェアマリウム",
+        "url": "https://sharemarium.com/",
+        "inLanguage": "ja"
       }
     </script>
 
@@ -87,11 +202,7 @@
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Sharemarium" />
-    <link
-      rel="apple-touch-icon"
-      sizes="192x192"
-      href="/icons/Icon-192.png"
-    />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/Icon-192.png" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" sizes="48x48" />
@@ -104,20 +215,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
     <link rel="shortcut icon" href="/favicon.png" />
 
-    <title>Sharemarium</title>
+    <title>Sharemarium（シェアマリウム）</title>
     <link rel="manifest" href="manifest.json" />
   </head>
   <body>
     <noscript>
       <main>
         <header>
-          <h1>Sharemarium - 読書記録・本管理アプリ</h1>
+          <h1>Sharemarium（シェアマリウム） - 読書記録・本管理アプリ</h1>
           <p>
-            Sharemariumは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録Webアプリです。読書履歴や感想を残して、自分だけのWeb本棚を作成できます。
+            Sharemarium（シェアマリウム）は、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録Webアプリです。読書履歴や感想を残して、自分だけのWeb本棚を作成できます。
           </p>
         </header>
         <section>
-          <h2>Sharemariumでできること</h2>
+          <h2>Sharemarium（シェアマリウム）でできること</h2>
           <h3>読んだ本を記録</h3>
           <p>読み終えた本を登録し、読書履歴や感想を残せます。</p>
           <h3>読みたい本を管理</h3>
@@ -125,6 +236,12 @@
           <h3>自分だけのWeb本棚</h3>
           <p>
             登録した本を一覧表示し、蔵書管理や読書ログの振り返りができます。
+          </p>
+        </section>
+        <section>
+          <h2>シェアマリウムについて</h2>
+          <p>
+            シェアマリウムは英字でSharemariumと表記する、読書記録・本管理・レビュー共有のためのWebサービスです。
           </p>
         </section>
         <section>

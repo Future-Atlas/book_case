@@ -41,6 +41,34 @@
       }
     },
     {
+      "src": "/user$",
+      "status": 308,
+      "headers": {
+        "Location": "/users"
+      }
+    },
+    {
+      "src": "/user/(.*)",
+      "status": 308,
+      "headers": {
+        "Location": "/users/$1"
+      }
+    },
+    {
+      "src": "/profile$",
+      "status": 308,
+      "headers": {
+        "Location": "/users"
+      }
+    },
+    {
+      "src": "/profile/(.*)",
+      "status": 308,
+      "headers": {
+        "Location": "/users/$1"
+      }
+    },
+    {
       "src": "/(.*)",
       "has": [
         {
@@ -57,7 +85,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
+          "value": ".*([Gg]ooglebot|Mediapartners-Google|Google-Display-Ads-Bot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
         }
       ],
       "dest": "/api/seo?path=/"
@@ -68,7 +96,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*([Gg]ooglebot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
+          "value": ".*([Gg]ooglebot|Mediapartners-Google|Google-Display-Ads-Bot|[Bb]ingbot|[Yy]andex[Bb]ot|[Dd]uck[Dd]uck[Bb]ot|[Bb]aiduspider|[Tt]witterbot|[Ff]acebookexternalhit|[Ff]acebot|[Ll]inkedinbot|[Ee]mbedly|[Qq]uora|[Ss]lackbot).*"
         }
       ],
       "dest": "/api/seo?path=/$1"

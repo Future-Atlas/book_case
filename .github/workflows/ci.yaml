@@ -9,14 +9,16 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep an in-flight build running so a newer run on the same ref does not
+  # cancel `flutter build web --release` and report a misleading CI failure.
+  cancel-in-progress: false
 
 jobs:
   flutter:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

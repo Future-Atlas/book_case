@@ -55,6 +55,7 @@ Future<bool> showPostReplyDialog({
 }) async {
   final controller = TextEditingController();
   var isSubmitting = false;
+  var hasSpoiler = false;
 
   final submitted = await showDialog<bool>(
     context: context,
@@ -98,6 +99,18 @@ Future<bool> showPostReplyDialog({
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  value: hasSpoiler,
+                  onChanged: isSubmitting
+                      ? null
+                      : (value) {
+                          setDialogState(() => hasSpoiler = value);
+                        },
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('ネタバレあり', style: TextStyle(fontSize: 13)),
+                ),
               ],
             ),
           ),
@@ -118,6 +131,7 @@ Future<bool> showPostReplyDialog({
                         postId: postId,
                         message: controller.text,
                         parentReplyId: parentReplyId,
+                        hasSpoiler: hasSpoiler,
                       );
                       if (!dialogContext.mounted) return;
                       if (error == null) {

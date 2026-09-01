@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#000000",
-    "description": "読書記録・本管理アプリ Sharemarium",
+    "description": "Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

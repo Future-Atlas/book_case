@@ -4,6 +4,7 @@ class PostReply {
   final String profileId;
   final String? parentReplyId;
   final String message;
+  final bool hasSpoiler;
   final DateTime createdAt;
   final String username;
   final String userId;
@@ -15,6 +16,7 @@ class PostReply {
     required this.profileId,
     required this.parentReplyId,
     required this.message,
+    required this.hasSpoiler,
     required this.createdAt,
     required this.username,
     required this.userId,
@@ -29,6 +31,7 @@ class PostReply {
       profileId: json['profile_id']?.toString() ?? '',
       parentReplyId: json['parent_reply_id']?.toString(),
       message: json['message']?.toString() ?? '',
+      hasSpoiler: json['has_spoiler'] == true,
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),

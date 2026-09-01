@@ -9,13 +9,10 @@ const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || "";
 const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || "";
 const RAKUTEN_REFERER =
   process.env.RAKUTEN_REFERER || "https://www.sharemarium.com/";
+const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 const ENABLE_NDL_FALLBACK =
   String(process.env.SEO_ENABLE_NDL_FALLBACK || "false").toLowerCase() ===
   "true";
-const ENABLE_SAMPLE_BOOK_FALLBACK =
-  String(
-    process.env.SEO_ENABLE_SAMPLE_BOOK_FALLBACK || "true",
-  ).toLowerCase() === "true";
 
 const RAKUTEN_BOOK_API =
   "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404";
@@ -24,12 +21,12 @@ const RAKUTEN_FOREIGN_BOOK_API =
 const NDL_OPENSEARCH_API = "https://ndlsearch.ndl.go.jp/api/opensearch";
 const SITE_URL = "https://sharemarium.com";
 const SITE_NAME = "Sharemarium";
-const SITE_ALT_NAME = "Sharemarium";
-const SITE_TITLE = "Sharemarium | 読書レビューSNS";
+const SITE_ALT_NAME = "シェアマリウム";
+const SITE_BRAND = `${SITE_NAME}（${SITE_ALT_NAME}）`;
+const SITE_TITLE = "Sharemarium（シェアマリウム） | 読書レビューSNS";
 const TOP_DESCRIPTION =
-  "Sharemariumは、読んだ本や読みたい本を記録し、レビューや読書体験を共有できる読書レビューSNSです。";
+  "Sharemarium（シェアマリウム）は、読んだ本を記録し、感想をみんなと共有できる読書レビューSNSです。自分用の読書記録にも、お友だちとの感想共有にも使えるSharemariumで、あなただけの本棚を作りましょう。";
 const OG_IMAGE_URL = `${SITE_URL}/icons/Icon-512.png`;
-const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -109,116 +106,6 @@ function normalizeRakutenBooks(items, sectionTitle) {
       description: data.itemCaption || "",
     };
   });
-}
-
-function sampleBooksFor(sectionTitle) {
-  const samples = {
-    おすすめの本: [
-      {
-        title: "コンビニ人間",
-        author: "村田 沙耶香",
-        coverUrl: "",
-        genre: sectionTitle,
-        description: "日常の違和感と社会の規範を鋭く描く現代文学。",
-      },
-      {
-        title: "舟を編む",
-        author: "三浦 しをん",
-        coverUrl: "",
-        genre: sectionTitle,
-        description: "辞書づくりに情熱を注ぐ人々の物語。",
-      },
-    ],
-    洋書: [
-      {
-        title: "The Midnight Library",
-        author: "Matt Haig",
-        coverUrl: "",
-        genre: sectionTitle,
-        description: "人生の分岐を見つめ直す現代ファンタジー。",
-      },
-      {
-        title: "Atomic Habits",
-        author: "James Clear",
-        coverUrl: "",
-        genre: sectionTitle,
-        description: "小さな習慣の積み重ねを体系化した実践書。",
-      },
-    ],
-    人気作品: [
-      {
-        title: "そして、バトンは渡された",
-        author: "瀬尾 まいこ",
-        coverUrl: "",
-        genre: sectionTitle,
-        description: "家族のかたちをやさしく描く話題作。",
-      },
-      {
-        title: "汝、星のごとく",
-        author: "凪良 ゆう",
-        coverUrl: "",
-        genre: sectionTitle,
-        description: "地方都市に生きる二人の愛と選択を描く長編。",
-      },
-    ],
-  };
-
-  return samples[sectionTitle] || [];
-}
-
-function sampleBookCatalog() {
-  return [
-    {
-      slug: "konbini-ningen",
-      section: "おすすめの本",
-      title: "コンビニ人間",
-      author: "村田 沙耶香",
-      description: "日常の違和感と社会の規範を鋭く描く現代文学。",
-    },
-    {
-      slug: "fune-wo-amu",
-      section: "おすすめの本",
-      title: "舟を編む",
-      author: "三浦 しをん",
-      description: "辞書づくりに情熱を注ぐ人々の物語。",
-    },
-    {
-      slug: "midnight-library",
-      section: "洋書",
-      title: "The Midnight Library",
-      author: "Matt Haig",
-      description: "人生の分岐を見つめ直す現代ファンタジー。",
-    },
-    {
-      slug: "atomic-habits",
-      section: "洋書",
-      title: "Atomic Habits",
-      author: "James Clear",
-      description: "小さな習慣の積み重ねを体系化した実践書。",
-    },
-    {
-      slug: "baton-wa-watasareta",
-      section: "人気作品",
-      title: "そして、バトンは渡された",
-      author: "瀬尾 まいこ",
-      description: "家族のかたちをやさしく描く話題作。",
-    },
-    {
-      slug: "nanji-hoshi-no-gotoku",
-      section: "人気作品",
-      title: "汝、星のごとく",
-      author: "凪良 ゆう",
-      description: "地方都市に生きる二人の愛と選択を描く長編。",
-    },
-  ];
-}
-
-function sampleBookBySlug(slug) {
-  return sampleBookCatalog().find((book) => book.slug === slug) || null;
-}
-
-function sampleBookLinksBySection(sectionTitle) {
-  return sampleBookCatalog().filter((book) => book.section === sectionTitle);
 }
 
 function decodeXmlEntities(text) {
@@ -432,7 +319,6 @@ function setDiagnosticsHeader(res, diagnostics) {
       `ndl_section_detail=${asciiToken(ndlDetail)}`,
       `ndl_isbn_fail=${diagnostics.ndlIsbnFailures}`,
       `ndl_fallback=${ENABLE_NDL_FALLBACK ? "on" : "off"}`,
-      `sample_books=${diagnostics.sampleBooksUsed ? "on" : "off"}`,
       `supabase_index_err=${diagnostics.supabaseIndexError === "none" ? "no" : "yes"}`,
       `supabase_profile_err=${diagnostics.supabaseProfileError === "none" ? "no" : "yes"}`,
     ].join(";"),
@@ -446,11 +332,31 @@ function toAbsoluteUrl(pathname) {
   return `${SITE_URL}${normalized}`;
 }
 
+function canonicalProfilePath(profileId) {
+  const rawId = String(profileId || "").trim();
+  if (!rawId) return "/users";
+  return `/users/${encodeURIComponent(rawId)}`;
+}
+
+function looksLikeUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim(),
+  );
+}
+
 function faqStructuredData() {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: [
+      {
+        "@type": "Question",
+        name: "シェアマリウムとは何ですか？",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "シェアマリウムは英字でSharemariumと表記する、読書記録・本管理・レビュー共有のためのWebサービスです。",
+        },
+      },
       {
         "@type": "Question",
         name: "Sharemariumでは何ができますか？",
@@ -534,7 +440,7 @@ function webApplicationStructuredData() {
     operatingSystem: "Web",
     inLanguage: "ja",
     description:
-      "読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
+      "Sharemarium（シェアマリウム）は、読んだ本、読みたい本、読書履歴、蔵書をまとめて管理できる読書記録Webアプリです。",
   };
 }
 
@@ -546,21 +452,6 @@ function siteNavigationStructuredData() {
     { name: "人気作品", url: `${SITE_URL}/genre/popular` },
     { name: "プライバシーポリシー", url: `${SITE_URL}/privacy` },
     { name: "利用規約", url: `${SITE_URL}/terms` },
-    { name: "コンビニ人間", url: `${SITE_URL}/book/konbini-ningen` },
-    { name: "舟を編む", url: `${SITE_URL}/book/fune-wo-amu` },
-    {
-      name: "The Midnight Library",
-      url: `${SITE_URL}/book/midnight-library`,
-    },
-    { name: "Atomic Habits", url: `${SITE_URL}/book/atomic-habits` },
-    {
-      name: "そして、バトンは渡された",
-      url: `${SITE_URL}/book/baton-wa-watasareta`,
-    },
-    {
-      name: "汝、星のごとく",
-      url: `${SITE_URL}/book/nanji-hoshi-no-gotoku`,
-    },
   ];
 
   return navItems.map((item) => ({
@@ -636,7 +527,6 @@ module.exports = async (req, res) => {
     rakutenIsbnFailures: 0,
     ndlSectionFailures: [],
     ndlIsbnFailures: 0,
-    sampleBooksUsed: false,
     supabaseIndexError: "none",
     supabaseProfileError: "none",
   };
@@ -655,11 +545,14 @@ module.exports = async (req, res) => {
     robots,
     pagePath = "/",
     extraJsonLd = [],
+    enableAds = false,
   }) => {
     const absoluteUrl = toAbsoluteUrl(pagePath);
-    const fullTitle = title.includes("Sharemarium")
-      ? title
-      : `${title} | Sharemarium`;
+    const fullTitle = title.includes(SITE_NAME)
+      ? title.includes(SITE_ALT_NAME)
+        ? title
+        : title.replace(SITE_NAME, SITE_BRAND)
+      : `${title} | ${SITE_BRAND}`;
     const jsonLdList = [
       organizationStructuredData(),
       jsonLd,
@@ -677,7 +570,7 @@ module.exports = async (req, res) => {
       <link rel="canonical" href="${absoluteUrl}">
         <meta property="og:title" content="${fullTitle}">
       <meta property="og:description" content="${description}">
-            <meta property="og:site_name" content="${SITE_NAME}">
+            <meta property="og:site_name" content="${SITE_BRAND}">
       <meta property="og:type" content="website">
             <meta property="og:locale" content="ja_JP">
       <meta property="og:url" content="${absoluteUrl}">
@@ -691,6 +584,27 @@ module.exports = async (req, res) => {
       <link rel="icon" type="image/svg+xml" sizes="any" href="${SITE_URL}/favicon.svg">
       <link rel="shortcut icon" href="${SITE_URL}/favicon.png">
       <link rel="apple-touch-icon" sizes="192x192" href="${SITE_URL}/icons/Icon-192.png">
+      <script>
+        window.__sharemariumAdsAllowed = ${enableAds ? "true" : "false"};
+      </script>
+      ${
+        enableAds
+          ? `
+      <script>
+        (function() {
+          if (!window.__sharemariumAdsAllowed) return;
+          const existing = document.querySelector('script[data-adsense]');
+          if (existing) return;
+          const script = document.createElement('script');
+          script.async = true;
+          script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3052085512168272';
+          script.crossOrigin = 'anonymous';
+          script.dataset.adsense = '1';
+          document.head.appendChild(script);
+        })();
+      </script>`
+          : ""
+      }
       ${jsonLdList
         .map(
           (item) =>
@@ -716,7 +630,7 @@ module.exports = async (req, res) => {
     </head>
     <body>
             <header>
-                <h1>${SITE_NAME} (${SITE_ALT_NAME})</h1>
+                <h1>${SITE_BRAND}</h1>
         <p>本のレビューと読書記録を管理できるアプリ</p>
       </header>
       <main>
@@ -729,7 +643,7 @@ module.exports = async (req, res) => {
         ${content}
       </main>
       <footer>
-        <p>© 2026 Sharemarium. All rights reserved.</p>
+        <p>© 2026 ${SITE_BRAND}. All rights reserved.</p>
       </footer>
     </body>
     </html>
@@ -745,31 +659,40 @@ module.exports = async (req, res) => {
     let hasReliableData = false;
     const isbnCache = new Map();
     const requestedProfileId = (() => {
-      const match = decodedPath.match(/(?:\/users\/|\/user\/|\/profile\/)([^/?#]+)/i);
+      const match = decodedPath.match(
+        /(?:\/users\/|\/user\/|\/profile\/)([^/?#]+)/i,
+      );
       return match ? decodeURIComponent(match[1]) : "";
     })();
+    const canonicalProfileUrl = canonicalProfilePath(requestedProfileId || "");
 
     try {
       if (requestedProfileId) {
+        const profileFilter = looksLikeUuid(requestedProfileId)
+          ? `id=eq.${encodeURIComponent(requestedProfileId)}`
+          : `user_id=eq.${encodeURIComponent(requestedProfileId.toLowerCase())}`;
         const profiles = await supabaseGet(
-          `profiles?id=eq.${encodeURIComponent(requestedProfileId)}&select=id,username,bio,read_count,followers_count,following_count,is_private,is_suspended` ,
+          `profiles?${profileFilter}&select=id,username,user_id,bio,read_count,followers_count,following_count,is_private,is_suspended`,
         );
         const user = Array.isArray(profiles) ? profiles[0] : null;
         if (user) {
-          const isPublic = user.is_private !== true && user.is_suspended !== true;
+          const isPublic =
+            user.is_private !== true && user.is_suspended !== true;
           if (!isPublic) {
             const forbiddenHtml = renderPage({
               title: "プロフィールは非公開です",
-              description: "指定されたプロフィールは公開範囲の条件を満たしていません。",
+              description:
+                "指定されたプロフィールは公開範囲の条件を満たしていません。",
               content: `<h2>プロフィールは非公開です</h2><p>このユーザーの公開プロフィールは表示できません。</p>`,
               jsonLd: {
                 "@context": "https://schema.org",
                 "@type": "WebPage",
                 name: "プロフィールは非公開です",
-                description: "指定されたプロフィールは公開範囲の条件を満たしていません。",
-                url: toAbsoluteUrl(decodedPath),
+                description:
+                  "指定されたプロフィールは公開範囲の条件を満たしていません。",
+                url: toAbsoluteUrl(canonicalProfileUrl),
               },
-              pagePath: decodedPath,
+              pagePath: canonicalProfileUrl,
               robots: "noindex,nofollow",
             });
             res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -844,9 +767,9 @@ module.exports = async (req, res) => {
               "@type": "WebPage",
               name: "ユーザーが見つかりません",
               description: "指定されたユーザーは存在しません。",
-              url: toAbsoluteUrl(decodedPath),
+              url: toAbsoluteUrl(canonicalProfileUrl),
             },
-            pagePath: decodedPath,
+            pagePath: canonicalProfileUrl,
             robots: "noindex,nofollow",
           });
           res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -888,6 +811,9 @@ module.exports = async (req, res) => {
       )
       .join("");
 
+    const canonicalPath = canonicalProfilePath(
+      user?.user_id || user?.username || requestedProfileId || "",
+    );
     const html = renderPage({
       title: `${escapeHtml(username)} のプロフィール`,
       description: buildProfileDescription(username, stats),
@@ -911,7 +837,8 @@ module.exports = async (req, res) => {
         name: escapeHtml(username),
         description: escapeHtml(bio),
       },
-      robots: "noindex,nofollow",
+      pagePath: canonicalPath,
+      robots: "index,follow",
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -1159,21 +1086,13 @@ module.exports = async (req, res) => {
       books = [];
     }
 
-    if (books.length === 0) {
-      books = sampleBooksFor(genreSection);
-      diagnostics.sampleBooksUsed = true;
-    }
-
-    const detailLinks = sampleBookLinksBySection(genreSection)
-      .map(
-        (book) =>
-          `<li><a href="${toAbsoluteUrl(`/book/${book.slug}`)}">${escapeHtml(book.title)}</a></li>`,
-      )
-      .join("");
+    const hasGenreBooks = books.length > 0;
+    const detailLinks = "";
 
     const html = renderPage({
       title: `${genreSection}一覧`,
       description: buildGenreDescription(genreSection, books),
+      enableAds: false,
       content: `
         <h2>${genreSection}について</h2>
         <p>Sharemariumが注目する${genreSection}を一覧で紹介します。</p>
@@ -1196,7 +1115,7 @@ module.exports = async (req, res) => {
         itemListStructuredData(genreSection, books, decodedPath),
       ],
       pagePath: decodedPath,
-      robots: "index,follow",
+      robots: hasGenreBooks ? "index,follow" : "noindex,nofollow",
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -1206,64 +1125,23 @@ module.exports = async (req, res) => {
 
   if (decodedPath.startsWith("/book/")) {
     const slug = decodedPath.replace("/book/", "").split("/")[0];
-    const book = sampleBookBySlug(slug);
-
-    if (!book) {
-      const notFoundHtml = renderPage({
-        title: "書籍ページが見つかりません",
-        description: "指定された書籍ページは見つかりませんでした。",
-        content: `<h2>書籍ページが見つかりません</h2><p>URLをご確認ください。</p>`,
-        jsonLd: {
-          "@context": "https://schema.org",
-          "@type": "WebPage",
-          name: "書籍ページが見つかりません",
-          description: "指定された書籍ページは見つかりませんでした。",
-          url: toAbsoluteUrl(decodedPath),
-        },
-        pagePath: decodedPath,
-        robots: "noindex,nofollow",
-      });
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      setDiagnosticsHeader(res, diagnostics);
-      return res.status(404).send(notFoundHtml);
-    }
-
-    diagnostics.sampleBooksUsed = true;
-    const genrePath = genrePathBySection(book.section);
-    const html = renderPage({
-      title: `${book.title} の紹介`,
-      description: buildBookDescription(book),
-      content: `
-        <h2>${escapeHtml(book.title)}</h2>
-        <p><strong>著者:</strong> ${escapeHtml(book.author)}</p>
-        <p>${escapeHtml(book.description)}</p>
-        <p><strong>ジャンル:</strong> <a href="${toAbsoluteUrl(genrePath)}">${escapeHtml(book.section)}</a></p>
-      `,
+    const notFoundHtml = renderPage({
+      title: "書籍ページが見つかりません",
+      description: "指定された書籍ページは見つかりませんでした。",
+      content: `<h2>書籍ページが見つかりません</h2><p>URLをご確認ください。</p>`,
       jsonLd: {
         "@context": "https://schema.org",
-        "@type": "Book",
-        name: book.title,
-        author: {
-          "@type": "Person",
-          name: book.author,
-        },
-        description: book.description,
+        "@type": "WebPage",
+        name: "書籍ページが見つかりません",
+        description: "指定された書籍ページは見つかりませんでした。",
         url: toAbsoluteUrl(decodedPath),
       },
-      extraJsonLd: [
-        breadcrumbStructuredData([
-          { name: "ホーム", url: `${SITE_URL}/` },
-          { name: book.section, url: toAbsoluteUrl(genrePath) },
-          { name: book.title, url: toAbsoluteUrl(decodedPath) },
-        ]),
-      ],
       pagePath: decodedPath,
-      robots: "index,follow",
+      robots: "noindex,nofollow",
     });
-
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     setDiagnosticsHeader(res, diagnostics);
-    return res.status(200).send(html);
+    return res.status(404).send(notFoundHtml);
   }
 
   let recommendedBooks = [];
@@ -1271,7 +1149,6 @@ module.exports = async (req, res) => {
   let popularBooks = [];
   let recentPosts = [];
   let hasReliableData = false;
-  let usingSampleBooks = false;
 
   try {
     const [recommendedR, westernR, popularR] = await Promise.all([
@@ -1297,21 +1174,6 @@ module.exports = async (req, res) => {
     recommendedBooks = recommendedR.length ? recommendedR : recommendedN;
     westernBooks = westernR.length ? westernR : westernN;
     popularBooks = popularR.length ? popularR : popularN;
-
-    if (ENABLE_SAMPLE_BOOK_FALLBACK) {
-      if (recommendedBooks.length === 0) {
-        recommendedBooks = sampleBooksFor("おすすめの本");
-        usingSampleBooks = true;
-      }
-      if (westernBooks.length === 0) {
-        westernBooks = sampleBooksFor("洋書");
-        usingSampleBooks = true;
-      }
-      if (popularBooks.length === 0) {
-        popularBooks = sampleBooksFor("人気作品");
-        usingSampleBooks = true;
-      }
-    }
 
     if (
       recommendedBooks.length > 0 ||
@@ -1370,13 +1232,12 @@ module.exports = async (req, res) => {
   `,
     )
     .join("");
-  diagnostics.sampleBooksUsed = usingSampleBooks;
-
-  const sampleNoticeHtml = usingSampleBooks
-    ? `<p style="background:#fff3cd; border:1px solid #ffe69c; color:#664d03; padding:10px; border-radius:8px;">現在、外部APIの一時的な制約により書籍情報はサンプル表示です。</p>`
-    : "";
   const faqHtml = `
             <h2>よくある質問</h2>
+            <div class="post-card">
+                <strong>シェアマリウムとは何ですか？</strong>
+                <p>シェアマリウムは、英字でSharemariumと表記する、読書記録・本管理・レビュー共有のためのWebサービスです。</p>
+            </div>
             <div class="post-card">
                 <strong>Sharemariumでは何ができますか？</strong>
                 <p>本の検索、レビュー投稿、読書記録の管理、タイムライン閲覧ができます。</p>
@@ -1402,22 +1263,23 @@ module.exports = async (req, res) => {
                 <li><a href="${SITE_URL}/infringement-policy">権利侵害・通報ポリシー</a></li>
                 <li><a href="${SITE_URL}/external-transmission">外部送信に関する公表事項</a></li>
                 <li><a href="${SITE_URL}/contact">お問い合わせ</a></li>
-                <li><a href="${SITE_URL}/book/konbini-ningen">コンビニ人間の紹介</a></li>
-                <li><a href="${SITE_URL}/book/fune-wo-amu">舟を編むの紹介</a></li>
-                <li><a href="${SITE_URL}/book/midnight-library">The Midnight Library の紹介</a></li>
-                <li><a href="${SITE_URL}/book/atomic-habits">Atomic Habits の紹介</a></li>
-                <li><a href="${SITE_URL}/book/baton-wa-watasareta">そして、バトンは渡されたの紹介</a></li>
-                <li><a href="${SITE_URL}/book/nanji-hoshi-no-gotoku">汝、星のごとくの紹介</a></li>
             </ul>
         `;
+
+  const canShowAdsOnHome =
+    recommendedBooks.length > 0 ||
+    westernBooks.length > 0 ||
+    popularBooks.length > 0 ||
+    recentPosts.length > 0;
 
   const html = renderPage({
     title: SITE_TITLE,
     description: TOP_DESCRIPTION,
+    enableAds: canShowAdsOnHome,
     content: `
             <section>
-            <h2>Sharemariumでできること</h2>
-            <p>Sharemariumは、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録・本管理アプリです。読書履歴、感想、蔵書管理を一つのWeb本棚で行えます。</p>
+            <h2>Sharemarium（シェアマリウム）でできること</h2>
+            <p>Sharemarium（シェアマリウム）は、読んだ本、読書中の本、これから読みたい本をまとめて管理できる読書記録・本管理アプリです。読書履歴、感想、蔵書管理を一つのWeb本棚で行えます。</p>
             <h3>主な機能</h3>
             <ul>
                 <li>読んだ本の登録と読書履歴の保存</li>
@@ -1429,8 +1291,6 @@ module.exports = async (req, res) => {
             <p>読んだ本を忘れずに記録したい方、所有している本を整理したい方、読書習慣を振り返りたい方に向けたサービスです。</p>
             <p><a href="${SITE_URL}/">Sharemariumを始める</a> / <a href="${SITE_URL}/contact">お問い合わせ</a></p>
             </section>
-            ${sampleNoticeHtml}
-
       <h2>おすすめの本</h2>
       <div>${renderBookList(recommendedBooks)}</div>
 
@@ -1465,8 +1325,7 @@ module.exports = async (req, res) => {
       ...siteNavigationStructuredData(),
     ],
     pagePath: decodedPath || "/",
-    robots:
-      hasReliableData || usingSampleBooks ? "index,follow" : "noindex,nofollow",
+    robots: hasReliableData ? "index,follow" : "noindex,nofollow",
   });
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
