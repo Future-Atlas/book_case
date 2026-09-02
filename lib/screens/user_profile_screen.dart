@@ -1058,7 +1058,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final selectedTextColor = isDarkMode ? Colors.black : Colors.white;
     final unselectedTextColor = isDarkMode ? Colors.white : Colors.black;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: tabBackgroundColor,
         borderRadius: BorderRadius.circular(16),
