@@ -26,7 +26,26 @@ enum FavoriteToggleResult {
   failed,
 }
 
-enum WantToReadToggleResult { added, removed, failed }
+enum WantToReadToggleResult { added, removed, alreadyRead, failed }
+
+extension WantToReadToggleResultLabel on WantToReadToggleResult {
+  bool get shouldRestoreOptimisticState =>
+      this == WantToReadToggleResult.alreadyRead ||
+      this == WantToReadToggleResult.failed;
+
+  String get message {
+    switch (this) {
+      case WantToReadToggleResult.added:
+        return '「読みたい！」に追加しました。';
+      case WantToReadToggleResult.removed:
+        return '「読みたい！」から解除しました。';
+      case WantToReadToggleResult.alreadyRead:
+        return 'この本はすでに読了済みです。';
+      case WantToReadToggleResult.failed:
+        return '「読みたい！」を更新できませんでした。';
+    }
+  }
+}
 
 class SupabaseService extends ChangeNotifier {
   static const int standardFavoriteLimit = 3;
@@ -2249,9 +2268,16 @@ class SupabaseService extends ChangeNotifier {
         },
       );
       notifyListeners();
-      return result?.toString() == 'removed'
-          ? WantToReadToggleResult.removed
-          : WantToReadToggleResult.added;
+      switch (result?.toString()) {
+        case 'added':
+          return WantToReadToggleResult.added;
+        case 'removed':
+          return WantToReadToggleResult.removed;
+        case 'already_read':
+          return WantToReadToggleResult.alreadyRead;
+        default:
+          return WantToReadToggleResult.failed;
+      }
     } catch (e) {
       debugPrint('Error toggling want-to-read: $e');
       return WantToReadToggleResult.failed;

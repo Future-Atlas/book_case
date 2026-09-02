@@ -191,11 +191,11 @@ class _BookListScreenState extends State<BookListScreen> {
     );
     _pendingReactionPostIds.remove('want:${post.id}');
     if (!mounted) return;
-    if (result == WantToReadToggleResult.failed && previous != null) {
+    if (result.shouldRestoreOptimisticState && previous != null) {
       _controller.restoreTimelinePost(previous);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('「読みたい！」を更新できませんでした。')));
+      ).showSnackBar(SnackBar(content: Text(result.message)));
     }
   }
 
@@ -474,9 +474,8 @@ class _BookListScreenState extends State<BookListScreen> {
                                                         );
                                                     if (!mounted) return;
                                                     if (context.mounted &&
-                                                        result !=
-                                                            WantToReadToggleResult
-                                                                .failed) {
+                                                        !result
+                                                            .shouldRestoreOptimisticState) {
                                                       Navigator.of(
                                                         context,
                                                       ).pop();
@@ -486,15 +485,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                                     ).showSnackBar(
                                                       SnackBar(
                                                         content: Text(
-                                                          result ==
-                                                                  WantToReadToggleResult
-                                                                      .added
-                                                              ? '「読みたい！」に追加しました。'
-                                                              : result ==
-                                                                    WantToReadToggleResult
-                                                                        .removed
-                                                              ? '「読みたい！」から解除しました。'
-                                                              : '「読みたい！」を更新できませんでした。',
+                                                          result.message,
                                                         ),
                                                       ),
                                                     );
@@ -1575,12 +1566,15 @@ class _BookPostsPanelState extends State<_BookPostsPanel> {
       sourcePostId: post.id,
     );
     if (!mounted) return;
-    if (result == WantToReadToggleResult.failed) {
+    if (result.shouldRestoreOptimisticState) {
       setState(() {
         final current = List<Post>.from(_posts);
         current[index] = post;
         _posts = current;
       });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
     }
   }
 

@@ -449,7 +449,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
     _pendingReactionPostIds.remove(pendingKey);
     if (!mounted) return;
-    if (result == WantToReadToggleResult.failed && previous != null) {
+    if (result.shouldRestoreOptimisticState && previous != null) {
       setState(() {
         final restoreIndex = _userPosts.indexWhere((p) => p.id == previous.id);
         if (restoreIndex >= 0) {
@@ -458,6 +458,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           _userPosts = restored;
         }
       });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.message)));
     } else {
       final profileId = Provider.of<SupabaseService>(
         context,
@@ -768,6 +771,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                           _buildGridTab(
                             _wantToRead,
                             '「読みたい！」作品はありません。',
+                            showDescription: true,
                             compactThreeColumn: true,
                           ),
                         ],
@@ -1046,6 +1050,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Widget _buildTabBar() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
     final tabBackgroundColor = isDarkMode
         ? const Color(0xFF424242)
         : const Color(0xFFBDBDBD);
@@ -1060,6 +1065,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       ),
       child: TabBar(
         controller: _tabController,
+        isScrollable: isMobile,
+        tabAlignment: isMobile ? TabAlignment.start : null,
+        labelPadding: EdgeInsets.zero,
         indicator: BoxDecoration(
           color: selectedBackgroundColor,
           borderRadius: BorderRadius.circular(12),
@@ -1074,12 +1082,36 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           fontWeight: FontWeight.w500,
           fontSize: 13,
         ),
-        tabs: const [
-          Tab(text: '投稿'),
-          Tab(text: 'My 本棚'),
-          Tab(text: 'お気に入り'),
-          Tab(text: '読みたい！'),
-        ],
+        tabs: isMobile
+            ? const [
+                Tab(
+                  child: SizedBox(width: 56, child: Center(child: Text('投稿'))),
+                ),
+                Tab(
+                  child: SizedBox(
+                    width: 74,
+                    child: Center(child: Text('My 本棚')),
+                  ),
+                ),
+                Tab(
+                  child: SizedBox(
+                    width: 100,
+                    child: Center(child: Text('お気に入り')),
+                  ),
+                ),
+                Tab(
+                  child: SizedBox(
+                    width: 94,
+                    child: Center(child: Text('読みたい！')),
+                  ),
+                ),
+              ]
+            : const [
+                Tab(text: '投稿'),
+                Tab(text: 'My 本棚'),
+                Tab(text: 'お気に入り'),
+                Tab(text: '読みたい！'),
+              ],
       ),
     );
   }
