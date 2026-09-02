@@ -2,7 +2,7 @@
 // Mock book data removed – books are fetched from external APIs via BookRepository.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' hide debugPrint;
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../api/rakuten_api.dart';
 import '../models/book.dart';
@@ -16,10 +16,12 @@ import '../models/profile_page_color.dart';
 import 'content_safety_service.dart';
 import 'input_security_service.dart';
 import 'timeline_ranking_service.dart';
+import '../utils/dev_logger.dart';
 
-// Do not emit internal diagnostics in public builds. User-facing errors are
-// shown by the calling screens as appropriate.
-void debugPrint(String? message, {int? wrapWidth}) {}
+// Kept for local troubleshooting. `debugLog` is silent outside debug builds.
+void debugPrint(String? message, {int? wrapWidth}) {
+  debugLog(message, wrapWidth: wrapWidth);
+}
 
 enum FavoriteToggleResult {
   added,

@@ -1,12 +1,15 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' hide debugPrint;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/book.dart';
+import '../utils/dev_logger.dart';
 
-// External API diagnostics must not be emitted to the public web console.
-void debugPrint(String? message, {int? wrapWidth}) {}
+// Kept for local troubleshooting. `debugLog` is silent outside debug builds.
+void debugPrint(String? message, {int? wrapWidth}) {
+  debugLog(message, wrapWidth: wrapWidth);
+}
 
 class RakutenApi {
   static const String _proxyBaseUrl = String.fromEnvironment(
