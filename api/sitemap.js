@@ -1,5 +1,5 @@
 const SITE_URL = "https://sharemarium.com";
-const LASTMOD = process.env.SEO_LASTMOD || "2026-07-18";
+const LASTMOD = process.env.SEO_LASTMOD || "2026-09-02";
 const IS_PRODUCTION = process.env.VERCEL_ENV === "production";
 
 function nowIsoDate() {
@@ -19,9 +19,6 @@ module.exports = async (_req, res) => {
     sitemapUrl(`${SITE_URL}/infringement-policy`, "monthly", "0.4"),
     sitemapUrl(`${SITE_URL}/external-transmission`, "monthly", "0.4"),
     sitemapUrl(`${SITE_URL}/contact`, "monthly", "0.4"),
-    sitemapUrl(`${SITE_URL}/genre/recommended`, "daily", "0.9"),
-    sitemapUrl(`${SITE_URL}/genre/western`, "daily", "0.9"),
-    sitemapUrl(`${SITE_URL}/genre/popular`, "daily", "0.9"),
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join("\n")}\n</urlset>\n`;

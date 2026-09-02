@@ -276,9 +276,11 @@ class _ProfileBookSearchScreenState extends State<ProfileBookSearchScreen> {
                                     borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                                child: const Text(
-                                  '読了',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                child: Text(
+                                  isRead ? '読了済み' : '読了',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               );
                             },

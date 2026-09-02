@@ -2,7 +2,7 @@
 // Mock book data removed – books are fetched from external APIs via BookRepository.
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../api/rakuten_api.dart';
 import '../models/book.dart';
@@ -16,6 +16,10 @@ import '../models/profile_page_color.dart';
 import 'content_safety_service.dart';
 import 'input_security_service.dart';
 import 'timeline_ranking_service.dart';
+
+// Do not emit internal diagnostics in public builds. User-facing errors are
+// shown by the calling screens as appropriate.
+void debugPrint(String? message, {int? wrapWidth}) {}
 
 enum FavoriteToggleResult {
   added,
@@ -1597,7 +1601,7 @@ class SupabaseService extends ChangeNotifier {
 
   Future<List<Post>> fetchPostsForBook(
     String bookId, {
-    bool excludeCurrentUser = true,
+    bool excludeCurrentUser = false,
   }) async {
     final normalizedBookId = bookId.trim();
     if (!_isInitialized || _client == null || normalizedBookId.isEmpty) {
@@ -1609,12 +1613,26 @@ class SupabaseService extends ChangeNotifier {
       final enriched = await _enrichPostsWithBookMetadata(parsed);
       final visible = await _filterPostsForCurrentViewer(enriched);
       final viewerId = activeProfileId;
-      final otherUsersPosts = excludeCurrentUser && viewerId.isNotEmpty
+      final otherUsersPosts = viewerId.isNotEmpty
           ? visible
                 .where((post) => post.profileId != viewerId)
                 .toList(growable: false)
-          : visible;
-      return _arrangeTimelinePosts(otherUsersPosts);
+          : <Post>[];
+      if (excludeCurrentUser || viewerId.isEmpty) {
+        return _arrangeTimelinePosts(
+          excludeCurrentUser ? otherUsersPosts : visible,
+        );
+      }
+
+      final ownPosts =
+          visible
+              .where((post) => post.profileId == viewerId)
+              .toList(growable: false)
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final rankedOtherUsersPosts = await _arrangeTimelinePosts(
+        otherUsersPosts,
+      );
+      return [...ownPosts, ...rankedOtherUsersPosts];
     }
 
     try {

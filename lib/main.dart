@@ -33,10 +33,6 @@ void main() async {
 
   await themeService.initialize();
 
-  debugPrint(
-    'Starting Sharemarium with APP_ENV=${AppEnvironmentConfig.environmentName}',
-  );
-
   // Initialize Supabase service
   await supabaseService.initialize(
     url: AppEnvironmentConfig.supabaseUrl,

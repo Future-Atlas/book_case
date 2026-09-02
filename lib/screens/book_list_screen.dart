@@ -438,9 +438,9 @@ class _BookListScreenState extends State<BookListScreen> {
                                             ),
                                           ),
                                         ),
-                                        child: const Text(
-                                          '読了',
-                                          style: TextStyle(
+                                        child: Text(
+                                          isRead ? '読了済み' : '読了',
+                                          style: const TextStyle(
                                             fontSize: 52 / 2,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -1642,7 +1642,7 @@ class _BookPostsPanelState extends State<_BookPostsPanel> {
                 : _posts.isEmpty
                 ? Center(
                     child: Text(
-                      'この本に関する他のユーザーの投稿はまだありません。',
+                      'この本に関する投稿はまだありません。',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: isDarkMode ? Colors.white70 : Colors.black54,

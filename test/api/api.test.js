@@ -105,6 +105,9 @@ test("production sitemap omits fixed sample book URLs", async () => {
   assert.equal(res.statusCode, 200);
   assert.doesNotMatch(res.body, /\/book\/konbini-ningen/);
   assert.doesNotMatch(res.body, /\/book\/midnight-library/);
+  assert.doesNotMatch(res.body, /\/genre\/recommended/);
+  assert.doesNotMatch(res.body, /\/genre\/western/);
+  assert.doesNotMatch(res.body, /\/genre\/popular/);
   delete process.env.VERCEL_ENV;
 });
 
