@@ -24,6 +24,7 @@ class _ProfileBookSearchScreenState extends State<ProfileBookSearchScreen> {
   bool _hasSearched = false;
   int _searchGeneration = 0;
   final Map<String, Future<bool>> _readStatusFutures = {};
+  final Map<String, Future<bool>> _wantedStatusFutures = {};
 
   @override
   void initState() {
@@ -83,6 +84,25 @@ class _ProfileBookSearchScreenState extends State<ProfileBookSearchScreen> {
     final posted = await showPostComposerDialog(context: context, book: book);
     if (!mounted || !posted) return;
     Navigator.of(context).pop(true);
+  }
+
+  Future<void> _toggleWantToRead(Book book) async {
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final result = await service.toggleWantToRead(book: book);
+    if (!mounted) return;
+    _wantedStatusFutures[book.id] = service.isBookWantedByCurrentUser(book.id);
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result == WantToReadToggleResult.added
+              ? '「読みたい！」に追加しました。'
+              : result == WantToReadToggleResult.removed
+              ? '「読みたい！」から解除しました。'
+              : '「読みたい！」を更新できませんでした。',
+        ),
+      ),
+    );
   }
 
   @override
@@ -233,43 +253,76 @@ class _ProfileBookSearchScreenState extends State<ProfileBookSearchScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FutureBuilder<bool>(
-                          future: _readStatusFutures.putIfAbsent(
-                            book.id,
-                            () => Provider.of<SupabaseService>(
-                              context,
-                              listen: false,
-                            ).isBookReadByCurrentUser(bookId: book.id),
-                          ),
-                          builder: (context, snapshot) {
-                            final isRead = snapshot.data ?? false;
-                            final isChecking =
-                                snapshot.connectionState ==
-                                ConnectionState.waiting;
-                            return ElevatedButton(
-                              onPressed: isRead || isChecking
-                                  ? null
-                                  : () => _markAsRead(book),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                foregroundColor: const Color(0xFFFF1F1F),
-                                disabledBackgroundColor: Colors.black,
-                                disabledForegroundColor: isRead
-                                    ? const Color(0xFF00BFFF)
-                                    : Colors.grey,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          FutureBuilder<bool>(
+                            future: _readStatusFutures.putIfAbsent(
+                              book.id,
+                              () => Provider.of<SupabaseService>(
+                                context,
+                                listen: false,
+                              ).isBookReadByCurrentUser(bookId: book.id),
+                            ),
+                            builder: (context, snapshot) {
+                              final isRead = snapshot.data ?? false;
+                              final isChecking =
+                                  snapshot.connectionState ==
+                                  ConnectionState.waiting;
+                              return ElevatedButton(
+                                onPressed: isRead || isChecking
+                                    ? null
+                                    : () => _markAsRead(book),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: const Color(0xFFFF1F1F),
+                                  disabledBackgroundColor: Colors.black,
+                                  disabledForegroundColor: isRead
+                                      ? const Color(0xFF00BFFF)
+                                      : Colors.grey,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
                                 ),
-                              ),
-                              child: const Text(
-                                '読了',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            );
-                          },
-                        ),
+                                child: const Text(
+                                  '読了',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          FutureBuilder<bool>(
+                            future: _wantedStatusFutures.putIfAbsent(
+                              book.id,
+                              () => Provider.of<SupabaseService>(
+                                context,
+                                listen: false,
+                              ).isBookWantedByCurrentUser(book.id),
+                            ),
+                            builder: (context, snapshot) {
+                              final wanted = snapshot.data ?? false;
+                              return ElevatedButton(
+                                onPressed:
+                                    snapshot.connectionState ==
+                                        ConnectionState.waiting
+                                    ? null
+                                    : () => _toggleWantToRead(book),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.amber,
+                                  disabledBackgroundColor: Colors.black,
+                                  disabledForegroundColor:
+                                      Colors.amber.shade200,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                child: Text(wanted ? '読みたい！済み' : '読みたい！'),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),

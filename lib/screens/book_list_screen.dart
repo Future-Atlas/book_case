@@ -12,6 +12,7 @@ import '../widgets/post_composer_dialog.dart';
 import '../widgets/post_reply_dialog.dart';
 import 'report_post_dialog.dart';
 import 'user_profile_screen.dart';
+import 'post_engagement_users_screen.dart';
 
 class BookListScreen extends StatefulWidget {
   const BookListScreen({
@@ -169,6 +170,56 @@ class _BookListScreenState extends State<BookListScreen> {
     }
   }
 
+  Future<void> _toggleWantToReadFromPost(Post post) async {
+    if (!await _ensureAuthenticated() || !mounted) return;
+    if (!_pendingReactionPostIds.add('want:${post.id}')) return;
+    final previous = _controller.toggleTimelineWantToReadOptimistically(
+      post.id,
+    );
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final result = await service.toggleWantToRead(
+      book: Book(
+        id: post.bookId,
+        title: post.bookTitle,
+        author: post.bookAuthor,
+        publisher: '',
+        pubDate: '',
+        isbn: post.bookId,
+        coverUrl: post.bookCoverUrl,
+      ),
+      sourcePostId: post.id,
+    );
+    _pendingReactionPostIds.remove('want:${post.id}');
+    if (!mounted) return;
+    if (result == WantToReadToggleResult.failed && previous != null) {
+      _controller.restoreTimelinePost(previous);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('「読みたい！」を更新できませんでした。')));
+    }
+  }
+
+  Future<void> _openEngagementUsers(
+    Post post, {
+    PostReactionType? reaction,
+    bool wantToRead = false,
+  }) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => PostEngagementUsersScreen(
+          postId: post.id,
+          title: wantToRead ? '「読みたい！」したユーザー' : '${reaction!.symbol}したユーザー',
+          reaction: reaction,
+          wantToRead: wantToRead,
+          onProfileTap: (profile) {
+            Navigator.of(routeContext).pop();
+            _openUserProfile(profile.id);
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _reportPost(String postId) async {
     if (!await _ensureAuthenticated() || !mounted) return;
     await showPostReportDialog(context: context, postId: postId);
@@ -277,6 +328,7 @@ class _BookListScreenState extends State<BookListScreen> {
         final service = Provider.of<SupabaseService>(context, listen: false);
         final isReadFuture = service.isBookReadByCurrentUser(bookId: book.id);
         final isFavoriteFuture = service.isBookFavoritedByCurrentUser(book.id);
+        final isWantedFuture = service.isBookWantedByCurrentUser(book.id);
 
         return Dialog(
           backgroundColor: const Color(0xFFE6E6E6),
@@ -356,39 +408,123 @@ class _BookListScreenState extends State<BookListScreen> {
                               final isChecking =
                                   snapshot.connectionState ==
                                   ConnectionState.waiting;
-                              return Align(
-                                alignment: Alignment.topCenter,
-                                child: SizedBox(
-                                  width: 190,
-                                  height: 64,
-                                  child: ElevatedButton(
-                                    onPressed: isRead || isChecking
-                                        ? null
-                                        : () async {
-                                            if (!mounted) return;
-                                            Navigator.of(this.context).pop();
-                                            _showPostComposerDialog(book);
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.black,
-                                      foregroundColor: const Color(0xFFFF1F1F),
-                                      disabledBackgroundColor: Colors.black,
-                                      disabledForegroundColor: isRead
-                                          ? const Color(0xFF00BFFF)
-                                          : Colors.grey,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      '読了',
-                                      style: TextStyle(
-                                        fontSize: 52 / 2,
-                                        fontWeight: FontWeight.bold,
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 64,
+                                      child: ElevatedButton(
+                                        onPressed: isRead || isChecking
+                                            ? null
+                                            : () async {
+                                                if (!mounted) return;
+                                                Navigator.of(
+                                                  this.context,
+                                                ).pop();
+                                                _showPostComposerDialog(book);
+                                              },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.black,
+                                          foregroundColor: const Color(
+                                            0xFFFF1F1F,
+                                          ),
+                                          disabledBackgroundColor: Colors.black,
+                                          disabledForegroundColor: isRead
+                                              ? const Color(0xFF00BFFF)
+                                              : Colors.grey,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              18,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          '読了',
+                                          style: TextStyle(
+                                            fontSize: 52 / 2,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FutureBuilder<bool>(
+                                      future: isWantedFuture,
+                                      builder: (context, wantedSnapshot) {
+                                        final wanted =
+                                            wantedSnapshot.data ?? false;
+                                        final checking =
+                                            wantedSnapshot.connectionState ==
+                                            ConnectionState.waiting;
+                                        return SizedBox(
+                                          height: 64,
+                                          child: ElevatedButton(
+                                            onPressed: checking
+                                                ? null
+                                                : () async {
+                                                    if (!await _ensureAuthenticated() ||
+                                                        !mounted) {
+                                                      return;
+                                                    }
+                                                    final result = await service
+                                                        .toggleWantToRead(
+                                                          book: book,
+                                                        );
+                                                    if (!mounted) return;
+                                                    if (context.mounted &&
+                                                        result !=
+                                                            WantToReadToggleResult
+                                                                .failed) {
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop();
+                                                    }
+                                                    ScaffoldMessenger.of(
+                                                      this.context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          result ==
+                                                                  WantToReadToggleResult
+                                                                      .added
+                                                              ? '「読みたい！」に追加しました。'
+                                                              : result ==
+                                                                    WantToReadToggleResult
+                                                                        .removed
+                                                              ? '「読みたい！」から解除しました。'
+                                                              : '「読みたい！」を更新できませんでした。',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.black,
+                                              foregroundColor: Colors.amber,
+                                              disabledBackgroundColor:
+                                                  Colors.black,
+                                              disabledForegroundColor:
+                                                  Colors.amber.shade200,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              wanted ? '読みたい！済み' : '読みたい！',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -1241,12 +1377,10 @@ class _BookListScreenState extends State<BookListScreen> {
           itemCount: _controller.timelinePosts.length,
           itemBuilder: (context, index) {
             final post = _controller.timelinePosts[index];
-            // Temporarily disable auth-bound ownership state in guest mode.
-            // final currentProfileId = Provider.of<SupabaseService>(
-            //   context,
-            //   listen: false,
-            // ).activeProfileId;
-            const currentProfileId = '';
+            final currentProfileId = Provider.of<SupabaseService>(
+              context,
+              listen: false,
+            ).activeProfileId;
             return PostCard(
               key: ValueKey(post.id),
               post: post,
@@ -1256,6 +1390,13 @@ class _BookListScreenState extends State<BookListScreen> {
               onReaction: post.profileId == currentProfileId
                   ? null
                   : (reaction) => _toggleReaction(post.id, reaction),
+              onWantToRead: post.profileId == currentProfileId
+                  ? null
+                  : () => _toggleWantToReadFromPost(post),
+              onReactionUsers: (reaction) =>
+                  _openEngagementUsers(post, reaction: reaction),
+              onWantToReadUsers: () =>
+                  _openEngagementUsers(post, wantToRead: true),
               onDelete: post.profileId == currentProfileId
                   ? () => _deletePost(post)
                   : null,
@@ -1414,6 +1555,56 @@ class _BookPostsPanelState extends State<_BookPostsPanel> {
     if (mounted) await _load(showLoading: false);
   }
 
+  Future<void> _toggleWantToRead(Post post) async {
+    final index = _posts.indexWhere((candidate) => candidate.id == post.id);
+    if (index < 0) return;
+    final optimistic = List<Post>.from(_posts);
+    optimistic[index] = post.withToggledWantToRead();
+    setState(() => _posts = optimistic);
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final result = await service.toggleWantToRead(
+      book: Book(
+        id: post.bookId,
+        title: post.bookTitle,
+        author: post.bookAuthor,
+        publisher: '',
+        pubDate: '',
+        isbn: post.bookId,
+        coverUrl: post.bookCoverUrl,
+      ),
+      sourcePostId: post.id,
+    );
+    if (!mounted) return;
+    if (result == WantToReadToggleResult.failed) {
+      setState(() {
+        final current = List<Post>.from(_posts);
+        current[index] = post;
+        _posts = current;
+      });
+    }
+  }
+
+  Future<void> _showEngagementUsers(
+    Post post, {
+    PostReactionType? reaction,
+    bool wantToRead = false,
+  }) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => PostEngagementUsersScreen(
+          postId: post.id,
+          title: wantToRead ? '「読みたい！」したユーザー' : '${reaction!.symbol}したユーザー',
+          reaction: reaction,
+          wantToRead: wantToRead,
+          onProfileTap: (profile) {
+            Navigator.of(routeContext).pop();
+            widget.onUserTap(profile.id);
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _reply(Post post, PostReply? parentReply) async {
     await widget.onReply(post, parentReply);
     if (mounted) await _load(showLoading: false);
@@ -1492,6 +1683,13 @@ class _BookPostsPanelState extends State<_BookPostsPanel> {
                             onReaction: post.profileId == currentProfileId
                                 ? null
                                 : (reaction) => _toggleReaction(post, reaction),
+                            onWantToRead: post.profileId == currentProfileId
+                                ? null
+                                : () => _toggleWantToRead(post),
+                            onReactionUsers: (reaction) =>
+                                _showEngagementUsers(post, reaction: reaction),
+                            onWantToReadUsers: () =>
+                                _showEngagementUsers(post, wantToRead: true),
                             onReport: post.profileId == currentProfileId
                                 ? null
                                 : () => widget.onReport(post),

@@ -26,6 +26,8 @@ enum FavoriteToggleResult {
   failed,
 }
 
+enum WantToReadToggleResult { added, removed, failed }
+
 class SupabaseService extends ChangeNotifier {
   static const int standardFavoriteLimit = 3;
   static const int subscriberFavoriteLimit = 12;
@@ -1312,6 +1314,7 @@ class SupabaseService extends ChangeNotifier {
         final rawType = row['type']?.toString();
         final type = switch (rawType) {
           'reaction' => SocialNotificationType.reaction,
+          'want_to_read' => SocialNotificationType.wantToRead,
           'reply' => SocialNotificationType.reply,
           'follow_request' => SocialNotificationType.followRequest,
           'new_post' => SocialNotificationType.newPost,
@@ -1860,6 +1863,42 @@ class SupabaseService extends ChangeNotifier {
     return [];
   }
 
+  Future<List<Book>> fetchUserWantToRead(String profileId) async {
+    if (!_isInitialized || _client == null || profileId.isEmpty) return [];
+    try {
+      final response = await _client!
+          .from('want_to_read_books')
+          .select(
+            'book_id, book_title, book_author, book_cover_url, created_at',
+          )
+          .eq('profile_id', profileId)
+          .order('created_at', ascending: false);
+      final rows = (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false);
+      final resolved = await Future.wait(
+        rows.map((row) async {
+          final id = row['book_id']?.toString() ?? '';
+          final apiBook = await RakutenApi.fetchBookById(id);
+          if (apiBook != null) return apiBook;
+          return Book(
+            id: id,
+            title: row['book_title']?.toString() ?? id,
+            author: row['book_author']?.toString() ?? '',
+            publisher: '',
+            pubDate: '',
+            isbn: id,
+            coverUrl: row['book_cover_url']?.toString() ?? '',
+          );
+        }),
+      );
+      return resolved.where((book) => book.id.isNotEmpty).toList();
+    } catch (e) {
+      debugPrint('Error fetching want-to-read shelf: $e');
+      return [];
+    }
+  }
+
   // 該当箇所（105行目付近から始まるメソッド）をこれに差し替えてください
   Future<List<Post>> fetchUserPosts(String uid) async {
     if (!_isInitialized || _client == null) return [];
@@ -2070,7 +2109,7 @@ class SupabaseService extends ChangeNotifier {
           currentReactions[postId] = reaction;
         }
       }
-      return posts
+      var enrichedPosts = posts
           .map(
             (post) => post.copyWith(
               reactionCounts: counts[post.id] ?? const {},
@@ -2078,6 +2117,35 @@ class SupabaseService extends ChangeNotifier {
             ),
           )
           .toList();
+      try {
+        final wantResponse = await _client!
+            .from('post_want_to_reads')
+            .select('post_id, profile_id')
+            .inFilter('post_id', postIds);
+        final wantCounts = <String, int>{};
+        final wantedPostIds = <String>{};
+        for (final raw in wantResponse as List<dynamic>) {
+          final row = raw as Map<String, dynamic>;
+          final postId = row['post_id']?.toString() ?? '';
+          if (postId.isEmpty) continue;
+          wantCounts[postId] = (wantCounts[postId] ?? 0) + 1;
+          if (row['profile_id']?.toString() == currentProfileId) {
+            wantedPostIds.add(postId);
+          }
+        }
+        enrichedPosts = enrichedPosts
+            .map(
+              (post) => post.copyWith(
+                wantToReadCount: wantCounts[post.id] ?? 0,
+                wantedByCurrentUser: wantedPostIds.contains(post.id),
+              ),
+            )
+            .toList();
+      } catch (e) {
+        // Keep ordinary reactions available while a new migration is pending.
+        debugPrint('Error attaching want-to-read state: $e');
+      }
+      return enrichedPosts;
     } catch (e) {
       debugPrint('Error attaching reaction state: $e');
       return posts;
@@ -2159,6 +2227,99 @@ class SupabaseService extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error setting post reaction: $e');
       return false;
+    }
+  }
+
+  Future<WantToReadToggleResult> toggleWantToRead({
+    required Book book,
+    String? sourcePostId,
+  }) async {
+    if (!_isInitialized || _client == null || !isAuthenticated) {
+      return WantToReadToggleResult.failed;
+    }
+    try {
+      final result = await _client!.rpc(
+        'toggle_want_to_read',
+        params: {
+          'target_book_id': book.id,
+          'target_book_title': book.title,
+          'target_book_author': book.author,
+          'target_book_cover_url': book.coverUrl,
+          'source_post_id': sourcePostId,
+        },
+      );
+      notifyListeners();
+      return result?.toString() == 'removed'
+          ? WantToReadToggleResult.removed
+          : WantToReadToggleResult.added;
+    } catch (e) {
+      debugPrint('Error toggling want-to-read: $e');
+      return WantToReadToggleResult.failed;
+    }
+  }
+
+  Future<bool> isBookWantedByCurrentUser(String bookId) async {
+    if (!_isInitialized || _client == null || activeProfileId.isEmpty) {
+      return false;
+    }
+    try {
+      final row = await _client!
+          .from('want_to_read_books')
+          .select('book_id')
+          .eq('profile_id', activeProfileId)
+          .eq('book_id', bookId)
+          .maybeSingle();
+      return row != null;
+    } catch (e) {
+      debugPrint('Error checking want-to-read state: $e');
+      return false;
+    }
+  }
+
+  Future<List<UserProfile>> fetchPostEngagementUsers({
+    required String postId,
+    PostReactionType? reaction,
+    bool wantToRead = false,
+  }) async {
+    if (!_isInitialized || _client == null || postId.isEmpty) return [];
+    try {
+      final List<dynamic> rows;
+      if (wantToRead) {
+        rows = await _client!
+            .from('post_want_to_reads')
+            .select('profile_id, created_at')
+            .eq('post_id', postId)
+            .order('created_at', ascending: false);
+      } else {
+        if (reaction == null) return [];
+        rows = await _client!
+            .from('post_reactions')
+            .select('profile_id, created_at')
+            .eq('post_id', postId)
+            .eq('reaction_type', reaction.databaseValue)
+            .order('created_at', ascending: false);
+      }
+      final ids = rows
+          .map((row) => row['profile_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList(growable: false);
+      if (ids.isEmpty) return [];
+      final profiles = await _client!
+          .from('profiles')
+          .select(
+            'id, username, user_id, avatar_url, bio, followers_count, '
+            'following_count, read_count, is_private, page_color',
+          )
+          .inFilter('id', ids);
+      final byId = <String, UserProfile>{
+        for (final raw in profiles as List<dynamic>)
+          if (raw is Map<String, dynamic>)
+            raw['id'].toString(): UserProfile.fromJson(raw),
+      };
+      return ids.map((id) => byId[id]).whereType<UserProfile>().toList();
+    } catch (e) {
+      debugPrint('Error fetching post engagement users: $e');
+      return [];
     }
   }
 

@@ -10,6 +10,9 @@ class PostCard extends StatefulWidget {
   final bool showUserInfo;
   final VoidCallback? onUserTap;
   final Future<void> Function(PostReactionType reaction)? onReaction;
+  final Future<void> Function()? onWantToRead;
+  final ValueChanged<PostReactionType>? onReactionUsers;
+  final VoidCallback? onWantToReadUsers;
   final VoidCallback? onReport;
   final VoidCallback? onFavorite;
   final String favoriteLabel;
@@ -31,6 +34,9 @@ class PostCard extends StatefulWidget {
     this.showUserInfo = true,
     this.onUserTap,
     this.onReaction,
+    this.onWantToRead,
+    this.onReactionUsers,
+    this.onWantToReadUsers,
     this.onReport,
     this.onFavorite,
     this.favoriteLabel = 'お気に入りに追加／解除',
@@ -64,6 +70,7 @@ class _PostCardState extends State<PostCard> {
   VoidCallback? get onUserTap => widget.onUserTap;
   Future<void> Function(PostReactionType reaction)? get onReaction =>
       widget.onReaction;
+  Future<void> Function()? get onWantToRead => widget.onWantToRead;
   VoidCallback? get onReport => widget.onReport;
   VoidCallback? get onFavorite => widget.onFavorite;
   VoidCallback? get onEdit => widget.onEdit;
@@ -409,6 +416,11 @@ class _PostCardState extends State<PostCard> {
                         ),
                       ),
                       const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _buildWantToReadButton(tertiaryTextColor),
+                      ),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           for (final reaction in PostReactionType.values) ...[
@@ -786,6 +798,11 @@ class _PostCardState extends State<PostCard> {
               ),
             ),
             const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _buildWantToReadButton(tertiaryTextColor),
+            ),
+            const SizedBox(height: 6),
             LayoutBuilder(
               builder: (context, constraints) {
                 return Wrap(
@@ -1179,8 +1196,15 @@ class _PostCardState extends State<PostCard> {
         ? Colors.red
         : Theme.of(context).colorScheme.primary;
 
+    void showUsers() => widget.onReactionUsers?.call(reaction);
     return InkWell(
-      onTap: onReaction == null ? null : () async => onReaction!(reaction),
+      onTap: onReaction != null
+          ? () async => onReaction!(reaction)
+          : widget.onReactionUsers != null
+          ? showUsers
+          : null,
+      onLongPress: widget.onReactionUsers == null ? null : showUsers,
+      onSecondaryTap: widget.onReactionUsers == null ? null : showUsers,
       borderRadius: BorderRadius.circular(18),
       child: Container(
         constraints: const BoxConstraints(minWidth: 42, minHeight: 34),
@@ -1214,6 +1238,64 @@ class _PostCardState extends State<PostCard> {
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: selected ? selectedColor : inactiveColor,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWantToReadButton(Color inactiveColor) {
+    final selected = post.wantedByCurrentUser;
+    void showUsers() => widget.onWantToReadUsers?.call();
+    return InkWell(
+      onTap: onWantToRead != null
+          ? () async => onWantToRead!()
+          : widget.onWantToReadUsers != null
+          ? showUsers
+          : null,
+      onLongPress: widget.onWantToReadUsers == null ? null : showUsers,
+      onSecondaryTap: widget.onWantToReadUsers == null ? null : showUsers,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: selected
+                ? Colors.amber
+                : inactiveColor.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.bookmark_add_outlined,
+              color: Colors.amber,
+              size: 17,
+            ),
+            const SizedBox(width: 5),
+            const Text(
+              '読みたい！',
+              style: TextStyle(
+                color: Colors.amber,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (post.wantToReadCount > 0) ...[
+              const SizedBox(width: 5),
+              Text(
+                '${post.wantToReadCount}',
+                style: const TextStyle(
+                  color: Colors.amber,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],

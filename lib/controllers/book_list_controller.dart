@@ -79,6 +79,17 @@ class BookListController extends ChangeNotifier {
     return previous;
   }
 
+  Post? toggleTimelineWantToReadOptimistically(String postId) {
+    final index = timelinePosts.indexWhere((post) => post.id == postId);
+    if (index < 0) return null;
+    final previous = timelinePosts[index];
+    final updatedPosts = List<Post>.from(timelinePosts);
+    updatedPosts[index] = previous.withToggledWantToRead();
+    timelinePosts = updatedPosts;
+    notifyListeners();
+    return previous;
+  }
+
   void restoreTimelinePost(Post previous) {
     final index = timelinePosts.indexWhere((post) => post.id == previous.id);
     if (index < 0) return;

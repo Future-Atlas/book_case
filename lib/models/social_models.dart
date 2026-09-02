@@ -49,7 +49,14 @@ class ProfileRelationship {
   }
 }
 
-enum SocialNotificationType { reaction, reply, follow, followRequest, newPost }
+enum SocialNotificationType {
+  reaction,
+  wantToRead,
+  reply,
+  follow,
+  followRequest,
+  newPost,
+}
 
 class SocialNotification {
   const SocialNotification({

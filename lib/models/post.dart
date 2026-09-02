@@ -20,6 +20,8 @@ class Post {
   final bool isSpoiler;
   final Map<PostReactionType, int> reactionCounts;
   final PostReactionType? currentUserReaction;
+  final int wantToReadCount;
+  final bool wantedByCurrentUser;
 
   int get reactionsCount => reactionCounts.values.fold(0, (a, b) => a + b);
   double get reactionScore =>
@@ -58,6 +60,8 @@ class Post {
     this.isSpoiler = false,
     this.reactionCounts = const {},
     this.currentUserReaction,
+    this.wantToReadCount = 0,
+    this.wantedByCurrentUser = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -127,6 +131,8 @@ class Post {
     Map<PostReactionType, int>? reactionCounts,
     PostReactionType? currentUserReaction,
     bool clearCurrentUserReaction = false,
+    int? wantToReadCount,
+    bool? wantedByCurrentUser,
   }) {
     return Post(
       id: id ?? this.id,
@@ -148,6 +154,8 @@ class Post {
       currentUserReaction: clearCurrentUserReaction
           ? null
           : currentUserReaction ?? this.currentUserReaction,
+      wantToReadCount: wantToReadCount ?? this.wantToReadCount,
+      wantedByCurrentUser: wantedByCurrentUser ?? this.wantedByCurrentUser,
     );
   }
 
@@ -175,6 +183,15 @@ class Post {
       reactionCounts: nextCounts,
       currentUserReaction: nextReaction,
       clearCurrentUserReaction: nextReaction == null,
+    );
+  }
+
+  Post withToggledWantToRead() {
+    return copyWith(
+      wantToReadCount: wantedByCurrentUser
+          ? (wantToReadCount - 1).clamp(0, 1 << 31).toInt()
+          : wantToReadCount + 1,
+      wantedByCurrentUser: !wantedByCurrentUser,
     );
   }
 }

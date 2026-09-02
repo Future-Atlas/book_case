@@ -14,6 +14,7 @@ import '../widgets/post_reply_dialog.dart';
 import 'profile_book_search_screen.dart';
 import 'report_post_dialog.dart';
 import 'follow_list_screen.dart';
+import 'post_engagement_users_screen.dart';
 import '../repositories/book_repository.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -43,6 +44,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Map<String, List<PostReply>> _postReplies = {};
   List<Book> _collections = [];
   List<Book> _favorites = [];
+  List<Book> _wantToRead = [];
   int _favoriteLimit = SupabaseService.standardFavoriteLimit;
   List<Book> _searchResults = [];
   bool _isLoading = true;
@@ -68,7 +70,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadProfileData();
   }
 
@@ -178,6 +180,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           _postReplies = {};
           _collections = [];
           _favorites = [];
+          _wantToRead = [];
           _isLoading = false;
         });
       }
@@ -207,6 +210,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     final favs = canLoadContent
         ? await service.fetchUserFavorites(profileId)
         : <Book>[];
+    final wanted = canLoadContent
+        ? await service.fetchUserWantToRead(profileId)
+        : <Book>[];
     final favoriteLimit = relationship.isOwnProfile
         ? await service.fetchCurrentFavoriteLimit()
         : SupabaseService.standardFavoriteLimit;
@@ -223,6 +229,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         _postReplies = replies;
         _collections = colls;
         _favorites = visibleFavorites;
+        _wantToRead = wanted;
         _favoriteLimit = favoriteLimit;
         _isLoading = false;
       });
@@ -413,6 +420,75 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         context,
       ).showSnackBar(const SnackBar(content: Text('リアクションを更新できませんでした。')));
     }
+  }
+
+  Future<void> _toggleWantToReadFromPost(Post post) async {
+    final pendingKey = 'want:${post.id}';
+    if (!_pendingReactionPostIds.add(pendingKey)) return;
+    final index = _userPosts.indexWhere((candidate) => candidate.id == post.id);
+    final previous = index < 0 ? null : _userPosts[index];
+    if (previous != null) {
+      setState(() {
+        final updated = List<Post>.from(_userPosts);
+        updated[index] = previous.withToggledWantToRead();
+        _userPosts = updated;
+      });
+    }
+    final service = Provider.of<SupabaseService>(context, listen: false);
+    final result = await service.toggleWantToRead(
+      book: Book(
+        id: post.bookId,
+        title: post.bookTitle,
+        author: post.bookAuthor,
+        publisher: '',
+        pubDate: '',
+        isbn: post.bookId,
+        coverUrl: post.bookCoverUrl,
+      ),
+      sourcePostId: post.id,
+    );
+    _pendingReactionPostIds.remove(pendingKey);
+    if (!mounted) return;
+    if (result == WantToReadToggleResult.failed && previous != null) {
+      setState(() {
+        final restoreIndex = _userPosts.indexWhere((p) => p.id == previous.id);
+        if (restoreIndex >= 0) {
+          final restored = List<Post>.from(_userPosts);
+          restored[restoreIndex] = previous;
+          _userPosts = restored;
+        }
+      });
+    } else {
+      final profileId = Provider.of<SupabaseService>(
+        context,
+        listen: false,
+      ).activeProfileId;
+      if (profileId.isNotEmpty) {
+        _wantToRead = await service.fetchUserWantToRead(profileId);
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  Future<void> _openEngagementUsers(
+    Post post, {
+    PostReactionType? reaction,
+    bool wantToRead = false,
+  }) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => PostEngagementUsersScreen(
+          postId: post.id,
+          title: wantToRead ? '「読みたい！」したユーザー' : '${reaction!.symbol}したユーザー',
+          reaction: reaction,
+          wantToRead: wantToRead,
+          onProfileTap: (profile) {
+            Navigator.of(routeContext).pop();
+            _openReplyProfile(profile.id);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _reportPost(String postId) async {
@@ -689,6 +765,11 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             enableFavoriteAction: true,
                           ),
                           _buildFavoritesTab(),
+                          _buildGridTab(
+                            _wantToRead,
+                            '「読みたい！」作品はありません。',
+                            compactThreeColumn: true,
+                          ),
                         ],
                       )
                     : _buildPrivateOrBlockedState(),
@@ -953,7 +1034,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             if (!blocked) ...[
               const SizedBox(height: 8),
               const Text(
-                'フォローリクエストが承認されると、投稿・My 本棚・お気に入りを確認できます。',
+                'フォローリクエストが承認されると、投稿・My 本棚・お気に入り・「読みたい！」を確認できます。',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -997,6 +1078,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           Tab(text: '投稿'),
           Tab(text: 'My 本棚'),
           Tab(text: 'お気に入り'),
+          Tab(text: '読みたい！'),
         ],
       ),
     );
@@ -1023,6 +1105,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           onReaction: _isOwnProfile
               ? null
               : (reaction) => _toggleReaction(post.id, reaction),
+          onWantToRead: _isOwnProfile
+              ? null
+              : () => _toggleWantToReadFromPost(post),
+          onReactionUsers: (reaction) =>
+              _openEngagementUsers(post, reaction: reaction),
+          onWantToReadUsers: () => _openEngagementUsers(post, wantToRead: true),
           onDelete: _isOwnProfile ? () => _deletePost(post) : null,
           onEdit: _isOwnProfile ? () => _editPost(post) : null,
           onFavorite: _isOwnProfile ? () => _toggleFavorite(post.bookId) : null,

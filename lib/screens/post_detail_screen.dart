@@ -3,11 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../models/post.dart';
 import '../models/post_reply.dart';
+import '../models/book.dart';
+import '../models/social_models.dart';
 import '../services/supabase_service.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_reply_dialog.dart';
 import 'user_profile_screen.dart';
 import 'report_post_dialog.dart';
+import 'post_engagement_users_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   const PostDetailScreen({
@@ -101,6 +104,61 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
+  Future<void> _toggleReaction(PostReactionType reaction) async {
+    final post = _post;
+    if (post == null) return;
+    setState(() => _post = post.withToggledReaction(reaction));
+    final success = await Provider.of<SupabaseService>(
+      context,
+      listen: false,
+    ).setPostReaction(post.id, reaction);
+    if (!mounted) return;
+    if (!success) setState(() => _post = post);
+  }
+
+  Future<void> _toggleWantToRead() async {
+    final post = _post;
+    if (post == null) return;
+    setState(() => _post = post.withToggledWantToRead());
+    final result = await Provider.of<SupabaseService>(context, listen: false)
+        .toggleWantToRead(
+          book: Book(
+            id: post.bookId,
+            title: post.bookTitle,
+            author: post.bookAuthor,
+            publisher: '',
+            pubDate: '',
+            isbn: post.bookId,
+            coverUrl: post.bookCoverUrl,
+          ),
+          sourcePostId: post.id,
+        );
+    if (!mounted) return;
+    if (result == WantToReadToggleResult.failed) setState(() => _post = post);
+  }
+
+  Future<void> _showEngagementUsers({
+    PostReactionType? reaction,
+    bool wantToRead = false,
+  }) async {
+    final post = _post;
+    if (post == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => PostEngagementUsersScreen(
+          postId: post.id,
+          title: wantToRead ? '「読みたい！」したユーザー' : '${reaction!.symbol}したユーザー',
+          reaction: reaction,
+          wantToRead: wantToRead,
+          onProfileTap: (profile) {
+            Navigator.of(routeContext).pop();
+            _openProfile(profile.id);
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = Provider.of<SupabaseService>(context, listen: false);
@@ -120,6 +178,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   highlightedReplyId: widget.highlightedReplyId,
                   concealSpoiler: post.profileId != service.activeProfileId,
                   onUserTap: () => _openProfile(post.profileId),
+                  onReaction: post.profileId == service.activeProfileId
+                      ? null
+                      : _toggleReaction,
+                  onWantToRead: post.profileId == service.activeProfileId
+                      ? null
+                      : _toggleWantToRead,
+                  onReactionUsers: (reaction) =>
+                      _showEngagementUsers(reaction: reaction),
+                  onWantToReadUsers: () =>
+                      _showEngagementUsers(wantToRead: true),
                   onReplyUserTap: _openProfile,
                   onReply: _reply,
                   onReplyReport: _reportReply,
