@@ -388,6 +388,31 @@ test("Flutter placeholder ad banner is not rendered", () => {
   assert.equal(fs.existsSync(bannerPath), false);
 });
 
+test("Flutter book routes do not resolve legacy sample slugs", () => {
+  const bookListScreen = fs.readFileSync(
+    path.join(__dirname, "../../lib/screens/book_list_screen.dart"),
+    "utf8",
+  );
+  const main = fs.readFileSync(
+    path.join(__dirname, "../../lib/main.dart"),
+    "utf8",
+  );
+  const productionSource = `${bookListScreen}\n${main}`;
+  const legacySampleSlugs = [
+    "konbini-ningen",
+    "fune-wo-amu",
+    "midnight-library",
+    "atomic-habits",
+    "baton-wa-watasareta",
+    "nanji-hoshi-no-gotoku",
+  ];
+
+  assert.doesNotMatch(productionSource, /_titleForBookSlug|initialBookSlug/);
+  for (const slug of legacySampleSlugs) {
+    assert.doesNotMatch(productionSource, new RegExp(slug));
+  }
+});
+
 test("AdSense crawlers use the SEO HTML routing", () => {
   const vercel = JSON.parse(
     fs.readFileSync(path.join(__dirname, "../../vercel.json"), "utf8"),
