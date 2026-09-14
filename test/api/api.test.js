@@ -421,7 +421,7 @@ test("AdSense crawlers use the SEO HTML routing", () => {
     route.has?.some((condition) => condition.key === "user-agent"),
   );
 
-  assert.equal(crawlerRoutes.length, 2);
+  assert.equal(crawlerRoutes.length, 4);
   for (const route of crawlerRoutes) {
     const userAgentPattern = route.has[0].value;
     assert.match(userAgentPattern, /\[Gg\]ooglebot/);
