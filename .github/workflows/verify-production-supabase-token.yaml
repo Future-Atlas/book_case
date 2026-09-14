@@ -1,0 +1,71 @@
+name: Verify Production Supabase Token (Read Only)
+
+on:
+  push:
+    branches:
+      - codex/verify-production-token-20260914
+    paths:
+      - .github/workflows/verify-production-supabase-token.yaml
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  verify:
+    if: github.repository == 'Future-Atlas/sharemarium' && github.ref == 'refs/heads/codex/verify-production-token-20260914'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: production
+    steps:
+      # No checkout, CLI, database password, SQL, or deployment commands.
+      - name: Read the approved production project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const expectedRef = 'jeyxadmkbzgpkveomesz';
+          const fail = (message) => {
+            console.error(`::error::${message}`);
+            process.exitCode = 1;
+          };
+          async function verify() {
+            if (process.env.GITHUB_REPOSITORY !== 'Future-Atlas/sharemarium' ||
+                process.env.GITHUB_REF !== 'refs/heads/codex/verify-production-token-20260914') {
+              return fail('Repository or branch guard failed. No request sent.');
+            }
+            if (process.env.SUPABASE_PROJECT_ID !== expectedRef) {
+              return fail('Production project ID does not match the approved target. No request sent.');
+            }
+            const token = process.env.SUPABASE_ACCESS_TOKEN || '';
+            if (!token.startsWith('sbp_') || token.trim() !== token || /\s/.test(token)) {
+              return fail('Production access token is missing or malformed. No request sent.');
+            }
+            let response;
+            try {
+              response = await fetch(`https://api.supabase.com/v1/projects/${expectedRef}`, {
+                method: 'GET',
+                redirect: 'error',
+                headers: { Authorization: `Bearer ${token}` },
+                signal: AbortSignal.timeout(20000),
+              });
+            } catch {
+              // Never output an exception or response body containing credentials.
+              return fail('Read-only request failed (network, redirect, or timeout).');
+            }
+            if (response.status !== 200) {
+              return fail(`Read-only project check returned HTTP ${response.status}. Check token expiry and Project Settings Read permission.`);
+            }
+            let project;
+            try { project = await response.json(); } catch {
+              return fail('Project response was not valid JSON.');
+            }
+            if (project?.ref !== expectedRef) {
+              return fail('Project response did not match the approved production target.');
+            }
+            console.log('PASS: production project identity and access-token read permission verified (HTTP 200).');
+            console.log('No database changes, API key reads, or function deployments were performed.');
+          }
+          await verify();
+          NODE
