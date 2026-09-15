@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -51,3 +52,8 @@ jobs:
 
       - name: Deploy to Vercel
         run: vercel deploy --prebuilt --prod --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
+
+      - name: Smoke test production
+        env:
+          SMOKE_BASE_URL: https://sharemarium.com
+        run: node scripts/production-smoke.mjs
