@@ -22,6 +22,7 @@ import 'screens/profile_onboarding_screen.dart';
 import 'screens/moderation_screen.dart';
 import 'screens/account_suspension_gate.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/public_post_routes.dart';
 
 enum _HeaderMenuAction { home, myPage, settings, help, moderation, logout }
 
@@ -156,6 +157,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+      onGenerateRoute: publicPostRoute,
       home: const AccountSuspensionGate(
         child: LegalConsentGate(
           child: ProfileOnboardingGate(child: MainNavigationShell()),
@@ -441,7 +443,9 @@ class _MainNavigationShellState extends State<MainNavigationShell>
         (fragmentQuery['privacy_password_recovery'] == '1');
     _currentScreenIndex = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      // A direct /posts URL can place a post route above the initial home
+      // route. Do not let the hidden home shell overwrite that URL with '/'.
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
       _applyRouteFromUri(currentUri, replaceUrl: true);
     });
   }
@@ -456,6 +460,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   Future<bool> didPushRouteInformation(
     RouteInformation routeInformation,
   ) async {
+    if (ModalRoute.of(context)?.isCurrent == false) return false;
     final uri = routeInformation.uri;
     _applyRouteFromUri(uri, replaceUrl: _hasTransientQuery(uri));
     return true;

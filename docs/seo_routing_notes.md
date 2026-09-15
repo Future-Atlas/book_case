@@ -20,25 +20,51 @@ The general crawler-aware routes include:
 The Flutter app keeps compatible route semantics so a human opening a canonical
 URL sees the same content intent as the crawler representation.
 
-## Public posts: current state
+## Public posts: active human/crawler split
 
-On the current `develop` branch, `vercel.json` rewrites:
-
-- `/posts` -> `/api/posts-seo`
-- `/posts/{postId}` -> `/api/post-seo?post_id={postId}`
-
-Those two rewrites are currently unconditional, so they serve the SSR renderer to
-both crawlers and ordinary browsers.
-
-A separate pending PR changes the post routes to the intended target model:
+Public post URLs intentionally use different renderers for the same public
+resource:
 
 ```text
 crawler -> SSR
 human   -> Flutter
 ```
 
-Do not document the split as active production behavior until that PR is merged
-and the Vercel/Supabase runtime environment has been verified.
+`vercel.json` applies the post SSR rewrites only when the request User-Agent
+matches a supported crawler:
+
+- crawler `/posts` -> `/api/posts-seo`
+- crawler `/posts/{postId}` -> `/api/post-seo?post_id={postId}`
+
+Ordinary browser requests fall through to the Flutter SPA:
+
+- human `/posts` -> Flutter public post index
+- human `/posts/{postId}` -> Flutter post detail
+
+The Flutter post routes retain the normal account gates and the existing privacy,
+age, blocking, and spoiler behavior. SSR and Flutter must represent the same
+public data; this split is an alternate rendering strategy rather than separate
+content.
+
+The crawler SSR functions read `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the
+Vercel Serverless runtime. Those values are separate from the Supabase values
+passed to Flutter with `--dart-define` during GitHub Actions builds. Configure
+them independently for Production and Preview/Staging.
+
+## Verification
+
+For staging, inspect `https://staging.sharemarium.com/posts` with both request
+types:
+
+- default browser User-Agent: expect the Flutter post index and working post detail navigation
+- crawler User-Agent such as Googlebot: expect SSR HTML, HTTP 200, and a healthy `X-Posts-Diagnostics` value
+
+When Preview deployment protection is enabled, use an authenticated Vercel
+Preview session for browser verification. A Vercel login page that happens to
+return HTTP 200 is not a successful SSR/content check.
+
+Production uses the same human/crawler routing model on the canonical Sharemarium
+domain.
 
 ## Indexing boundaries
 

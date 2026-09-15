@@ -6,7 +6,7 @@ Sharemarium uses `develop` as the long-lived staging/integration branch and
 ## Current repository state
 
 Branch protection is configured in GitHub repository settings, not in this
-repository. As of 2026-09-14, the GitHub branch API reports both `main` and
+repository. As of 2026-09-16, the GitHub branch API reports both `main` and
 `develop` as **not protected**.
 
 Therefore the rules below are the required target state, not a claim that they

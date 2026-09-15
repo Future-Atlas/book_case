@@ -124,7 +124,7 @@ GitHub Environments are used to separate credentials:
 
 Web deployment workflows:
 
-- `.github/workflows/deploy.yaml`: `main` -> Vercel Production
+- `.github/workflows/deploy.yaml`: `main` -> Vercel Production, supports manual dispatch, and runs post-deploy smoke tests against the production domain
 - `.github/workflows/deploy-staging.yaml`: `develop` -> Vercel Preview/Staging
 
 Supabase workflows:
@@ -160,8 +160,7 @@ supabase test db
 
 ## SEO / Public Routes
 
-`vercel.json` separates static/Flutter routing from crawler-oriented server
-rendering.
+`vercel.json` separates Flutter routing from crawler-oriented server rendering.
 
 `api/seo.js` serves crawler-friendly HTML for routes such as:
 
@@ -174,17 +173,21 @@ rendering.
 Legacy `/user/*` and `/profile/*` URLs redirect to the canonical `/users/*`
 family.
 
-Public post SEO uses:
+Public post URLs use the active human/crawler split:
 
-- `/posts` -> `api/posts-seo.js`
-- `/posts/{postId}` -> `api/post-seo.js`
+- ordinary browser `/posts` -> Flutter public post index
+- ordinary browser `/posts/{postId}` -> Flutter post detail
+- crawler `/posts` -> `api/posts-seo.js`
+- crawler `/posts/{postId}` -> `api/post-seo.js`
 
-The repository also contains a separate pending route change that will make those
-post SSR rewrites crawler-only so human requests can be handled by Flutter. Do
-not treat that behavior as active until the corresponding PR is merged.
+The crawler SSR functions require `SUPABASE_URL` and `SUPABASE_ANON_KEY` in the
+corresponding Vercel runtime environment. Flutter build-time values do not replace
+those Serverless runtime variables.
 
 Private, suspended, deleted, missing, or otherwise non-indexable content must not
-be exposed as indexable crawler HTML or sitemap entries.
+be exposed as indexable crawler HTML or sitemap entries. Human and crawler views
+must represent the same public resource; SSR is an alternate rendering path, not
+a separate content model.
 
 ## Project Structure
 
